@@ -50,7 +50,7 @@ jobs:
           persist-credentials: false
 
       - name: Install NuGet
-        uses: NuGet/setup-nuget@12c57947e9458a5b976961b08ea0706a17dd71ae # v3
+        uses: NuGet/setup-nuget@b26b823c478ee115be5c9403e62c90b0bf943843 # v3.1.0
         with:
           nuget-version: 7.9.0
 

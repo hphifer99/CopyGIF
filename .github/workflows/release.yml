@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing semantic version tag, such as v1.0.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Resolve release tag
+        id: release_tag
+        shell: pwsh
+        run: |
+          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+              "${{ inputs.tag }}"
+          }
+          else {
+              "${{ github.ref_name }}"
+          }
+
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
+              throw "Release tag must use the form v1.2.3."
+          }
+
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$($tag.Substring(1))" >> $env:GITHUB_OUTPUT
+
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ steps.release_tag.outputs.tag }}
+          persist-credentials: false
+
+      - name: Install NuGet
+        uses: NuGet/setup-nuget@12c57947e9458a5b976961b08ea0706a17dd71ae # v3
+        with:
+          nuget-version: 7.9.0
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
+        with:
+          msbuild-architecture: x64
+
+      - name: Build and package tagged version
+        shell: pwsh
+        run: >-
+          .\scripts\Build-Release.ps1
+          -Version "${{ steps.release_tag.outputs.version }}"
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ steps.release_tag.outputs.tag }}"
+          $version = "${{ steps.release_tag.outputs.version }}"
+          $zip = ".\artifacts\CopyGIF-win-x64.zip"
+          $checksum = ".\artifacts\CopyGIF-win-x64.sha256"
+
+          gh release view $tag 2>$null
+
+          if ($LASTEXITCODE -eq 0) {
+              gh release upload $tag $zip $checksum --clobber
+          }
+          else {
+              gh release create $tag $zip $checksum `
+                  --verify-tag `
+                  --generate-notes `
+                  --title "CopyGIF $version"
+          }
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "GitHub Release publication failed with exit code $LASTEXITCODE."
+          }

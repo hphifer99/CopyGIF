@@ -21,6 +21,7 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
+
         <Grid
             Grid.Row="0"
             Padding="24,20,24,12">
@@ -41,6 +42,7 @@
         </Grid>
 
         <!-- Search -->
+
         <Grid
             Grid.Row="1"
             Padding="24,8,24,16"
@@ -65,12 +67,13 @@
 
             <Button
                 Grid.Column="2"
-                Command="{x:Bind ViewModel.CancelSearchCommand}"
+                Command="{x:Bind ViewModel.CancelCommand}"
                 Content="Cancel" />
 
         </Grid>
 
         <!-- Results -->
+
         <Grid
             Grid.Row="2"
             Padding="16,0">
@@ -100,8 +103,10 @@
                                     Stretch="UniformToFill">
 
                                     <Image.Source>
+
                                         <BitmapImage
                                             UriSource="{x:Bind ThumbnailUri}" />
+
                                     </Image.Source>
 
                                 </Image>
@@ -138,17 +143,19 @@
 
         </Grid>
 
-        <!-- Status -->
+        <!-- Status / Pagination -->
+
         <Border
             Grid.Row="3"
             Padding="24,12"
             BorderThickness="0,1,0,0">
 
-            <Grid ColumnSpacing="10">
+            <Grid ColumnSpacing="12">
 
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
@@ -156,7 +163,7 @@
                     Grid.Column="0"
                     Width="16"
                     Height="16"
-                    IsActive="{x:Bind ViewModel.IsSearching, Mode=OneWay}" />
+                    IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
 
                 <TextBlock
                     Grid.Column="1"
@@ -164,13 +171,22 @@
                     Opacity="0.7"
                     Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
 
-                <TextBlock
+                <Button
                     Grid.Column="2"
+                    Command="{x:Bind ViewModel.LoadMoreCommand}"
+                    Content="Load more" />
+
+                <TextBlock
+                    Grid.Column="3"
                     VerticalAlignment="Center"
                     Opacity="0.55">
+
                     <Run
                         Text="{x:Bind ViewModel.ResultCount, Mode=OneWay}" />
-                    <Run Text=" results" />
+
+                    <Run
+                        Text=" results" />
+
                 </TextBlock>
 
             </Grid>

@@ -12,18 +12,24 @@ public sealed class MainViewModel :
     private readonly IGifSearchCoordinator
         _searchCoordinator;
 
+    private readonly HashSet<string>
+        _resultIdentities =
+            new(StringComparer.Ordinal);
+
     private CancellationTokenSource?
-        _searchCancellation;
+        _operationCancellation;
 
     private string _query =
         string.Empty;
 
-    private bool _isSearching;
+    private string? _activeQuery;
+
+    private string? _continuationToken;
+
+    private bool _isBusy;
 
     private string _statusMessage =
         "Ready";
-
-    private string? _continuationToken;
 
     public MainViewModel(
         IGifSearchCoordinator searchCoordinator)
@@ -48,10 +54,15 @@ public sealed class MainViewModel :
                 SearchAsync,
                 CanSearch);
 
-        CancelSearchCommand =
+        LoadMoreCommand =
+            new AsyncRelayCommand(
+                LoadMoreAsync,
+                CanLoadMore);
+
+        CancelCommand =
             new RelayCommand(
-                CancelSearch,
-                CanCancelSearch);
+                CancelOperation,
+                CanCancel);
     }
 
     public ObservableCollection<GifItem>
@@ -63,8 +74,12 @@ public sealed class MainViewModel :
         SearchCommand
     { get; }
 
+    public IAsyncRelayCommand
+        LoadMoreCommand
+    { get; }
+
     public IRelayCommand
-        CancelSearchCommand
+        CancelCommand
     { get; }
 
     public string Query
@@ -77,27 +92,22 @@ public sealed class MainViewModel :
                     ref _query,
                     value))
             {
-                SearchCommand
-                    .NotifyCanExecuteChanged();
+                NotifyCommandStates();
             }
         }
     }
 
-    public bool IsSearching
+    public bool IsBusy
     {
-        get => _isSearching;
+        get => _isBusy;
 
         private set
         {
             if (SetProperty(
-                    ref _isSearching,
+                    ref _isBusy,
                     value))
             {
-                SearchCommand
-                    .NotifyCanExecuteChanged();
-
-                CancelSearchCommand
-                    .NotifyCanExecuteChanged();
+                NotifyCommandStates();
             }
         }
     }
@@ -125,54 +135,72 @@ public sealed class MainViewModel :
     private bool CanSearch()
     {
         return
-            !IsSearching &&
+            !IsBusy &&
             !string.IsNullOrWhiteSpace(
                 Query);
     }
 
-    private bool CanCancelSearch()
+    private bool CanLoadMore()
     {
-        return IsSearching;
+        if (IsBusy)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(
+                _activeQuery))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(
+                _continuationToken))
+        {
+            return false;
+        }
+
+        return string.Equals(
+            Query.Trim(),
+            _activeQuery,
+            StringComparison.Ordinal);
     }
 
-    private void CancelSearch()
+    private bool CanCancel()
     {
-        _searchCancellation?.Cancel();
+        return IsBusy;
+    }
+
+    private void CancelOperation()
+    {
+        _operationCancellation?.Cancel();
     }
 
     private async Task SearchAsync()
     {
+        string searchQuery =
+            Query.Trim();
+
         if (string.IsNullOrWhiteSpace(
-                Query))
+                searchQuery))
         {
             return;
         }
 
-        _searchCancellation?.Cancel();
-        _searchCancellation?.Dispose();
-
         CancellationTokenSource cancellation =
-            new();
+            BeginOperation(
+                "Searching...");
 
-        _searchCancellation =
-            cancellation;
-
-        string searchQuery =
-            Query.Trim();
-
-        IsSearching =
-            true;
-
-        StatusMessage =
-            "Searching...";
-
-        Results.Clear();
+        _activeQuery =
+            searchQuery;
 
         _continuationToken =
             null;
 
-        OnPropertyChanged(
-            nameof(HasMoreResults));
+        Results.Clear();
+
+        _resultIdentities.Clear();
+
+        NotifyPaginationState();
 
         try
         {
@@ -182,30 +210,10 @@ public sealed class MainViewModel :
                         searchQuery,
                         cancellation.Token);
 
-            foreach (GifItem item
-                     in page.Items)
-            {
-                Results.Add(item);
-            }
+            ApplyPage(
+                page);
 
-            _continuationToken =
-                page.ContinuationToken;
-
-            OnPropertyChanged(
-                nameof(HasMoreResults));
-
-            StatusMessage =
-                Results.Count switch
-                {
-                    0 =>
-                        "No results found.",
-
-                    1 =>
-                        "1 result",
-
-                    _ =>
-                        $"{Results.Count} results"
-                };
+            UpdateResultStatus();
         }
         catch (OperationCanceledException)
             when (
@@ -228,19 +236,171 @@ public sealed class MainViewModel :
         }
         finally
         {
-            if (ReferenceEquals(
-                    _searchCancellation,
-                    cancellation))
-            {
-                _searchCancellation =
-                    null;
-
-                IsSearching =
-                    false;
-            }
-
-            cancellation.Dispose();
+            EndOperation(
+                cancellation);
         }
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        if (string.IsNullOrWhiteSpace(
+                _activeQuery) ||
+            string.IsNullOrWhiteSpace(
+                _continuationToken))
+        {
+            return;
+        }
+
+        string activeQuery =
+            _activeQuery;
+
+        string continuationToken =
+            _continuationToken;
+
+        CancellationTokenSource cancellation =
+            BeginOperation(
+                "Loading more...");
+
+        try
+        {
+            GifSearchPage page =
+                await _searchCoordinator
+                    .LoadMoreAsync(
+                        activeQuery,
+                        continuationToken,
+                        cancellation.Token);
+
+            ApplyPage(
+                page);
+
+            UpdateResultStatus();
+        }
+        catch (OperationCanceledException)
+            when (
+                cancellation
+                    .IsCancellationRequested)
+        {
+            StatusMessage =
+                "Load more cancelled.";
+        }
+        catch (GifProviderException exception)
+        {
+            StatusMessage =
+                GetProviderErrorMessage(
+                    exception.Failure);
+        }
+        catch (Exception)
+        {
+            StatusMessage =
+                "Unable to load more GIFs.";
+        }
+        finally
+        {
+            EndOperation(
+                cancellation);
+        }
+    }
+
+    private CancellationTokenSource
+        BeginOperation(
+            string statusMessage)
+    {
+        _operationCancellation?.Cancel();
+        _operationCancellation?.Dispose();
+
+        CancellationTokenSource cancellation =
+            new();
+
+        _operationCancellation =
+            cancellation;
+
+        IsBusy =
+            true;
+
+        StatusMessage =
+            statusMessage;
+
+        return cancellation;
+    }
+
+    private void EndOperation(
+        CancellationTokenSource cancellation)
+    {
+        if (ReferenceEquals(
+                _operationCancellation,
+                cancellation))
+        {
+            _operationCancellation =
+                null;
+
+            IsBusy =
+                false;
+        }
+
+        cancellation.Dispose();
+
+        NotifyCommandStates();
+    }
+
+    private void ApplyPage(
+        GifSearchPage page)
+    {
+        foreach (GifItem item
+                 in page.Items)
+        {
+            if (_resultIdentities.Add(
+                    item.Identity))
+            {
+                Results.Add(
+                    item);
+            }
+        }
+
+        _continuationToken =
+            page.ContinuationToken;
+
+        NotifyPaginationState();
+    }
+
+    private void UpdateResultStatus()
+    {
+        StatusMessage =
+            Results.Count switch
+            {
+                0 =>
+                    "No results found.",
+
+                1 =>
+                    HasMoreResults
+                        ? "1 result"
+                        : "1 result - end of results",
+
+                _ =>
+                    HasMoreResults
+                        ? $"{Results.Count} results"
+                        : $"{Results.Count} results - end of results"
+            };
+    }
+
+    private void NotifyPaginationState()
+    {
+        OnPropertyChanged(
+            nameof(HasMoreResults));
+
+        LoadMoreCommand
+            .NotifyCanExecuteChanged();
+    }
+
+    private void NotifyCommandStates()
+    {
+        SearchCommand
+            .NotifyCanExecuteChanged();
+
+        LoadMoreCommand
+            .NotifyCanExecuteChanged();
+
+        CancelCommand
+            .NotifyCanExecuteChanged();
     }
 
     private static string

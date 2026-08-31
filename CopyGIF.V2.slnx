@@ -2,7 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/CopyGIF.Core/CopyGIF.Core.csproj" />
   </Folder>
-  <Project Path="src/CopyGIF.app/CopyGIF.app.csproj" DisplayName="CopyGIF.App" Id="797bb677-2e35-4ab2-9a7d-ecc12b458e3a">
+  <Project Path="src/CopyGIF.App/CopyGIF.App.csproj" DisplayName="CopyGIF.App" Id="797bb677-2e35-4ab2-9a7d-ecc12b458e3a">
     <Platform Project="x64" />
     <Deploy />
   </Project>

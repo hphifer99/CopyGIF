@@ -1,4 +1,6 @@
-﻿using CopyGIF.Application.Search;
+﻿using CopyGIF.Application.Providers;
+using CopyGIF.Application.Search;
+using CopyGIF.Application.Setup;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CopyGIF.Application;
@@ -13,8 +15,16 @@ public static class ServiceCollectionExtensions
             services);
 
         services.AddTransient<
+            IActiveGifProviderAccessor,
+            ActiveGifProviderAccessor>();
+
+        services.AddTransient<
             IGifSearchCoordinator,
             GifSearchCoordinator>();
+
+        services.AddTransient<
+            IProviderSetupCoordinator,
+            ProviderSetupCoordinator>();
 
         return services;
     }

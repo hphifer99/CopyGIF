@@ -1,4 +1,5 @@
-﻿using CopyGIF.Application.Search;
+﻿using CopyGIF.Application.Providers;
+using CopyGIF.Application.Search;
 using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 using CopyGIF.Core.Settings;
@@ -27,7 +28,7 @@ public sealed class GifSearchCoordinatorTests
                 });
 
         GifSearchCoordinator coordinator =
-            new(
+            CreateCoordinator(
                 provider,
                 settings);
 
@@ -62,7 +63,7 @@ public sealed class GifSearchCoordinatorTests
                 new AppSettings());
 
         GifSearchCoordinator coordinator =
-            new(
+            CreateCoordinator(
                 provider,
                 settings);
 
@@ -103,7 +104,7 @@ public sealed class GifSearchCoordinatorTests
                 });
 
         GifSearchCoordinator coordinator =
-            new(
+            CreateCoordinator(
                 provider,
                 settings);
 
@@ -118,6 +119,74 @@ public sealed class GifSearchCoordinatorTests
         Assert.AreEqual(
             50,
             request.PageSize);
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_UsesActiveProvider()
+    {
+        FakeGifProvider provider =
+            new();
+
+        FakeSettingsStore settings =
+            new(
+                new AppSettings());
+
+        FakeProviderAccessor accessor =
+            new(
+                provider);
+
+        GifSearchCoordinator coordinator =
+            new(
+                accessor,
+                settings);
+
+        await coordinator.SearchAsync(
+            "cats");
+
+        Assert.AreEqual(
+            1,
+            accessor.GetActiveProviderCallCount);
+
+        Assert.IsNotNull(
+            provider.LastRequest);
+    }
+
+    private static GifSearchCoordinator
+        CreateCoordinator(
+            IGifProvider provider,
+            ISettingsStore settingsStore)
+    {
+        return new GifSearchCoordinator(
+            new FakeProviderAccessor(
+                provider),
+            settingsStore);
+    }
+
+    private sealed class FakeProviderAccessor :
+        IActiveGifProviderAccessor
+    {
+        private readonly IGifProvider
+            _provider;
+
+        public FakeProviderAccessor(
+            IGifProvider provider)
+        {
+            _provider =
+                provider;
+        }
+
+        public int GetActiveProviderCallCount
+        {
+            get;
+            private set;
+        }
+
+        public IGifProvider GetActiveProvider()
+        {
+            GetActiveProviderCallCount++;
+
+            return _provider;
+        }
     }
 
     private sealed class FakeSettingsStore :

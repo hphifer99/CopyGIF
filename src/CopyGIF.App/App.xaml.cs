@@ -1,50 +1,128 @@
-﻿using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Data;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Navigation;
-using Microsoft.UI.Xaml.Shapes;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
-using Windows.ApplicationModel;
-using Windows.ApplicationModel.Activation;
-using Windows.Foundation;
-using Windows.Foundation.Collections;
+﻿using System;
+using System.Net;
+using System.Net.Http;
+using CopyGIF.Core.Contracts;
+using CopyGIF.Infrastructure.Klipy;
+using CopyGIF.Infrastructure.Storage;
+using CopyGIF.Platform.Windows.Secrets;
+using CopyGIF.Presentation.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Xaml;
 
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
+namespace CopyGIF.App;
 
-namespace CopyGIF.App
+public partial class App : Application
 {
-    /// <summary>
-    /// Provides application-specific behavior to supplement the default Application class.
-    /// </summary>
-    public partial class App : Application
+    private Window? _window;
+
+    public IServiceProvider Services { get; }
+
+    public new static App Current =>
+        (App)Application.Current;
+
+    public App()
     {
-        private Window? _window;
+        Services = ConfigureServices();
 
-        /// <summary>
-        /// Initializes the singleton application object.  This is the first line of authored code
-        /// executed, and as such is the logical equivalent of main() or WinMain().
-        /// </summary>
-        public App()
-        {
-            InitializeComponent();
-        }
+        InitializeComponent();
+    }
 
-        /// <summary>
-        /// Invoked when the application is launched.
-        /// </summary>
-        /// <param name="args">Details about the launch request and process.</param>
-        protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
-        {
-            _window = new MainWindow();
-            _window.Activate();
-        }
+    private static IServiceProvider ConfigureServices()
+    {
+        ServiceCollection services = new();
+
+        //
+        // Application storage
+        //
+
+        services.AddSingleton<ApplicationPaths>();
+
+        services.AddSingleton<
+            ISettingsStore,
+            JsonSettingsStore>();
+
+        //
+        // Secure credential storage
+        //
+
+        services.AddSingleton<ISecretStore>(
+            serviceProvider =>
+            {
+                ApplicationPaths paths =
+                    serviceProvider
+                        .GetRequiredService<ApplicationPaths>();
+
+                paths.EnsureDirectoriesExist();
+
+                return new DpapiSecretStore(
+                    paths.SecretsDirectory);
+            });
+
+        //
+        // KLIPY HTTP client
+        //
+
+        services
+            .AddHttpClient<KlipyGifProvider>(
+                httpClient =>
+                {
+                    httpClient.BaseAddress =
+                        new Uri(
+                            "https://api.klipy.com/");
+
+                    httpClient.Timeout =
+                        TimeSpan.FromSeconds(20);
+                })
+            .ConfigurePrimaryHttpMessageHandler(
+                () =>
+                    new SocketsHttpHandler
+                    {
+                        AllowAutoRedirect = false,
+
+                        AutomaticDecompression =
+                            DecompressionMethods.GZip |
+                            DecompressionMethods.Deflate |
+                            DecompressionMethods.Brotli,
+
+                        ConnectTimeout =
+                            TimeSpan.FromSeconds(10)
+                    });
+
+        //
+        // GIF provider abstraction
+        //
+
+        services.AddTransient<IGifProvider>(
+            serviceProvider =>
+                serviceProvider
+                    .GetRequiredService<KlipyGifProvider>());
+
+        //
+        // Presentation layer
+        //
+
+        services.AddSingleton<MainViewModel>();
+
+        //
+        // WinUI shell
+        //
+
+        services.AddSingleton<MainWindow>();
+
+        return services.BuildServiceProvider(
+            new ServiceProviderOptions
+            {
+                ValidateOnBuild = true,
+                ValidateScopes = true
+            });
+    }
+
+    protected override void OnLaunched(
+        LaunchActivatedEventArgs args)
+    {
+        _window =
+            Services.GetRequiredService<MainWindow>();
+
+        _window.Activate();
     }
 }

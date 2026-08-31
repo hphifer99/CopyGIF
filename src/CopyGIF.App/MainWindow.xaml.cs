@@ -1,18 +1,21 @@
+using System;
+using CopyGIF.Presentation.ViewModels;
 using Microsoft.UI.Xaml;
 
 namespace CopyGIF.App;
 
 public sealed partial class MainWindow : Window
 {
-    public MainWindow()
-    {
-        InitializeComponent();
-    }
+    public MainViewModel ViewModel { get; }
 
-    private void HealthCheckButton_Click(
-        object sender,
-        RoutedEventArgs e)
+    public MainWindow(
+        MainViewModel viewModel)
     {
-        StatusText.Text = "Application shell verified.";
+        ViewModel =
+            viewModel ??
+            throw new ArgumentNullException(
+                nameof(viewModel));
+
+        InitializeComponent();
     }
 }

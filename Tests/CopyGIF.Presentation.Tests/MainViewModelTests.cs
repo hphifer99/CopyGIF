@@ -1,6 +1,5 @@
-﻿using CopyGIF.Core.Contracts;
+﻿using CopyGIF.Application.Search;
 using CopyGIF.Core.Models;
-using CopyGIF.Core.Settings;
 using CopyGIF.Presentation.ViewModels;
 
 namespace CopyGIF.Presentation.Tests;
@@ -11,16 +10,11 @@ public sealed class MainViewModelTests
     [TestMethod]
     public void SearchCommand_IsDisabledForEmptyQuery()
     {
-        FakeGifProvider provider =
+        FakeGifSearchCoordinator coordinator =
             new();
 
-        FakeSettingsStore settings =
-            new(new AppSettings());
-
         MainViewModel viewModel =
-            new(
-                provider,
-                settings);
+            new(coordinator);
 
         Assert.IsFalse(
             viewModel.SearchCommand
@@ -37,39 +31,25 @@ public sealed class MainViewModelTests
     [TestMethod]
     public async Task SearchCommand_LoadsResults()
     {
-        FakeGifProvider provider =
+        FakeGifSearchCoordinator coordinator =
             new()
             {
                 SearchResult =
                     new GifSearchPage
                     {
                         Items =
-                            new[]
-                            {
-                                CreateGif("1"),
-                                CreateGif("2")
-                            },
+                        [
+                            CreateGif("1"),
+                            CreateGif("2")
+                        ],
 
                         ContinuationToken =
                             "next-page"
                     }
             };
 
-        FakeSettingsStore settings =
-            new(
-                new AppSettings
-                {
-                    Search =
-                        new SearchSettings
-                        {
-                            ResultsPerSearch = 12
-                        }
-                });
-
         MainViewModel viewModel =
-            new(
-                provider,
-                settings)
+            new(coordinator)
             {
                 Query = "cats"
             };
@@ -78,9 +58,9 @@ public sealed class MainViewModelTests
             .SearchCommand
             .ExecuteAsync(null);
 
-        Assert.AreEqual(
+        Assert.HasCount(
             2,
-            viewModel.Results.Count);
+            viewModel.Results);
 
         Assert.AreEqual(
             "2 results",
@@ -92,40 +72,27 @@ public sealed class MainViewModelTests
         Assert.IsTrue(
             viewModel.HasMoreResults);
 
-        GifSearchRequest request =
-            provider.LastRequest ??
-            throw new AssertFailedException(
-                "The provider did not receive a search request.");
-
         Assert.AreEqual(
             "cats",
-            request.Query);
-
-        Assert.AreEqual(
-            12,
-            request.PageSize);
+            coordinator.LastQuery);
     }
 
     [TestMethod]
     public async Task SearchCommand_ShowsMissingCredentialMessage()
     {
-        FakeGifProvider provider =
+        FakeGifSearchCoordinator coordinator =
             new()
             {
                 SearchException =
                     new GifProviderException(
-                        "klipy",
-                        GifProviderFailure.MissingCredential,
+                        "test",
+                        GifProviderFailure
+                            .MissingCredential,
                         "Credential missing.")
             };
 
-        FakeSettingsStore settings =
-            new(new AppSettings());
-
         MainViewModel viewModel =
-            new(
-                provider,
-                settings)
+            new(coordinator)
             {
                 Query = "cats"
             };
@@ -135,12 +102,11 @@ public sealed class MainViewModelTests
             .ExecuteAsync(null);
 
         Assert.AreEqual(
-            "KLIPY API key required.",
+            "A GIF provider API key is required.",
             viewModel.StatusMessage);
 
-        Assert.AreEqual(
-            0,
-            viewModel.Results.Count);
+        Assert.IsEmpty(
+            viewModel.Results);
     }
 
     private static GifItem CreateGif(
@@ -148,9 +114,14 @@ public sealed class MainViewModelTests
     {
         return new GifItem
         {
-            ProviderId = "test",
-            Id = id,
-            Title = $"GIF {id}",
+            ProviderId =
+                "test",
+
+            Id =
+                id,
+
+            Title =
+                $"GIF {id}",
 
             ThumbnailUri =
                 new Uri(
@@ -166,50 +137,17 @@ public sealed class MainViewModelTests
         };
     }
 
-    private sealed class FakeSettingsStore :
-        ISettingsStore
+    private sealed class
+        FakeGifSearchCoordinator :
+            IGifSearchCoordinator
     {
-        private AppSettings _settings;
-
-        public FakeSettingsStore(
-            AppSettings settings)
+        public string? LastQuery
         {
-            _settings = settings;
+            get;
+            private set;
         }
 
-        public Task<AppSettings> LoadAsync(
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken
-                .ThrowIfCancellationRequested();
-
-            return Task.FromResult(
-                _settings);
-        }
-
-        public Task SaveAsync(
-            AppSettings settings,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken
-                .ThrowIfCancellationRequested();
-
-            _settings = settings;
-
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class FakeGifProvider :
-        IGifProvider
-    {
-        public string Id =>
-            "test";
-
-        public string DisplayName =>
-            "Test Provider";
-
-        public GifSearchRequest? LastRequest
+        public string? LastContinuationToken
         {
             get;
             private set;
@@ -222,25 +160,27 @@ public sealed class MainViewModelTests
         } =
             new GifSearchPage
             {
-                Items =
-                    Array.Empty<GifItem>()
+                Items = []
             };
 
-        public GifProviderException? SearchException
+        public GifProviderException?
+            SearchException
         {
             get;
             init;
         }
 
-        public Task<GifSearchPage> SearchAsync(
-            GifSearchRequest request,
-            CancellationToken cancellationToken = default)
+        public Task<GifSearchPage>
+            SearchAsync(
+                string query,
+                CancellationToken cancellationToken =
+                    default)
         {
             cancellationToken
                 .ThrowIfCancellationRequested();
 
-            LastRequest =
-                request;
+            LastQuery =
+                query;
 
             if (SearchException is not null)
             {
@@ -251,21 +191,29 @@ public sealed class MainViewModelTests
                 SearchResult);
         }
 
-        public Task<CredentialValidationResult>
-            ValidateCredentialAsync(
-                string credential,
-                CancellationToken cancellationToken = default)
+        public Task<GifSearchPage>
+            LoadMoreAsync(
+                string query,
+                string continuationToken,
+                CancellationToken cancellationToken =
+                    default)
         {
-            return Task.FromResult(
-                CredentialValidationResult.Valid());
-        }
+            cancellationToken
+                .ThrowIfCancellationRequested();
 
-        public Task RegisterShareAsync(
-            string itemId,
-            string? searchQuery,
-            CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
+            LastQuery =
+                query;
+
+            LastContinuationToken =
+                continuationToken;
+
+            if (SearchException is not null)
+            {
+                throw SearchException;
+            }
+
+            return Task.FromResult(
+                SearchResult);
         }
     }
 }

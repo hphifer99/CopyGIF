@@ -1,37 +1,37 @@
 ﻿using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using CopyGIF.Core.Contracts;
+using CopyGIF.Application.Search;
 using CopyGIF.Core.Models;
-using CopyGIF.Core.Settings;
 
 namespace CopyGIF.Presentation.ViewModels;
 
-public sealed class MainViewModel : ObservableObject
+public sealed class MainViewModel :
+    ObservableObject
 {
-    private readonly IGifProvider _gifProvider;
-    private readonly ISettingsStore _settingsStore;
+    private readonly IGifSearchCoordinator
+        _searchCoordinator;
 
-    private CancellationTokenSource? _searchCancellation;
+    private CancellationTokenSource?
+        _searchCancellation;
 
-    private string _query = string.Empty;
+    private string _query =
+        string.Empty;
+
     private bool _isSearching;
-    private string _statusMessage = "Ready";
+
+    private string _statusMessage =
+        "Ready";
+
     private string? _continuationToken;
 
     public MainViewModel(
-        IGifProvider gifProvider,
-        ISettingsStore settingsStore)
+        IGifSearchCoordinator searchCoordinator)
     {
-        _gifProvider =
-            gifProvider ??
+        _searchCoordinator =
+            searchCoordinator ??
             throw new ArgumentNullException(
-                nameof(gifProvider));
-
-        _settingsStore =
-            settingsStore ??
-            throw new ArgumentNullException(
-                nameof(settingsStore));
+                nameof(searchCoordinator));
 
         Results.CollectionChanged +=
             (_, _) =>
@@ -54,12 +54,18 @@ public sealed class MainViewModel : ObservableObject
                 CanCancelSearch);
     }
 
-    public ObservableCollection<GifItem> Results { get; } =
-        new();
+    public ObservableCollection<GifItem>
+        Results
+    { get; } =
+            new();
 
-    public IAsyncRelayCommand SearchCommand { get; }
+    public IAsyncRelayCommand
+        SearchCommand
+    { get; }
 
-    public IRelayCommand CancelSearchCommand { get; }
+    public IRelayCommand
+        CancelSearchCommand
+    { get; }
 
     public string Query
     {
@@ -120,7 +126,8 @@ public sealed class MainViewModel : ObservableObject
     {
         return
             !IsSearching &&
-            !string.IsNullOrWhiteSpace(Query);
+            !string.IsNullOrWhiteSpace(
+                Query);
     }
 
     private bool CanCancelSearch()
@@ -135,7 +142,8 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task SearchAsync()
     {
-        if (string.IsNullOrWhiteSpace(Query))
+        if (string.IsNullOrWhiteSpace(
+                Query))
         {
             return;
         }
@@ -152,40 +160,30 @@ public sealed class MainViewModel : ObservableObject
         string searchQuery =
             Query.Trim();
 
-        IsSearching = true;
+        IsSearching =
+            true;
 
         StatusMessage =
             "Searching...";
 
         Results.Clear();
 
-        _continuationToken = null;
+        _continuationToken =
+            null;
 
         OnPropertyChanged(
             nameof(HasMoreResults));
 
         try
         {
-            AppSettings settings =
-                await _settingsStore.LoadAsync(
-                    cancellation.Token);
-
-            int pageSize =
-                Math.Clamp(
-                    settings.Search.ResultsPerSearch,
-                    1,
-                    50);
-
             GifSearchPage page =
-                await _gifProvider.SearchAsync(
-                    new GifSearchRequest
-                    {
-                        Query = searchQuery,
-                        PageSize = pageSize
-                    },
-                    cancellation.Token);
+                await _searchCoordinator
+                    .SearchAsync(
+                        searchQuery,
+                        cancellation.Token);
 
-            foreach (GifItem item in page.Items)
+            foreach (GifItem item
+                     in page.Items)
             {
                 Results.Add(item);
             }
@@ -210,7 +208,9 @@ public sealed class MainViewModel : ObservableObject
                 };
         }
         catch (OperationCanceledException)
-            when (cancellation.IsCancellationRequested)
+            when (
+                cancellation
+                    .IsCancellationRequested)
         {
             StatusMessage =
                 "Search cancelled.";
@@ -243,28 +243,29 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private static string GetProviderErrorMessage(
-        GifProviderFailure failure)
+    private static string
+        GetProviderErrorMessage(
+            GifProviderFailure failure)
     {
         return failure switch
         {
             GifProviderFailure.MissingCredential =>
-                "KLIPY API key required.",
+                "A GIF provider API key is required.",
 
             GifProviderFailure.Unauthorized =>
-                "KLIPY rejected the configured API key.",
+                "The configured GIF provider rejected its API key.",
 
             GifProviderFailure.RateLimited =>
-                "KLIPY is temporarily rate limiting searches.",
+                "GIF searches are temporarily rate limited.",
 
             GifProviderFailure.Network =>
-                "Unable to reach KLIPY. Check your connection.",
+                "Unable to reach the GIF provider. Check your connection.",
 
             GifProviderFailure.ServiceUnavailable =>
-                "KLIPY is temporarily unavailable.",
+                "The GIF provider is temporarily unavailable.",
 
             GifProviderFailure.InvalidResponse =>
-                "KLIPY returned an unexpected response.",
+                "The GIF provider returned an unexpected response.",
 
             _ =>
                 "GIF search failed."

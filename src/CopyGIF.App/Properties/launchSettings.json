@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "CopyGIF.App (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "CopyGIF.App (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

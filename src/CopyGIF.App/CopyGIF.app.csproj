@@ -46,6 +46,7 @@
     <ProjectReference Include="..\CopyGIF.Core\CopyGIF.Core.csproj" />
     <ProjectReference Include="..\CopyGIF.Infrastructure\CopyGIF.Infrastructure.csproj" />
     <ProjectReference Include="..\CopyGIF.Platform.Windows\CopyGIF.Platform.Windows.csproj" />
+    <ProjectReference Include="..\CopyGIF.Presentation\CopyGIF.Presentation.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Views\" />

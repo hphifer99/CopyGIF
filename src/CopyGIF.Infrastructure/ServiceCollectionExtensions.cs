@@ -58,6 +58,10 @@ public static class ServiceCollectionExtensions
                     .GetRequiredService<
                         KlipyGifProvider>());
 
+        services.AddTransient<
+            IGifProviderCredentialManager,
+            KlipyCredentialManager>();
+
         return services;
     }
 }

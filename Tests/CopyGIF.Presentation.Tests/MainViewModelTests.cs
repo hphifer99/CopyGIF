@@ -51,7 +51,8 @@ public sealed class MainViewModelTests
         MainViewModel viewModel =
             new(coordinator)
             {
-                Query = "cats"
+                Query =
+                    "cats"
             };
 
         await viewModel
@@ -72,9 +73,188 @@ public sealed class MainViewModelTests
         Assert.IsTrue(
             viewModel.HasMoreResults);
 
+        Assert.IsTrue(
+            viewModel.LoadMoreCommand
+                .CanExecute(null));
+
         Assert.AreEqual(
             "cats",
             coordinator.LastQuery);
+    }
+
+    [TestMethod]
+    public async Task LoadMoreCommand_AppendsResults()
+    {
+        FakeGifSearchCoordinator coordinator =
+            new()
+            {
+                SearchResult =
+                    new GifSearchPage
+                    {
+                        Items =
+                        [
+                            CreateGif("1"),
+                            CreateGif("2")
+                        ],
+
+                        ContinuationToken =
+                            "page-two"
+                    },
+
+                LoadMoreResult =
+                    new GifSearchPage
+                    {
+                        Items =
+                        [
+                            CreateGif("3"),
+                            CreateGif("4")
+                        ],
+
+                        ContinuationToken =
+                            null
+                    }
+            };
+
+        MainViewModel viewModel =
+            new(coordinator)
+            {
+                Query =
+                    "cats"
+            };
+
+        await viewModel
+            .SearchCommand
+            .ExecuteAsync(null);
+
+        await viewModel
+            .LoadMoreCommand
+            .ExecuteAsync(null);
+
+        Assert.HasCount(
+            4,
+            viewModel.Results);
+
+        Assert.AreEqual(
+            "page-two",
+            coordinator.LastContinuationToken);
+
+        Assert.IsFalse(
+            viewModel.HasMoreResults);
+
+        Assert.IsFalse(
+            viewModel.LoadMoreCommand
+                .CanExecute(null));
+
+        Assert.AreEqual(
+            "4 results - end of results",
+            viewModel.StatusMessage);
+    }
+
+    [TestMethod]
+    public async Task LoadMoreCommand_DoesNotAddDuplicates()
+    {
+        FakeGifSearchCoordinator coordinator =
+            new()
+            {
+                SearchResult =
+                    new GifSearchPage
+                    {
+                        Items =
+                        [
+                            CreateGif("1"),
+                            CreateGif("2")
+                        ],
+
+                        ContinuationToken =
+                            "page-two"
+                    },
+
+                LoadMoreResult =
+                    new GifSearchPage
+                    {
+                        Items =
+                        [
+                            CreateGif("2"),
+                            CreateGif("3")
+                        ],
+
+                        ContinuationToken =
+                            null
+                    }
+            };
+
+        MainViewModel viewModel =
+            new(coordinator)
+            {
+                Query =
+                    "cats"
+            };
+
+        await viewModel
+            .SearchCommand
+            .ExecuteAsync(null);
+
+        await viewModel
+            .LoadMoreCommand
+            .ExecuteAsync(null);
+
+        Assert.HasCount(
+            3,
+            viewModel.Results);
+
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "1",
+                "2",
+                "3"
+            },
+            viewModel.Results
+                .Select(
+                    item => item.Id)
+                .ToArray());
+    }
+
+    [TestMethod]
+    public async Task LoadMoreCommand_IsDisabledWhenQueryChanges()
+    {
+        FakeGifSearchCoordinator coordinator =
+            new()
+            {
+                SearchResult =
+                    new GifSearchPage
+                    {
+                        Items =
+                        [
+                            CreateGif("1")
+                        ],
+
+                        ContinuationToken =
+                            "page-two"
+                    }
+            };
+
+        MainViewModel viewModel =
+            new(coordinator)
+            {
+                Query =
+                    "cats"
+            };
+
+        await viewModel
+            .SearchCommand
+            .ExecuteAsync(null);
+
+        Assert.IsTrue(
+            viewModel.LoadMoreCommand
+                .CanExecute(null));
+
+        viewModel.Query =
+            "dogs";
+
+        Assert.IsFalse(
+            viewModel.LoadMoreCommand
+                .CanExecute(null));
     }
 
     [TestMethod]
@@ -94,7 +274,8 @@ public sealed class MainViewModelTests
         MainViewModel viewModel =
             new(coordinator)
             {
-                Query = "cats"
+                Query =
+                    "cats"
             };
 
         await viewModel
@@ -163,6 +344,16 @@ public sealed class MainViewModelTests
                 Items = []
             };
 
+        public GifSearchPage LoadMoreResult
+        {
+            get;
+            init;
+        } =
+            new GifSearchPage
+            {
+                Items = []
+            };
+
         public GifProviderException?
             SearchException
         {
@@ -213,7 +404,7 @@ public sealed class MainViewModelTests
             }
 
             return Task.FromResult(
-                SearchResult);
+                LoadMoreResult);
         }
     }
 }

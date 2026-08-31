@@ -1,4 +1,5 @@
-﻿using CopyGIF.Core.Contracts;
+﻿using CopyGIF.Application.Providers;
+using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 using CopyGIF.Core.Settings;
 
@@ -7,17 +8,20 @@ namespace CopyGIF.Application.Search;
 public sealed class GifSearchCoordinator :
     IGifSearchCoordinator
 {
-    private readonly IGifProvider _gifProvider;
-    private readonly ISettingsStore _settingsStore;
+    private readonly IActiveGifProviderAccessor
+        _providerAccessor;
+
+    private readonly ISettingsStore
+        _settingsStore;
 
     public GifSearchCoordinator(
-        IGifProvider gifProvider,
+        IActiveGifProviderAccessor providerAccessor,
         ISettingsStore settingsStore)
     {
-        _gifProvider =
-            gifProvider ??
+        _providerAccessor =
+            providerAccessor ??
             throw new ArgumentNullException(
-                nameof(gifProvider));
+                nameof(providerAccessor));
 
         _settingsStore =
             settingsStore ??
@@ -27,7 +31,8 @@ public sealed class GifSearchCoordinator :
 
     public Task<GifSearchPage> SearchAsync(
         string query,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken =
+            default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(
             query);
@@ -41,7 +46,8 @@ public sealed class GifSearchCoordinator :
     public Task<GifSearchPage> LoadMoreAsync(
         string query,
         string continuationToken,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken =
+            default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(
             query);
@@ -73,16 +79,24 @@ public sealed class GifSearchCoordinator :
                 1,
                 50);
 
+        IGifProvider provider =
+            _providerAccessor
+                .GetActiveProvider();
+
         GifSearchRequest request =
             new()
             {
-                Query = query.Trim(),
-                PageSize = pageSize,
+                Query =
+                    query.Trim(),
+
+                PageSize =
+                    pageSize,
+
                 ContinuationToken =
                     continuationToken
             };
 
-        return await _gifProvider
+        return await provider
             .SearchAsync(
                 request,
                 cancellationToken)

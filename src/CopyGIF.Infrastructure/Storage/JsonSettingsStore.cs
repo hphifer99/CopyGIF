@@ -5,17 +5,22 @@ using CopyGIF.Core.Settings;
 
 namespace CopyGIF.Infrastructure.Storage;
 
-public sealed class JsonSettingsStore : ISettingsStore
+public sealed class JsonSettingsStore :
+    ISettingsStore
 {
-    private readonly ApplicationPaths _paths;
+    private readonly IApplicationPaths _paths;
 
-    private static readonly JsonSerializerOptions SerializerOptions =
-        CreateSerializerOptions();
+    private static readonly JsonSerializerOptions
+        SerializerOptions =
+            CreateSerializerOptions();
 
-    public JsonSettingsStore(ApplicationPaths paths)
+    public JsonSettingsStore(
+        IApplicationPaths paths)
     {
-        _paths = paths ??
-            throw new ArgumentNullException(nameof(paths));
+        _paths =
+            paths ??
+            throw new ArgumentNullException(
+                nameof(paths));
     }
 
     public async Task<AppSettings> LoadAsync(
@@ -23,22 +28,26 @@ public sealed class JsonSettingsStore : ISettingsStore
     {
         _paths.EnsureDirectoriesExist();
 
-        AppSettings? settings = await TryLoadAsync(
-            _paths.SettingsPath,
-            cancellationToken);
+        AppSettings? settings =
+            await TryLoadAsync(
+                _paths.SettingsPath,
+                cancellationToken);
 
         if (settings is not null)
         {
-            return AppSettingsNormalizer.Normalize(settings);
+            return AppSettingsNormalizer.Normalize(
+                settings);
         }
 
-        AppSettings? backup = await TryLoadAsync(
-            _paths.SettingsBackupPath,
-            cancellationToken);
+        AppSettings? backup =
+            await TryLoadAsync(
+                _paths.SettingsBackupPath,
+                cancellationToken);
 
         if (backup is not null)
         {
-            return AppSettingsNormalizer.Normalize(backup);
+            return AppSettingsNormalizer.Normalize(
+                backup);
         }
 
         return AppSettingsNormalizer.Normalize(
@@ -49,7 +58,8 @@ public sealed class JsonSettingsStore : ISettingsStore
         AppSettings settings,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(
+            settings);
 
         _paths.EnsureDirectoriesExist();
 
@@ -57,23 +67,26 @@ public sealed class JsonSettingsStore : ISettingsStore
             cancellationToken);
 
         AppSettings normalized =
-            AppSettingsNormalizer.Normalize(settings);
+            AppSettingsNormalizer.Normalize(
+                settings);
 
         string temporaryPath =
-            _paths.SettingsPath + ".tmp";
+            _paths.SettingsPath +
+            ".tmp";
 
         try
         {
             await using (
-                FileStream stream = new(
-                    temporaryPath,
-                    FileMode.Create,
-                    FileAccess.Write,
-                    FileShare.None,
-                    bufferSize: 4096,
-                    options:
-                        FileOptions.Asynchronous |
-                        FileOptions.WriteThrough))
+                FileStream stream =
+                    new(
+                        temporaryPath,
+                        FileMode.Create,
+                        FileAccess.Write,
+                        FileShare.None,
+                        bufferSize: 4096,
+                        options:
+                            FileOptions.Asynchronous |
+                            FileOptions.WriteThrough))
             {
                 await JsonSerializer.SerializeAsync(
                     stream,
@@ -85,9 +98,11 @@ public sealed class JsonSettingsStore : ISettingsStore
                     cancellationToken);
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
+            cancellationToken
+                .ThrowIfCancellationRequested();
 
-            if (File.Exists(_paths.SettingsPath))
+            if (File.Exists(
+                    _paths.SettingsPath))
             {
                 File.Replace(
                     temporaryPath,
@@ -104,14 +119,17 @@ public sealed class JsonSettingsStore : ISettingsStore
         }
         finally
         {
-            TryDelete(temporaryPath);
+            TryDelete(
+                temporaryPath);
         }
     }
 
-    private async Task EnsureNoLegacySettingsAsync(
-        CancellationToken cancellationToken)
+    private async Task
+        EnsureNoLegacySettingsAsync(
+            CancellationToken cancellationToken)
     {
-        if (!File.Exists(_paths.SettingsPath))
+        if (!File.Exists(
+                _paths.SettingsPath))
         {
             return;
         }
@@ -128,9 +146,10 @@ public sealed class JsonSettingsStore : ISettingsStore
         }
     }
 
-    private static async Task<AppSettings?> TryLoadAsync(
-        string path,
-        CancellationToken cancellationToken)
+    private static async Task<AppSettings?>
+        TryLoadAsync(
+            string path,
+            CancellationToken cancellationToken)
     {
         if (!File.Exists(path))
         {
@@ -139,13 +158,15 @@ public sealed class JsonSettingsStore : ISettingsStore
 
         try
         {
-            await using FileStream stream = new(
-                path,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                bufferSize: 4096,
-                options: FileOptions.Asynchronous);
+            await using FileStream stream =
+                new(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    bufferSize: 4096,
+                    options:
+                        FileOptions.Asynchronous);
 
             using JsonDocument document =
                 await JsonDocument.ParseAsync(
@@ -153,12 +174,14 @@ public sealed class JsonSettingsStore : ISettingsStore
                     cancellationToken:
                         cancellationToken);
 
-            if (!document.RootElement.TryGetProperty(
-                    "schemaVersion",
-                    out _))
+            if (!document.RootElement
+                    .TryGetProperty(
+                        "schemaVersion",
+                        out _))
             {
-                throw new LegacySettingsDetectedException(
-                    path);
+                throw new
+                    LegacySettingsDetectedException(
+                        path);
             }
 
             return document.RootElement
@@ -182,13 +205,15 @@ public sealed class JsonSettingsStore : ISettingsStore
     {
         try
         {
-            await using FileStream stream = new(
-                path,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                bufferSize: 4096,
-                options: FileOptions.Asynchronous);
+            await using FileStream stream =
+                new(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    bufferSize: 4096,
+                    options:
+                        FileOptions.Asynchronous);
 
             using JsonDocument document =
                 await JsonDocument.ParseAsync(
@@ -196,9 +221,10 @@ public sealed class JsonSettingsStore : ISettingsStore
                     cancellationToken:
                         cancellationToken);
 
-            return !document.RootElement.TryGetProperty(
-                "schemaVersion",
-                out _);
+            return !document.RootElement
+                .TryGetProperty(
+                    "schemaVersion",
+                    out _);
         }
         catch (JsonException)
         {
@@ -213,13 +239,14 @@ public sealed class JsonSettingsStore : ISettingsStore
     private static JsonSerializerOptions
         CreateSerializerOptions()
     {
-        JsonSerializerOptions options = new()
-        {
-            PropertyNamingPolicy =
-                JsonNamingPolicy.CamelCase,
+        JsonSerializerOptions options =
+            new()
+            {
+                PropertyNamingPolicy =
+                    JsonNamingPolicy.CamelCase,
 
-            WriteIndented = true
-        };
+                WriteIndented = true
+            };
 
         options.Converters.Add(
             new JsonStringEnumConverter(
@@ -228,7 +255,8 @@ public sealed class JsonSettingsStore : ISettingsStore
         return options;
     }
 
-    private static void TryDelete(string path)
+    private static void TryDelete(
+        string path)
     {
         try
         {

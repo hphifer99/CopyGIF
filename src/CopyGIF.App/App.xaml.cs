@@ -1,113 +1,48 @@
 ﻿using System;
-using System.Net;
-using System.Net.Http;
-using CopyGIF.Core.Contracts;
-using CopyGIF.Infrastructure.Klipy;
-using CopyGIF.Infrastructure.Storage;
-using CopyGIF.Platform.Windows.Secrets;
-using CopyGIF.Presentation.ViewModels;
+using CopyGIF.Application;
+using CopyGIF.Infrastructure;
+using CopyGIF.Platform.Windows;
+using CopyGIF.Presentation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
+using XamlApplication = Microsoft.UI.Xaml.Application;
 
 namespace CopyGIF.App;
 
-public partial class App : Application
+public partial class App : XamlApplication
 {
     private Window? _window;
 
     public IServiceProvider Services { get; }
 
-    public new static App Current =>
-        (App)Application.Current;
-
     public App()
     {
-        Services = ConfigureServices();
-
         InitializeComponent();
+
+        Services =
+            ConfigureServices();
     }
 
-    private static IServiceProvider ConfigureServices()
+    private static IServiceProvider
+        ConfigureServices()
     {
-        ServiceCollection services = new();
-
-        //
-        // Application storage
-        //
-
-        services.AddSingleton<ApplicationPaths>();
-
-        services.AddSingleton<
-            ISettingsStore,
-            JsonSettingsStore>();
-
-        //
-        // Secure credential storage
-        //
-
-        services.AddSingleton<ISecretStore>(
-            serviceProvider =>
-            {
-                ApplicationPaths paths =
-                    serviceProvider
-                        .GetRequiredService<ApplicationPaths>();
-
-                paths.EnsureDirectoriesExist();
-
-                return new DpapiSecretStore(
-                    paths.SecretsDirectory);
-            });
-
-        //
-        // KLIPY HTTP client
-        //
+        ServiceCollection services =
+            new();
 
         services
-            .AddHttpClient<KlipyGifProvider>(
-                httpClient =>
-                {
-                    httpClient.BaseAddress =
-                        new Uri(
-                            "https://api.klipy.com/");
+            .AddCopyGifInfrastructure();
 
-                    httpClient.Timeout =
-                        TimeSpan.FromSeconds(20);
-                })
-            .ConfigurePrimaryHttpMessageHandler(
-                () =>
-                    new SocketsHttpHandler
-                    {
-                        AllowAutoRedirect = false,
+        services
+            .AddCopyGifWindowsPlatform();
 
-                        AutomaticDecompression =
-                            DecompressionMethods.GZip |
-                            DecompressionMethods.Deflate |
-                            DecompressionMethods.Brotli,
+        services
+            .AddCopyGifApplication();
 
-                        ConnectTimeout =
-                            TimeSpan.FromSeconds(10)
-                    });
+        services
+            .AddCopyGifPresentation();
 
-        //
-        // GIF provider abstraction
-        //
-
-        services.AddTransient<IGifProvider>(
-            serviceProvider =>
-                serviceProvider
-                    .GetRequiredService<KlipyGifProvider>());
-
-        //
-        // Presentation layer
-        //
-
-        services.AddSingleton<MainViewModel>();
-
-        //
-        // WinUI shell
-        //
-
-        services.AddSingleton<MainWindow>();
+        services.AddTransient<
+            MainWindow>();
 
         return services.BuildServiceProvider(
             new ServiceProviderOptions
@@ -121,7 +56,8 @@ public partial class App : Application
         LaunchActivatedEventArgs args)
     {
         _window =
-            Services.GetRequiredService<MainWindow>();
+            Services.GetRequiredService<
+                MainWindow>();
 
         _window.Activate();
     }

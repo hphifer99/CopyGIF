@@ -14,7 +14,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\CopyGIF.Application\CopyGIF.Application.csproj" />
     <ProjectReference Include="..\..\src\CopyGIF.Core\CopyGIF.Core.csproj" />
-    <ProjectReference Include="..\..\src\CopyGIF.Presentation\CopyGIF.Presentation.csproj" />
   </ItemGroup>
 
   <ItemGroup>

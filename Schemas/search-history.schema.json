@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/hphifer99/CopyGIF/schemas/search-history.schema.json",
+  "title": "CopyGIF Search History",
+  "description": "Local search history used for optional on-device suggestions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "entries"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "entries": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/searchHistoryEntry"
+      }
+    }
+  },
+  "$defs": {
+    "searchHistoryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query",
+        "lastUsedAtUtc",
+        "useCount"
+      ],
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "lastUsedAtUtc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "useCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      }
+    }
+  }
+}

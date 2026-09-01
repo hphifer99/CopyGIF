@@ -1,22 +1,22 @@
 namespace CopyGIF.Core.Models;
 
-public sealed record GifItem
+public sealed record LibraryEntry
 {
-    public required string ProviderId { get; init; }
-
-    public required string Id { get; init; }
+    public required GifIdentity Identity { get; init; }
 
     public string Title { get; init; } = string.Empty;
 
     public string Description { get; init; } = string.Empty;
 
-    public required Uri ThumbnailUri { get; init; }
-
     public required Uri GifUri { get; init; }
+
+    public required Uri ThumbnailUri { get; init; }
 
     public Uri? PreviewUri { get; init; }
 
     public Uri? SourcePageUri { get; init; }
+
+    public string? LocalFilePath { get; init; }
 
     public int Width { get; init; }
 
@@ -24,11 +24,9 @@ public sealed record GifItem
 
     public long? SizeBytes { get; init; }
 
-    public GifIdentity StableIdentity =>
-        new(
-            ProviderId,
-            Id);
+    public required DateTimeOffset AddedAtUtc { get; init; }
 
-    public string Identity =>
-        StableIdentity.ToString();
+    public DateTimeOffset? LastCopiedAtUtc { get; init; }
+
+    public int CopyCount { get; init; }
 }

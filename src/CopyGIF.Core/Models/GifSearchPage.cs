@@ -1,4 +1,4 @@
-﻿namespace CopyGIF.Core.Models;
+namespace CopyGIF.Core.Models;
 
 public sealed record GifSearchPage
 {
@@ -6,6 +6,17 @@ public sealed record GifSearchPage
 
     public string? ContinuationToken { get; init; }
 
+    public int? TotalCount { get; init; }
+
     public bool HasMore =>
-        !string.IsNullOrWhiteSpace(ContinuationToken);
+        !string.IsNullOrWhiteSpace(
+            ContinuationToken);
+
+    public static GifSearchPage Empty()
+    {
+        return new GifSearchPage
+        {
+            Items = []
+        };
+    }
 }

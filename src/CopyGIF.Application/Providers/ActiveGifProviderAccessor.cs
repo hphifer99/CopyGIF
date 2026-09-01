@@ -1,11 +1,11 @@
-﻿using CopyGIF.Core.Contracts;
+using CopyGIF.Core.Contracts;
 
 namespace CopyGIF.Application.Providers;
 
 public sealed class ActiveGifProviderAccessor :
     IActiveGifProviderAccessor
 {
-    private readonly IReadOnlyList<IGifProvider>
+    private readonly IGifProvider[]
         _providers;
 
     public ActiveGifProviderAccessor(
@@ -46,14 +46,6 @@ public sealed class ActiveGifProviderAccessor :
 
     public IGifProvider GetActiveProvider()
     {
-        //
-        // V2 currently has one provider.
-        //
-        // Future provider selection will be implemented
-        // here without changing SearchCoordinator,
-        // SetupCoordinator, or ViewModels.
-        //
-
         return _providers[0];
     }
 }

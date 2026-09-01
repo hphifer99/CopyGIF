@@ -1,0 +1,104 @@
+name: V2 CI
+
+on:
+  push:
+    branches:
+      - development
+      - main
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "CopyGIF.slnx"
+      - "CopyGIF.V2.slnx"
+      - "global.json"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
+      - ".editorconfig"
+      - ".github/workflows/v2-ci.yml"
+
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "CopyGIF.slnx"
+      - "CopyGIF.V2.slnx"
+      - "global.json"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
+      - ".editorconfig"
+      - ".github/workflows/v2-ci.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v2-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      NUGET_XMLDOC_MODE: skip
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.400"
+
+      - name: Show .NET environment
+        shell: pwsh
+        run: dotnet --info
+
+      - name: Restore V2
+        shell: pwsh
+        run: dotnet restore .\CopyGIF.V2.slnx -p:Platform=x64
+
+      - name: Build V2 Debug x64
+        shell: pwsh
+        run: dotnet build .\CopyGIF.V2.slnx -c Debug -p:Platform=x64 --no-restore
+
+      - name: Build V2 Release x64
+        shell: pwsh
+        run: dotnet build .\CopyGIF.V2.slnx -c Release -p:Platform=x64 --no-restore
+
+      - name: Run V2 tests
+        shell: pwsh
+        run: |
+          $testProjects = Get-ChildItem `
+            -Path .\tests `
+            -Filter *.Tests.csproj `
+            -Recurse |
+            Sort-Object FullName
+
+          if ($testProjects.Count -eq 0) {
+            throw "No V2 test projects were found."
+          }
+
+          foreach ($project in $testProjects) {
+            Write-Host "Testing $($project.FullName)"
+
+            dotnet test `
+              $project.FullName `
+              -c Release `
+              -p:Platform=x64 `
+              --no-build `
+              --logger "console;verbosity=normal"
+
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }

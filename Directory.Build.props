@@ -1,0 +1,38 @@
+<Project>
+
+  <PropertyGroup Condition="$([System.String]::Copy('$(MSBuildProjectName)').StartsWith('CopyGIF.'))">
+    <CopyGifNetTargetFramework>net10.0</CopyGifNetTargetFramework>
+    <CopyGifWindowsMinimumVersion>10.0.17763.0</CopyGifWindowsMinimumVersion>
+    <CopyGifWindowsTargetFramework>net10.0-windows$(CopyGifWindowsMinimumVersion)</CopyGifWindowsTargetFramework>
+
+    <LangVersion>14.0</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+
+    <!--
+      Analyzers remain enabled and visible in Visual Studio,
+      but advisory analyzer warnings do not block compilation.
+      We will promote selected security/correctness rules later
+      instead of treating every style/performance suggestion as fatal.
+    -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <CodeAnalysisTreatWarningsAsErrors>false</CodeAnalysisTreatWarningsAsErrors>
+
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <DebugType>portable</DebugType>
+
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'CopyGIF.App'">
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+</Project>

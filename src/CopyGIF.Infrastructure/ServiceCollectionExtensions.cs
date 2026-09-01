@@ -1,6 +1,7 @@
-﻿using System.Net;
+using System.Net;
 using CopyGIF.Core.Contracts;
 using CopyGIF.Infrastructure.Klipy;
+using CopyGIF.Infrastructure.Migration;
 using CopyGIF.Infrastructure.Storage;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -20,8 +21,39 @@ public static class ServiceCollectionExtensions
             ApplicationPaths>();
 
         services.AddSingleton<
+            AtomicFileWriter>();
+
+        services.AddSingleton<
+            CorruptFileRecovery>();
+
+        services.AddSingleton<
+            VersionedJsonSerializer>();
+
+        services.AddSingleton<
             ISettingsStore,
             JsonSettingsStore>();
+
+        services.AddSingleton<
+            ILibraryStore,
+            JsonLibraryStore>();
+
+        services.AddSingleton<
+            ISearchHistoryStore,
+            JsonSearchHistoryStore>();
+
+        services.AddSingleton<
+            IMigrationStateStore,
+            JsonMigrationStateStore>();
+
+        services.AddSingleton<
+            V1SettingsReader>();
+
+        services.AddSingleton<
+            V1LibraryReader>();
+
+        services.AddSingleton<
+            IMigrationCoordinator,
+            V1MigrationCoordinator>();
 
         services
             .AddHttpClient<KlipyGifProvider>(

@@ -1,4 +1,4 @@
-﻿using CopyGIF.Core.Contracts;
+using CopyGIF.Core.Contracts;
 using CopyGIF.Platform.Windows.Secrets;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -26,6 +26,10 @@ public static class ServiceCollectionExtensions
                 return new DpapiSecretStore(
                     paths.SecretsDirectory);
             });
+
+        services.AddSingleton<
+            ILegacyCredentialDecoder,
+            DpapiLegacyCredentialDecoder>();
 
         return services;
     }

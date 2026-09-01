@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/hphifer99/CopyGIF/schemas/library.schema.json",
+  "title": "CopyGIF Library",
+  "description": "Local Favorites and Recents metadata.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "favorites",
+    "recents"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "favorites": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/libraryEntry"
+      }
+    },
+    "recents": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/libraryEntry"
+      }
+    }
+  },
+  "$defs": {
+    "gifIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "providerId",
+        "id"
+      ],
+      "properties": {
+        "providerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "httpsUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "nullableHttpsUri": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "libraryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "title",
+        "description",
+        "gifUri",
+        "thumbnailUri",
+        "previewUri",
+        "sourcePageUri",
+        "localFilePath",
+        "width",
+        "height",
+        "sizeBytes",
+        "addedAtUtc",
+        "lastCopiedAtUtc",
+        "copyCount"
+      ],
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/gifIdentity"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "gifUri": {
+          "$ref": "#/$defs/httpsUri"
+        },
+        "thumbnailUri": {
+          "$ref": "#/$defs/httpsUri"
+        },
+        "previewUri": {
+          "$ref": "#/$defs/nullableHttpsUri"
+        },
+        "sourcePageUri": {
+          "$ref": "#/$defs/nullableHttpsUri"
+        },
+        "localFilePath": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 32767
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sizeBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 52428800
+        },
+        "addedAtUtc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastCopiedAtUtc": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "copyCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

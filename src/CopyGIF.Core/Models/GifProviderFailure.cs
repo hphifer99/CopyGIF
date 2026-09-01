@@ -1,4 +1,4 @@
-﻿namespace CopyGIF.Core.Models;
+namespace CopyGIF.Core.Models;
 
 public enum GifProviderFailure
 {
@@ -6,6 +6,7 @@ public enum GifProviderFailure
     Unauthorized,
     RateLimited,
     Network,
+    Timeout,
     ServiceUnavailable,
     InvalidResponse,
     Unknown

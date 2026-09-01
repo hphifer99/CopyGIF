@@ -3,66 +3,57 @@
   <Configurations>
     <Platform Name="x64" />
   </Configurations>
+  <Folder Name="/Schemas/">
+    <File Path="Schemas/library.schema.json" />
+    <File Path="Schemas/search-history.schema.json" />
+    <File Path="Schemas/settings.schema.json" />
+    <File Path="Schemas/update-manifest.schema.json" />
+  </Folder>
 
   <Folder Name="/src/">
-
     <Project Path="src/CopyGIF.App/CopyGIF.App.csproj">
       <Platform Project="x64" />
       <Deploy />
     </Project>
-
     <Project Path="src/CopyGIF.Application/CopyGIF.Application.csproj">
       <Platform Project="x64" />
     </Project>
-
     <Project Path="src/CopyGIF.Core/CopyGIF.Core.csproj">
       <Platform Project="x64" />
     </Project>
-
     <Project Path="src/CopyGIF.Infrastructure/CopyGIF.Infrastructure.csproj">
       <Platform Project="x64" />
     </Project>
-
     <Project Path="src/CopyGIF.Platform.Windows/CopyGIF.Platform.Windows.csproj">
       <Platform Project="x64" />
     </Project>
-
     <Project Path="src/CopyGIF.Presentation/CopyGIF.Presentation.csproj">
       <Platform Project="x64" />
     </Project>
-
   </Folder>
 
   <Folder Name="/tests/">
-
     <Project Path="tests/CopyGIF.Application.Tests/CopyGIF.Application.Tests.csproj">
       <Platform Project="x64" />
     </Project>
-
     <Project Path="tests/CopyGIF.Architecture.Tests/CopyGIF.Architecture.Tests.csproj">
       <Platform Project="x64" />
     </Project>
-
     <Project Path="tests/CopyGIF.Core.Tests/CopyGIF.Core.Tests.csproj">
       <Platform Project="x64" />
     </Project>
-
     <Project Path="tests/CopyGIF.Infrastructure.Tests/CopyGIF.Infrastructure.Tests.csproj">
       <Platform Project="x64" />
     </Project>
-
     <Project Path="tests/CopyGIF.Platform.Windows.Tests/CopyGIF.Platform.Windows.Tests.csproj">
       <Platform Project="x64" />
     </Project>
-
     <Project Path="tests/CopyGIF.Presentation.Tests/CopyGIF.Presentation.Tests.csproj">
       <Platform Project="x64" />
     </Project>
-
     <Project Path="tests/CopyGIF.Testing/CopyGIF.Testing.csproj">
       <Platform Project="x64" />
     </Project>
-
   </Folder>
 
 </Solution>

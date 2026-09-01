@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/hphifer99/CopyGIF/schemas/settings.schema.json",
+  "title": "CopyGIF Settings",
+  "description": "Versioned local application settings. Secrets and mutable runtime state are prohibited.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "hotkey",
+    "search",
+    "library",
+    "window",
+    "behavior",
+    "appearance",
+    "startup",
+    "updates",
+    "providers"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "hotkey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "search": {
+      "$ref": "#/$defs/searchSettings"
+    },
+    "library": {
+      "$ref": "#/$defs/librarySettings"
+    },
+    "window": {
+      "$ref": "#/$defs/windowSettings"
+    },
+    "behavior": {
+      "$ref": "#/$defs/behaviorSettings"
+    },
+    "appearance": {
+      "$ref": "#/$defs/appearanceSettings"
+    },
+    "startup": {
+      "$ref": "#/$defs/startupSettings"
+    },
+    "updates": {
+      "$ref": "#/$defs/updateSettings"
+    },
+    "providers": {
+      "$ref": "#/$defs/providerSettings"
+    }
+  },
+  "$defs": {
+    "searchSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resultsPerSearch",
+        "debounceMilliseconds",
+        "animatePreviews",
+        "autoLoadMoreResults",
+        "showTrendingWhenEmpty",
+        "saveSearchHistory",
+        "useHistorySuggestions",
+        "searchHistoryLimit"
+      ],
+      "properties": {
+        "resultsPerSearch": {
+          "type": "integer",
+          "minimum": 6,
+          "maximum": 50,
+          "default": 24
+        },
+        "debounceMilliseconds": {
+          "type": "integer",
+          "minimum": 150,
+          "maximum": 2000,
+          "default": 300
+        },
+        "animatePreviews": {
+          "type": "boolean",
+          "default": true
+        },
+        "autoLoadMoreResults": {
+          "type": "boolean",
+          "default": false
+        },
+        "showTrendingWhenEmpty": {
+          "type": "boolean",
+          "default": true
+        },
+        "saveSearchHistory": {
+          "type": "boolean",
+          "default": true
+        },
+        "useHistorySuggestions": {
+          "type": "boolean",
+          "default": true
+        },
+        "searchHistoryLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500,
+          "default": 50
+        }
+      }
+    },
+    "librarySettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recentLimit",
+        "favoriteLimit",
+        "storeFavoritesLocally",
+        "storeRecentsLocally",
+        "customStorageRoot"
+      ],
+      "properties": {
+        "recentLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 30
+        },
+        "favoriteLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500,
+          "default": 100
+        },
+        "storeFavoritesLocally": {
+          "type": "boolean",
+          "default": true
+        },
+        "storeRecentsLocally": {
+          "type": "boolean",
+          "default": true
+        },
+        "customStorageRoot": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 32767,
+          "default": null
+        }
+      }
+    },
+    "windowSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "placementMode",
+        "rememberWindowSize",
+        "width",
+        "height",
+        "left",
+        "top",
+        "lastMonitorId"
+      ],
+      "properties": {
+        "placementMode": {
+          "type": "string",
+          "enum": [
+            "mouse",
+            "remember",
+            "center"
+          ],
+          "default": "mouse"
+        },
+        "rememberWindowSize": {
+          "type": "boolean",
+          "default": true
+        },
+        "width": {
+          "type": "number",
+          "minimum": 520,
+          "maximum": 1800,
+          "default": 760
+        },
+        "height": {
+          "type": "number",
+          "minimum": 400,
+          "maximum": 1400,
+          "default": 560
+        },
+        "left": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -10000000,
+          "maximum": 10000000,
+          "default": null
+        },
+        "top": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -10000000,
+          "maximum": 10000000,
+          "default": null
+        },
+        "lastMonitorId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 512,
+          "default": null
+        }
+      }
+    },
+    "behaviorSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "closeWhenFocusLost",
+        "hideAfterCopy"
+      ],
+      "properties": {
+        "closeWhenFocusLost": {
+          "type": "boolean",
+          "default": true
+        },
+        "hideAfterCopy": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "appearanceSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "theme"
+      ],
+      "properties": {
+        "theme": {
+          "type": "string",
+          "enum": [
+            "system",
+            "light",
+            "dark"
+          ],
+          "default": "system"
+        }
+      }
+    },
+    "startupSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "startWithWindows"
+      ],
+      "properties": {
+        "startWithWindows": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "updateSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkForUpdates",
+        "checkFrequency",
+        "mode"
+      ],
+      "properties": {
+        "checkForUpdates": {
+          "type": "boolean",
+          "default": true
+        },
+        "checkFrequency": {
+          "type": "string",
+          "enum": [
+            "daily",
+            "weekly"
+          ],
+          "default": "daily"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "recommended",
+            "notifyOnly",
+            "downloadAndPrompt",
+            "downloadAndInstall"
+          ],
+          "default": "recommended"
+        }
+      }
+    },
+    "providerSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "activeProviderId",
+        "displayMode"
+      ],
+      "properties": {
+        "activeProviderId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "default": "klipy"
+        },
+        "displayMode": {
+          "type": "string",
+          "enum": [
+            "single",
+            "sideBySide",
+            "combined"
+          ],
+          "default": "single"
+        }
+      }
+    }
+  }
+}

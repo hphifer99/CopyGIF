@@ -1,4 +1,6 @@
 using CopyGIF.Application;
+using CopyGIF.Core.Contracts;
+using CopyGIF.Core.Models;
 using CopyGIF.Infrastructure;
 using CopyGIF.Platform.Windows;
 using CopyGIF.Presentation;
@@ -51,12 +53,48 @@ public partial class App : XamlApplication
             });
     }
 
-    protected override void OnLaunched(
+    protected override async void OnLaunched(
         LaunchActivatedEventArgs args)
     {
+        try
+        {
+            IMigrationCoordinator migrationCoordinator =
+                Services.GetRequiredService<
+                    IMigrationCoordinator>();
+
+            MigrationResult migrationResult =
+                await migrationCoordinator
+                    .MigrateIfNeededAsync();
+
+            if (!migrationResult.Succeeded)
+            {
+                ShowStartupFailure(
+                    migrationResult.Message);
+
+                return;
+            }
+
+            _window =
+                Services.GetRequiredService<
+                    MainWindow>();
+
+            _window.Activate();
+        }
+        catch (Exception)
+        {
+            ShowStartupFailure(
+                "CopyGIF could not verify or migrate its saved data.");
+        }
+    }
+
+    private void ShowStartupFailure(
+        string? message)
+    {
         _window =
-            Services.GetRequiredService<
-                MainWindow>();
+            new StartupFailureWindow(
+                string.IsNullOrWhiteSpace(message)
+                    ? "CopyGIF could not start safely."
+                    : message);
 
         _window.Activate();
     }

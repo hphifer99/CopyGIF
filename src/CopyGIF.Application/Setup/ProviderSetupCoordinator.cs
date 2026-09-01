@@ -1,4 +1,4 @@
-﻿using CopyGIF.Application.Providers;
+using CopyGIF.Application.Providers;
 using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 
@@ -10,7 +10,7 @@ public sealed class ProviderSetupCoordinator :
     private readonly IActiveGifProviderAccessor
         _providerAccessor;
 
-    private readonly IReadOnlyDictionary<
+    private readonly Dictionary<
         string,
         IGifProviderCredentialManager>
         _credentialManagers;

@@ -1,18 +1,68 @@
 <Solution>
+
+  <Configurations>
+    <Platform Name="x64" />
+  </Configurations>
+
   <Folder Name="/src/">
-    <Project Path="src/CopyGIF.Core/CopyGIF.Core.csproj" />
+
+    <Project Path="src/CopyGIF.App/CopyGIF.App.csproj">
+      <Platform Project="x64" />
+      <Deploy />
+    </Project>
+
+    <Project Path="src/CopyGIF.Application/CopyGIF.Application.csproj">
+      <Platform Project="x64" />
+    </Project>
+
+    <Project Path="src/CopyGIF.Core/CopyGIF.Core.csproj">
+      <Platform Project="x64" />
+    </Project>
+
+    <Project Path="src/CopyGIF.Infrastructure/CopyGIF.Infrastructure.csproj">
+      <Platform Project="x64" />
+    </Project>
+
+    <Project Path="src/CopyGIF.Platform.Windows/CopyGIF.Platform.Windows.csproj">
+      <Platform Project="x64" />
+    </Project>
+
+    <Project Path="src/CopyGIF.Presentation/CopyGIF.Presentation.csproj">
+      <Platform Project="x64" />
+    </Project>
+
   </Folder>
-  <Project Path="src/CopyGIF.App/CopyGIF.App.csproj" DisplayName="CopyGIF.App" Id="797bb677-2e35-4ab2-9a7d-ecc12b458e3a">
-    <Platform Project="x64" />
-    <Deploy />
-  </Project>
-  <Project Path="src/CopyGIF.Application/CopyGIF.Application.csproj" Id="029c3bad-ad3c-4847-979d-0d512c6825fb" />
-  <Project Path="src/CopyGIF.Infrastructure/CopyGIF.Infrastructure.csproj" Id="5db668ad-3ca3-4059-801d-ad1211a81633" />
-  <Project Path="src/CopyGIF.Platform.Windows/CopyGIF.Platform.Windows.csproj" Id="c9edecb0-24eb-4ead-8db9-2cb60acb8eef" />
-  <Project Path="src/CopyGIF.Presentation/CopyGIF.Presentation.csproj" Id="c6128f10-7621-4a63-83b1-0a1f9c2c24f0" />
-  <Project Path="Tests/CopyGIF.Application.Tests/CopyGIF.Application.Tests.csproj" Id="c2d2bb78-8bd6-47db-85cd-b8ad0c076ea4" />
-  <Project Path="Tests/CopyGIF.Core.Tests/CopyGIF.Core.Tests.csproj" Id="9f396cde-769a-492c-b3b1-6921d41f17e9" />
-  <Project Path="Tests/CopyGIF.Infrastructure.Tests/CopyGIF.Infrastructure.Tests.csproj" Id="5ea6af06-76b4-4f38-b3f8-d72383aabe8e" />
-  <Project Path="Tests/CopyGIF.Platform.Windows.Tests/CopyGIF.Platform.Windows.Tests.csproj" Id="db13d248-4893-44c4-9bce-ac9a77432e70" />
-  <Project Path="Tests/CopyGIF.Presentation.Tests/CopyGIF.Presentation.Tests.csproj" Id="754d7353-f7a9-47db-ae5c-013ed52c9ad8" />
+
+  <Folder Name="/tests/">
+
+    <Project Path="tests/CopyGIF.Application.Tests/CopyGIF.Application.Tests.csproj">
+      <Platform Project="x64" />
+    </Project>
+
+    <Project Path="tests/CopyGIF.Architecture.Tests/CopyGIF.Architecture.Tests.csproj">
+      <Platform Project="x64" />
+    </Project>
+
+    <Project Path="tests/CopyGIF.Core.Tests/CopyGIF.Core.Tests.csproj">
+      <Platform Project="x64" />
+    </Project>
+
+    <Project Path="tests/CopyGIF.Infrastructure.Tests/CopyGIF.Infrastructure.Tests.csproj">
+      <Platform Project="x64" />
+    </Project>
+
+    <Project Path="tests/CopyGIF.Platform.Windows.Tests/CopyGIF.Platform.Windows.Tests.csproj">
+      <Platform Project="x64" />
+    </Project>
+
+    <Project Path="tests/CopyGIF.Presentation.Tests/CopyGIF.Presentation.Tests.csproj">
+      <Platform Project="x64" />
+    </Project>
+
+    <Project Path="tests/CopyGIF.Testing/CopyGIF.Testing.csproj">
+      <Platform Project="x64" />
+    </Project>
+
+  </Folder>
+
 </Solution>

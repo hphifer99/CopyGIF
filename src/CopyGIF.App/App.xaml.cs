@@ -1,4 +1,3 @@
-﻿using System;
 using CopyGIF.Application;
 using CopyGIF.Infrastructure;
 using CopyGIF.Platform.Windows;
@@ -23,7 +22,7 @@ public partial class App : XamlApplication
             ConfigureServices();
     }
 
-    private static IServiceProvider
+    private static ServiceProvider
         ConfigureServices()
     {
         ServiceCollection services =

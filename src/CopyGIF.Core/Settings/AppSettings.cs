@@ -1,22 +1,42 @@
-﻿namespace CopyGIF.Core.Settings;
+namespace CopyGIF.Core.Settings;
 
 public sealed record AppSettings
 {
     public const int CurrentSchemaVersion = 1;
 
-    public int SchemaVersion { get; init; } = CurrentSchemaVersion;
+    public const string DefaultHotkey = "Alt+G";
 
-    public string Hotkey { get; init; } = "Alt+G";
+    public const string DefaultProviderId = "klipy";
 
-    public SearchSettings Search { get; init; } = new();
+    public int SchemaVersion { get; init; } =
+        CurrentSchemaVersion;
 
-    public LibrarySettings Library { get; init; } = new();
+    public string Hotkey { get; init; } =
+        DefaultHotkey;
 
-    public WindowSettings Window { get; init; } = new();
+    public SearchSettings Search { get; init; } =
+        new();
 
-    public BehaviorSettings Behavior { get; init; } = new();
+    public LibrarySettings Library { get; init; } =
+        new();
 
-    public StartupSettings Startup { get; init; } = new();
+    public WindowSettings Window { get; init; } =
+        new();
+
+    public BehaviorSettings Behavior { get; init; } =
+        new();
+
+    public AppearanceSettings Appearance { get; init; } =
+        new();
+
+    public StartupSettings Startup { get; init; } =
+        new();
+
+    public UpdateSettings Updates { get; init; } =
+        new();
+
+    public ProviderSettings Providers { get; init; } =
+        new();
 }
 
 public sealed record SearchSettings
@@ -28,6 +48,14 @@ public sealed record SearchSettings
     public bool AnimatePreviews { get; init; } = true;
 
     public bool AutoLoadMoreResults { get; init; }
+
+    public bool ShowTrendingWhenEmpty { get; init; } = true;
+
+    public bool SaveSearchHistory { get; init; } = true;
+
+    public bool UseHistorySuggestions { get; init; } = true;
+
+    public int SearchHistoryLimit { get; init; } = 50;
 }
 
 public sealed record LibrarySettings
@@ -39,6 +67,8 @@ public sealed record LibrarySettings
     public bool StoreFavoritesLocally { get; init; } = true;
 
     public bool StoreRecentsLocally { get; init; } = true;
+
+    public string? CustomStorageRoot { get; init; }
 }
 
 public sealed record WindowSettings
@@ -55,6 +85,8 @@ public sealed record WindowSettings
     public double? Left { get; init; }
 
     public double? Top { get; init; }
+
+    public string? LastMonitorId { get; init; }
 }
 
 public sealed record BehaviorSettings
@@ -64,7 +96,33 @@ public sealed record BehaviorSettings
     public bool HideAfterCopy { get; init; } = true;
 }
 
+public sealed record AppearanceSettings
+{
+    public AppTheme Theme { get; init; } =
+        AppTheme.System;
+}
+
 public sealed record StartupSettings
 {
     public bool StartWithWindows { get; init; } = true;
+}
+
+public sealed record UpdateSettings
+{
+    public bool CheckForUpdates { get; init; } = true;
+
+    public UpdateCheckFrequency CheckFrequency { get; init; } =
+        UpdateCheckFrequency.Daily;
+
+    public UpdateMode Mode { get; init; } =
+        UpdateMode.Recommended;
+}
+
+public sealed record ProviderSettings
+{
+    public string ActiveProviderId { get; init; } =
+        AppSettings.DefaultProviderId;
+
+    public ProviderDisplayMode DisplayMode { get; init; } =
+        ProviderDisplayMode.Single;
 }

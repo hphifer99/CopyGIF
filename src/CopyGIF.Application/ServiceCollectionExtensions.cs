@@ -1,6 +1,7 @@
-﻿using CopyGIF.Application.Providers;
+using CopyGIF.Application.Providers;
 using CopyGIF.Application.Search;
 using CopyGIF.Application.Setup;
+using CopyGIF.Core.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CopyGIF.Application;
@@ -13,6 +14,10 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(
             services);
+
+        services.AddTransient<
+            IProviderCatalog,
+            ProviderCatalog>();
 
         services.AddTransient<
             IActiveGifProviderAccessor,

@@ -1,47 +1,81 @@
-﻿using System.Net;
+using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 using CopyGIF.Core.Models;
 using CopyGIF.Core.Settings;
 using CopyGIF.Infrastructure.Klipy;
 using CopyGIF.Infrastructure.Tests.TestDoubles;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace CopyGIF.Infrastructure.Tests.Klipy;
 
 [TestClass]
 public sealed class KlipyGifProviderTests
 {
+    private const string EmptyPageJson =
+        """
+        {
+          "result": true,
+          "data": {
+            "data": [],
+            "current_page": 1,
+            "per_page": 24,
+            "has_next": false
+          }
+        }
+        """;
+
     [TestMethod]
     public async Task SearchAsync_ValidResponse_MapsGif()
     {
         const string json =
             """
             {
-              "results": [
-                {
-                  "id": "12345",
-                  "title": "Test GIF",
-                  "content_description": "A test animation",
-                  "media_formats": {
-                    "gif": {
-                      "url": "https://static.klipy.com/full.gif",
-                      "dims": [640, 480],
-                      "size": 1000
-                    },
-                    "mediumgif": {
-                      "url": "https://static.klipy.com/preview.gif",
-                      "dims": [320, 240],
-                      "size": 500
-                    },
-                    "tinygifpreview": {
-                      "url": "https://static.klipy.com/thumbnail.gif",
-                      "dims": [160, 120],
-                      "size": 100
+              "result": true,
+              "data": {
+                "data": [
+                  {
+                    "id": 662,
+                    "slug": "hello-hi-662",
+                    "title": "Hello",
+                    "file": {
+                      "hd": {
+                        "gif": {
+                          "url": "https://static.klipy.com/full.gif",
+                          "width": 640,
+                          "height": 480,
+                          "size": 1000
+                        }
+                      },
+                      "md": {
+                        "gif": {
+                          "url": "https://static.klipy.com/medium.gif",
+                          "width": 480,
+                          "height": 360,
+                          "size": 700
+                        }
+                      },
+                      "sm": {
+                        "gif": {
+                          "url": "https://static.klipy.com/preview.gif",
+                          "width": 320,
+                          "height": 240,
+                          "size": 500
+                        },
+                        "jpg": {
+                          "url": "https://static.klipy.com/thumbnail.jpg",
+                          "width": 160,
+                          "height": 120,
+                          "size": 100
+                        }
+                      }
                     }
                   }
-                }
-              ],
-              "next": "continuation-value"
+                ],
+                "current_page": 1,
+                "per_page": 24,
+                "has_next": true
+              }
             }
             """;
 
@@ -54,21 +88,14 @@ public sealed class KlipyGifProviderTests
         using HttpClient client =
             CreateClient(handler);
 
-        TestSecretStore secrets =
-            new(
-                SecretNames.KlipyApiKey,
-                "test-key");
-
         KlipyGifProvider provider =
-            new(
-                client,
-                secrets);
+            CreateProvider(client);
 
         GifSearchPage page =
             await provider.SearchAsync(
                 new GifSearchRequest
                 {
-                    Query = "hello",
+                    Query = "hello world",
                     PageSize = 24
                 });
 
@@ -76,24 +103,34 @@ public sealed class KlipyGifProviderTests
             1,
             page.Items);
 
-        GifItem item =
-            page.Items[0];
+        GifItem item = page.Items[0];
 
         Assert.AreEqual(
             "klipy",
             item.ProviderId);
 
         Assert.AreEqual(
-            "12345",
+            "hello-hi-662",
             item.Id);
 
         Assert.AreEqual(
-            "Test GIF",
+            "Hello",
             item.Title);
 
         Assert.AreEqual(
-            "A test animation",
-            item.Description);
+            new Uri(
+                "https://static.klipy.com/full.gif"),
+            item.GifUri);
+
+        Assert.AreEqual(
+            new Uri(
+                "https://static.klipy.com/preview.gif"),
+            item.PreviewUri);
+
+        Assert.AreEqual(
+            new Uri(
+                "https://static.klipy.com/thumbnail.jpg"),
+            item.ThumbnailUri);
 
         Assert.AreEqual(
             640,
@@ -104,71 +141,192 @@ public sealed class KlipyGifProviderTests
             item.Height);
 
         Assert.AreEqual(
-            "continuation-value",
+            1000L,
+            item.SizeBytes);
+
+        Assert.AreEqual(
+            "2",
             page.ContinuationToken);
 
         Assert.IsTrue(
             page.HasMore);
-    }
 
-    [TestMethod]
-    public async Task SearchAsync_ContinuationToken_AddsPosParameter()
-    {
-        const string json =
-            """
-        {
-          "results": [],
-          "next": ""
-        }
-        """;
-
-        TestHttpMessageHandler handler =
-            new(
-                _ => JsonResponse(
-                    HttpStatusCode.OK,
-                    json));
-
-        using HttpClient client =
-            CreateClient(handler);
-
-        TestSecretStore secrets =
-            new(
-                SecretNames.KlipyApiKey,
-                "test-key");
-
-        KlipyGifProvider provider =
-            new(
-                client,
-                secrets);
-
-        await provider.SearchAsync(
-            new GifSearchRequest
-            {
-                Query = "hello world",
-                PageSize = 12,
-                ContinuationToken =
-                    "next-value"
-            });
-
-        Uri requestUri =
-            handler.LastRequest!
-                .RequestUri!;
+        Assert.AreEqual(
+            "/api/v1/test-key/gifs/search",
+            handler.LastRequestUri!
+                .AbsolutePath);
 
         string decodedQuery =
             Uri.UnescapeDataString(
-                requestUri.Query);
-
-        StringAssert.Contains(
-            decodedQuery,
-            "limit=12");
-
-        StringAssert.Contains(
-            decodedQuery,
-            "pos=next-value");
+                handler.LastRequestUri.Query);
 
         StringAssert.Contains(
             decodedQuery,
             "q=hello world");
+
+        StringAssert.Contains(
+            decodedQuery,
+            "page=1");
+
+        StringAssert.Contains(
+            decodedQuery,
+            "per_page=24");
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_ContinuationToken_UsesRequestedPage()
+    {
+        TestHttpMessageHandler handler =
+            new(
+                _ => JsonResponse(
+                    HttpStatusCode.OK,
+                    EmptyPageJson));
+
+        using HttpClient client =
+            CreateClient(handler);
+
+        KlipyGifProvider provider =
+            CreateProvider(client);
+
+        await provider.SearchAsync(
+            new GifSearchRequest
+            {
+                Query = "cats",
+                PageSize = 12,
+                ContinuationToken = "3"
+            });
+
+        string query =
+            handler.LastRequestUri!
+                .Query;
+
+        StringAssert.Contains(
+            query,
+            "page=3");
+
+        StringAssert.Contains(
+            query,
+            "per_page=12");
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_ProviderMinimum_ClampsPageSize()
+    {
+        TestHttpMessageHandler handler =
+            new(
+                _ => JsonResponse(
+                    HttpStatusCode.OK,
+                    EmptyPageJson));
+
+        using HttpClient client =
+            CreateClient(handler);
+
+        KlipyGifProvider provider =
+            CreateProvider(client);
+
+        await provider.SearchAsync(
+            new GifSearchRequest
+            {
+                Query = "cats",
+                PageSize = 6
+            });
+
+        StringAssert.Contains(
+            handler.LastRequestUri!.Query,
+            "per_page=8");
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_Trending_UsesTrendingEndpoint()
+    {
+        TestHttpMessageHandler handler =
+            new(
+                _ => JsonResponse(
+                    HttpStatusCode.OK,
+                    EmptyPageJson));
+
+        using HttpClient client =
+            CreateClient(handler);
+
+        KlipyGifProvider provider =
+            CreateProvider(client);
+
+        await provider.SearchAsync(
+            new GifSearchRequest
+            {
+                Query = string.Empty,
+                Kind = GifSearchKind.Trending,
+                PageSize = 24
+            });
+
+        Assert.AreEqual(
+            "/api/v1/test-key/gifs/trending",
+            handler.LastRequestUri!
+                .AbsolutePath);
+
+        Assert.IsFalse(
+            handler.LastRequestUri.Query
+                .Contains(
+                    "q=",
+                    StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_EmptySearch_ReturnsEmptyWithoutCredential()
+    {
+        TestHttpMessageHandler handler =
+            new(
+                _ => throw new AssertFailedException(
+                    "No HTTP request was expected."));
+
+        using HttpClient client =
+            CreateClient(handler);
+
+        KlipyGifProvider provider =
+            new(
+                client,
+                new TestSecretStore());
+
+        GifSearchPage page =
+            await provider.SearchAsync(
+                new GifSearchRequest
+                {
+                    Query = "   "
+                });
+
+        Assert.IsEmpty(
+            page.Items);
+
+        Assert.IsNull(
+            handler.LastRequestUri);
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_InvalidContinuationToken_IsRejected()
+    {
+        TestHttpMessageHandler handler =
+            new(
+                _ => JsonResponse(
+                    HttpStatusCode.OK,
+                    EmptyPageJson));
+
+        using HttpClient client =
+            CreateClient(handler);
+
+        KlipyGifProvider provider =
+            CreateProvider(client);
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => provider.SearchAsync(
+                new GifSearchRequest
+                {
+                    Query = "cats",
+                    ContinuationToken =
+                        "https://example.test"
+                }));
+
+        Assert.IsNull(
+            handler.LastRequestUri);
     }
 
     [TestMethod]
@@ -178,18 +336,15 @@ public sealed class KlipyGifProviderTests
             new(
                 _ => JsonResponse(
                     HttpStatusCode.OK,
-                    "{}"));
+                    EmptyPageJson));
 
         using HttpClient client =
             CreateClient(handler);
 
-        TestSecretStore secrets =
-            new();
-
         KlipyGifProvider provider =
             new(
                 client,
-                secrets);
+                new TestSecretStore());
 
         GifProviderException exception =
             await Assert.ThrowsAsync<
@@ -206,25 +361,31 @@ public sealed class KlipyGifProviderTests
     }
 
     [TestMethod]
-    public async Task SearchAsync_RateLimited_ThrowsExpectedFailure()
+    public async Task SearchAsync_RateLimited_PreservesRetryAfter()
     {
+        TimeSpan retryAfter =
+            TimeSpan.FromSeconds(30);
+
         TestHttpMessageHandler handler =
             new(
-                _ => new HttpResponseMessage(
-                    HttpStatusCode.TooManyRequests));
+                _ =>
+                {
+                    HttpResponseMessage response =
+                        new(
+                            HttpStatusCode.TooManyRequests);
+
+                    response.Headers.RetryAfter =
+                        new RetryConditionHeaderValue(
+                            retryAfter);
+
+                    return response;
+                });
 
         using HttpClient client =
             CreateClient(handler);
 
-        TestSecretStore secrets =
-            new(
-                SecretNames.KlipyApiKey,
-                "test-key");
-
         KlipyGifProvider provider =
-            new(
-                client,
-                secrets);
+            CreateProvider(client);
 
         GifProviderException exception =
             await Assert.ThrowsAsync<
@@ -237,6 +398,163 @@ public sealed class KlipyGifProviderTests
 
         Assert.AreEqual(
             GifProviderFailure.RateLimited,
+            exception.Failure);
+
+        Assert.AreEqual(
+            retryAfter,
+            exception.RetryAfter);
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_Timeout_ThrowsExpectedFailure()
+    {
+        TestHttpMessageHandler handler =
+            new(
+                _ => throw new TaskCanceledException(
+                    "Simulated timeout."));
+
+        using HttpClient client =
+            CreateClient(handler);
+
+        KlipyGifProvider provider =
+            CreateProvider(client);
+
+        GifProviderException exception =
+            await Assert.ThrowsAsync<
+                GifProviderException>(
+                () => provider.SearchAsync(
+                    new GifSearchRequest
+                    {
+                        Query = "test"
+                    }));
+
+        Assert.AreEqual(
+            GifProviderFailure.Timeout,
+            exception.Failure);
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_MalformedJson_ThrowsInvalidResponse()
+    {
+        TestHttpMessageHandler handler =
+            new(
+                _ => JsonResponse(
+                    HttpStatusCode.OK,
+                    "{ not-valid-json"));
+
+        using HttpClient client =
+            CreateClient(handler);
+
+        KlipyGifProvider provider =
+            CreateProvider(client);
+
+        GifProviderException exception =
+            await Assert.ThrowsAsync<
+                GifProviderException>(
+                () => provider.SearchAsync(
+                    new GifSearchRequest
+                    {
+                        Query = "test"
+                    }));
+
+        Assert.AreEqual(
+            GifProviderFailure.InvalidResponse,
+            exception.Failure);
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_OversizedResponse_ThrowsInvalidResponse()
+    {
+        byte[] oversizedBody =
+            new byte[
+                (2 * 1024 * 1024) + 1];
+
+        TestHttpMessageHandler handler =
+            new(
+                _ =>
+                    new HttpResponseMessage(
+                        HttpStatusCode.OK)
+                    {
+                        Content =
+                            new ByteArrayContent(
+                                oversizedBody)
+                    });
+
+        using HttpClient client =
+            CreateClient(handler);
+
+        KlipyGifProvider provider =
+            CreateProvider(client);
+
+        GifProviderException exception =
+            await Assert.ThrowsAsync<
+                GifProviderException>(
+                () => provider.SearchAsync(
+                    new GifSearchRequest
+                    {
+                        Query = "test"
+                    }));
+
+        Assert.AreEqual(
+            GifProviderFailure.InvalidResponse,
+            exception.Failure);
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_InsecureMediaUrl_ThrowsInvalidResponse()
+    {
+        const string json =
+            """
+            {
+              "result": true,
+              "data": {
+                "data": [
+                  {
+                    "id": 1,
+                    "slug": "unsafe-1",
+                    "title": "Unsafe",
+                    "file": {
+                      "hd": {
+                        "gif": {
+                          "url": "http://static.klipy.com/full.gif",
+                          "width": 100,
+                          "height": 100,
+                          "size": 100
+                        }
+                      }
+                    }
+                  }
+                ],
+                "current_page": 1,
+                "per_page": 24,
+                "has_next": false
+              }
+            }
+            """;
+
+        TestHttpMessageHandler handler =
+            new(
+                _ => JsonResponse(
+                    HttpStatusCode.OK,
+                    json));
+
+        using HttpClient client =
+            CreateClient(handler);
+
+        KlipyGifProvider provider =
+            CreateProvider(client);
+
+        GifProviderException exception =
+            await Assert.ThrowsAsync<
+                GifProviderException>(
+                () => provider.SearchAsync(
+                    new GifSearchRequest
+                    {
+                        Query = "test"
+                    }));
+
+        Assert.AreEqual(
+            GifProviderFailure.InvalidResponse,
             exception.Failure);
     }
 
@@ -251,13 +569,10 @@ public sealed class KlipyGifProviderTests
         using HttpClient client =
             CreateClient(handler);
 
-        TestSecretStore secrets =
-            new();
-
         KlipyGifProvider provider =
             new(
                 client,
-                secrets);
+                new TestSecretStore());
 
         CredentialValidationResult result =
             await provider.ValidateCredentialAsync(
@@ -265,6 +580,63 @@ public sealed class KlipyGifProviderTests
 
         Assert.IsFalse(
             result.IsValid);
+
+        Assert.AreEqual(
+            CredentialValidationFailure.InvalidCredential,
+            result.Failure);
+
+        Assert.AreEqual(
+            "/api/v1/invalid-key/gifs/trending",
+            handler.LastRequestUri!
+                .AbsolutePath);
+    }
+
+    [TestMethod]
+    public async Task RegisterShareAsync_PostsSlugAndQuery()
+    {
+        TestHttpMessageHandler handler =
+            new(
+                _ => new HttpResponseMessage(
+                    HttpStatusCode.NoContent));
+
+        using HttpClient client =
+            CreateClient(handler);
+
+        KlipyGifProvider provider =
+            CreateProvider(client);
+
+        await provider.RegisterShareAsync(
+            "hello-hi-662",
+            "  hello  ");
+
+        Assert.AreEqual(
+            HttpMethod.Post,
+            handler.LastMethod);
+
+        Assert.AreEqual(
+            "/api/v1/test-key/gifs/share/hello-hi-662",
+            handler.LastRequestUri!
+                .AbsolutePath);
+
+        using JsonDocument body =
+            JsonDocument.Parse(
+                handler.LastRequestBody!);
+
+        Assert.AreEqual(
+            "hello",
+            body.RootElement
+                .GetProperty("q")
+                .GetString());
+    }
+
+    private static KlipyGifProvider CreateProvider(
+        HttpClient client)
+    {
+        return new KlipyGifProvider(
+            client,
+            new TestSecretStore(
+                SecretNames.KlipyApiKey,
+                "test-key"));
     }
 
     private static HttpClient CreateClient(

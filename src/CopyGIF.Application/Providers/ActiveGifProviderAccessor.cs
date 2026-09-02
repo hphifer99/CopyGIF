@@ -1,51 +1,54 @@
 using CopyGIF.Core.Contracts;
+using CopyGIF.Core.Settings;
 
 namespace CopyGIF.Application.Providers;
 
 public sealed class ActiveGifProviderAccessor :
     IActiveGifProviderAccessor
 {
-    private readonly IGifProvider[]
-        _providers;
+    private readonly IProviderCatalog
+        _providerCatalog;
 
     public ActiveGifProviderAccessor(
-        IEnumerable<IGifProvider> providers)
+        IProviderCatalog providerCatalog)
     {
-        ArgumentNullException.ThrowIfNull(
-            providers);
-
-        IGifProvider[] providerArray =
-            providers.ToArray();
-
-        if (providerArray.Length == 0)
-        {
-            throw new InvalidOperationException(
-                "No GIF providers are registered.");
-        }
-
-        string? duplicateProviderId =
-            providerArray
-                .GroupBy(
-                    provider => provider.Id,
-                    StringComparer.OrdinalIgnoreCase)
-                .Where(
-                    group => group.Count() > 1)
-                .Select(
-                    group => group.Key)
-                .FirstOrDefault();
-
-        if (duplicateProviderId is not null)
-        {
-            throw new InvalidOperationException(
-                $"More than one GIF provider is registered with the ID '{duplicateProviderId}'.");
-        }
-
-        _providers =
-            providerArray;
+        _providerCatalog =
+            providerCatalog ??
+            throw new ArgumentNullException(
+                nameof(providerCatalog));
     }
 
-    public IGifProvider GetActiveProvider()
+    public IGifProvider GetActiveProvider(
+        AppSettings settings)
     {
-        return _providers[0];
+        ArgumentNullException.ThrowIfNull(
+            settings);
+
+        AppSettings normalized =
+            AppSettingsNormalizer.Normalize(
+                settings);
+
+        if (_providerCatalog.TryGetProvider(
+                normalized.Providers
+                    .ActiveProviderId,
+                out IGifProvider? provider) &&
+            provider is not null)
+        {
+            return provider;
+        }
+
+        if (_providerCatalog.TryGetProvider(
+                AppSettings.DefaultProviderId,
+                out provider) &&
+            provider is not null)
+        {
+            return provider;
+        }
+
+        throw new InvalidOperationException(
+            $"The configured GIF provider " +
+            $"'{normalized.Providers.ActiveProviderId}' " +
+            "is unavailable and the default provider " +
+            $"'{AppSettings.DefaultProviderId}' is not registered.");
     }
 }

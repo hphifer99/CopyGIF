@@ -1,6 +1,7 @@
 using CopyGIF.Application.Providers;
 using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
+using CopyGIF.Core.Settings;
 
 namespace CopyGIF.Application.Setup;
 
@@ -10,6 +11,9 @@ public sealed class ProviderSetupCoordinator :
     private readonly IActiveGifProviderAccessor
         _providerAccessor;
 
+    private readonly ISettingsStore
+        _settingsStore;
+
     private readonly Dictionary<
         string,
         IGifProviderCredentialManager>
@@ -17,8 +21,8 @@ public sealed class ProviderSetupCoordinator :
 
     public ProviderSetupCoordinator(
         IActiveGifProviderAccessor providerAccessor,
-        IEnumerable<
-            IGifProviderCredentialManager>
+        ISettingsStore settingsStore,
+        IEnumerable<IGifProviderCredentialManager>
             credentialManagers)
     {
         _providerAccessor =
@@ -26,23 +30,27 @@ public sealed class ProviderSetupCoordinator :
             throw new ArgumentNullException(
                 nameof(providerAccessor));
 
+        _settingsStore =
+            settingsStore ??
+            throw new ArgumentNullException(
+                nameof(settingsStore));
+
         ArgumentNullException.ThrowIfNull(
             credentialManagers);
 
         _credentialManagers =
-            credentialManagers.ToDictionary(
-                manager => manager.ProviderId,
-                StringComparer.OrdinalIgnoreCase);
+            CreateCredentialManagerDictionary(
+                credentialManagers);
     }
 
     public async Task<ProviderSetupState>
         GetStateAsync(
-            CancellationToken cancellationToken =
-                default)
+            CancellationToken cancellationToken = default)
     {
         IGifProvider provider =
-            _providerAccessor
-                .GetActiveProvider();
+            await GetActiveProviderAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
 
         IGifProviderCredentialManager manager =
             GetCredentialManager(
@@ -70,28 +78,32 @@ public sealed class ProviderSetupCoordinator :
     public async Task<CredentialValidationResult>
         ValidateAndSaveCredentialAsync(
             string credential,
-            CancellationToken cancellationToken =
-                default)
+            CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(
                 credential))
         {
             return CredentialValidationResult.Invalid(
-                "An API key is required.");
+                "An API key is required.",
+                CredentialValidationFailure.MissingCredential);
         }
 
         IGifProvider provider =
-            _providerAccessor
-                .GetActiveProvider();
+            await GetActiveProviderAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
 
         IGifProviderCredentialManager manager =
             GetCredentialManager(
                 provider.Id);
 
+        string normalizedCredential =
+            credential.Trim();
+
         CredentialValidationResult result =
             await manager
                 .ValidateCredentialAsync(
-                    credential.Trim(),
+                    normalizedCredential,
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -102,28 +114,44 @@ public sealed class ProviderSetupCoordinator :
 
         await manager
             .SaveCredentialAsync(
-                credential.Trim(),
+                normalizedCredential,
                 cancellationToken)
             .ConfigureAwait(false);
 
         return result;
     }
 
-    public Task ClearCredentialAsync(
-        CancellationToken cancellationToken =
-            default)
+    public async Task ClearCredentialAsync(
+        CancellationToken cancellationToken = default)
     {
         IGifProvider provider =
-            _providerAccessor
-                .GetActiveProvider();
+            await GetActiveProviderAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
 
         IGifProviderCredentialManager manager =
             GetCredentialManager(
                 provider.Id);
 
-        return manager
+        await manager
             .DeleteCredentialAsync(
-                cancellationToken);
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<IGifProvider>
+        GetActiveProviderAsync(
+            CancellationToken cancellationToken)
+    {
+        AppSettings settings =
+            await _settingsStore
+                .LoadAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        return _providerAccessor
+            .GetActiveProvider(
+                settings);
     }
 
     private IGifProviderCredentialManager
@@ -140,5 +168,40 @@ public sealed class ProviderSetupCoordinator :
 
         throw new InvalidOperationException(
             $"No credential manager is registered for GIF provider '{providerId}'.");
+    }
+
+    private static Dictionary<
+        string,
+        IGifProviderCredentialManager>
+        CreateCredentialManagerDictionary(
+            IEnumerable<
+                IGifProviderCredentialManager>
+                credentialManagers)
+    {
+        Dictionary<
+            string,
+            IGifProviderCredentialManager> result =
+                new(
+                    StringComparer.OrdinalIgnoreCase);
+
+        foreach (IGifProviderCredentialManager manager
+                 in credentialManagers)
+        {
+            ArgumentNullException.ThrowIfNull(
+                manager);
+
+            ArgumentException.ThrowIfNullOrWhiteSpace(
+                manager.ProviderId);
+
+            if (!result.TryAdd(
+                    manager.ProviderId,
+                    manager))
+            {
+                throw new InvalidOperationException(
+                    $"More than one credential manager is registered for GIF provider '{manager.ProviderId}'.");
+            }
+        }
+
+        return result;
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using CopyGIF.Core.Contracts;
@@ -11,10 +11,15 @@ public sealed class KlipyGifProvider : IGifProvider
 {
     public const string ProviderId = "klipy";
 
-    private const string MediaFilter =
-        "gif,mediumgif,tinygif,tinygifpreview";
+    private const int MaximumApiResponseBytes =
+        2 * 1024 * 1024;
+
+    private static readonly JsonSerializerOptions
+        SerializerOptions =
+            new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _httpClient;
+
     private readonly ISecretStore _secretStore;
 
     public KlipyGifProvider(
@@ -38,56 +43,35 @@ public sealed class KlipyGifProvider : IGifProvider
         GifSearchRequest request,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(
+            request);
 
-        if (string.IsNullOrWhiteSpace(request.Query))
+        if (request.Kind ==
+                GifSearchKind.Search &&
+            string.IsNullOrWhiteSpace(
+                request.Query))
         {
-            return new GifSearchPage
-            {
-                Items = [],
-                ContinuationToken = null
-            };
-        }
-
-        if (request.PageSize < 1 ||
-            request.PageSize > 50)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(request),
-                "Page size must be between 1 and 50.");
+            return GifSearchPage.Empty();
         }
 
         string apiKey =
             await GetApiKeyAsync(
-                cancellationToken);
+                    cancellationToken)
+                .ConfigureAwait(false);
 
         string requestUri =
-            BuildSearchUri(
+            KlipyRequestBuilder.BuildSearch(
                 apiKey,
                 request);
 
-        KlipySearchResponseDto response =
-            await SendAsync<KlipySearchResponseDto>(
-                requestUri,
-                cancellationToken);
+        KlipyResponseDto response =
+            await SendForResponseAsync(
+                    requestUri,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
-        List<GifItem> items =
-            new(response.Results.Count);
-
-        foreach (KlipyResultDto result
-                 in response.Results)
-        {
-            items.Add(MapResult(result));
-        }
-
-        return new GifSearchPage
-        {
-            Items = items,
-            ContinuationToken =
-                string.IsNullOrWhiteSpace(response.Next)
-                    ? null
-                    : response.Next
-        };
+        return KlipyResponseMapper.Map(
+            response);
     }
 
     public async Task<CredentialValidationResult>
@@ -95,34 +79,39 @@ public sealed class KlipyGifProvider : IGifProvider
             string credential,
             CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(credential))
+        if (string.IsNullOrWhiteSpace(
+                credential))
         {
             return CredentialValidationResult.Invalid(
-                "An API key is required.");
+                "An API key is required.",
+                CredentialValidationFailure.MissingCredential);
         }
 
         string requestUri =
-            "v2/featured" +
-            "?key=" +
-            Escape(credential.Trim()) +
-            "&limit=1" +
-            "&media_filter=tinygif";
+            KlipyRequestBuilder
+                .BuildCredentialValidation(
+                    credential.Trim());
 
         try
         {
-            await SendAsync<KlipySearchResponseDto>(
-                requestUri,
-                cancellationToken);
+            KlipyResponseDto response =
+                await SendForResponseAsync(
+                        requestUri,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            if (!response.Result)
+            {
+                return CredentialValidationResult.Invalid(
+                    "KLIPY did not accept that API key.");
+            }
 
             return CredentialValidationResult.Valid();
         }
         catch (GifProviderException exception)
-            when (
-                exception.Failure ==
-                    GifProviderFailure.Unauthorized)
         {
-            return CredentialValidationResult.Invalid(
-                "KLIPY did not accept that API key.");
+            return ToCredentialValidationResult(
+                exception);
         }
     }
 
@@ -136,33 +125,42 @@ public sealed class KlipyGifProvider : IGifProvider
 
         string apiKey =
             await GetApiKeyAsync(
-                cancellationToken);
+                    cancellationToken)
+                .ConfigureAwait(false);
 
         string requestUri =
-            "v2/registershare" +
-            "?key=" +
-            Escape(apiKey) +
-            "&id=" +
-            Escape(itemId);
+            KlipyRequestBuilder.BuildShare(
+                apiKey,
+                itemId);
 
-        if (searchQuery is not null)
-        {
-            requestUri +=
-                "&q=" +
-                Escape(searchQuery);
-        }
+        Dictionary<string, string?> body =
+            new(StringComparer.Ordinal)
+            {
+                ["q"] =
+                    string.IsNullOrWhiteSpace(
+                        searchQuery)
+                        ? null
+                        : searchQuery.Trim()
+            };
 
         using HttpRequestMessage request =
             new(
-                HttpMethod.Get,
-                requestUri);
+                HttpMethod.Post,
+                requestUri)
+            {
+                Content =
+                    JsonContent.Create(
+                        body)
+            };
 
         using HttpResponseMessage response =
             await SendRequestAsync(
-                request,
-                cancellationToken);
+                    request,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
-        EnsureSuccess(response);
+        EnsureSuccess(
+            response);
     }
 
     private async Task<string> GetApiKeyAsync(
@@ -170,10 +168,12 @@ public sealed class KlipyGifProvider : IGifProvider
     {
         string? apiKey =
             await _secretStore.GetAsync(
-                SecretNames.KlipyApiKey,
-                cancellationToken);
+                    SecretNames.KlipyApiKey,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
-        if (string.IsNullOrWhiteSpace(apiKey))
+        if (string.IsNullOrWhiteSpace(
+                apiKey))
         {
             throw new GifProviderException(
                 ProviderId,
@@ -184,9 +184,10 @@ public sealed class KlipyGifProvider : IGifProvider
         return apiKey.Trim();
     }
 
-    private async Task<T> SendAsync<T>(
-        string requestUri,
-        CancellationToken cancellationToken)
+    private async Task<KlipyResponseDto>
+        SendForResponseAsync(
+            string requestUri,
+            CancellationToken cancellationToken)
     {
         using HttpRequestMessage request =
             new(
@@ -195,45 +196,17 @@ public sealed class KlipyGifProvider : IGifProvider
 
         using HttpResponseMessage response =
             await SendRequestAsync(
-                request,
-                cancellationToken);
+                    request,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
-        EnsureSuccess(response);
+        EnsureSuccess(
+            response);
 
-        try
-        {
-            T? result =
-                await response.Content
-                    .ReadFromJsonAsync<T>(
-                        cancellationToken:
-                            cancellationToken);
-
-            if (result is null)
-            {
-                throw new GifProviderException(
-                    ProviderId,
-                    GifProviderFailure.InvalidResponse,
-                    "KLIPY returned an empty response.");
-            }
-
-            return result;
-        }
-        catch (JsonException exception)
-        {
-            throw new GifProviderException(
-                ProviderId,
-                GifProviderFailure.InvalidResponse,
-                "KLIPY returned an invalid response.",
-                exception);
-        }
-        catch (NotSupportedException exception)
-        {
-            throw new GifProviderException(
-                ProviderId,
-                GifProviderFailure.InvalidResponse,
-                "KLIPY returned an unsupported response.",
-                exception);
-        }
+        return await ReadResponseAsync(
+                response,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async Task<HttpResponseMessage>
@@ -244,17 +217,19 @@ public sealed class KlipyGifProvider : IGifProvider
         try
         {
             return await _httpClient.SendAsync(
-                request,
-                HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken);
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException exception)
             when (!cancellationToken.IsCancellationRequested)
         {
             throw new GifProviderException(
                 ProviderId,
-                GifProviderFailure.Network,
-                "The KLIPY request timed out.");
+                GifProviderFailure.Timeout,
+                "The KLIPY request timed out.",
+                exception);
         }
         catch (HttpRequestException exception)
         {
@@ -262,6 +237,97 @@ public sealed class KlipyGifProvider : IGifProvider
                 ProviderId,
                 GifProviderFailure.Network,
                 "KLIPY could not be reached.",
+                exception);
+        }
+    }
+
+    private static async Task<KlipyResponseDto>
+        ReadResponseAsync(
+            HttpResponseMessage response,
+            CancellationToken cancellationToken)
+    {
+        long? contentLength =
+            response.Content.Headers
+                .ContentLength;
+
+        if (contentLength >
+            MaximumApiResponseBytes)
+        {
+            throw InvalidResponse(
+                "KLIPY returned an oversized response.");
+        }
+
+        await using Stream source =
+            await response.Content
+                .ReadAsStreamAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        using MemoryStream buffer =
+            new();
+
+        byte[] chunk =
+            new byte[81920];
+
+        while (true)
+        {
+            int read =
+                await source.ReadAsync(
+                        chunk,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            if (read == 0)
+            {
+                break;
+            }
+
+            if (buffer.Length + read >
+                MaximumApiResponseBytes)
+            {
+                throw InvalidResponse(
+                    "KLIPY returned an oversized response.");
+            }
+
+            await buffer.WriteAsync(
+                    chunk.AsMemory(
+                        0,
+                        read),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        buffer.Position = 0;
+
+        try
+        {
+            KlipyResponseDto? result =
+                await JsonSerializer
+                    .DeserializeAsync<
+                        KlipyResponseDto>(
+                        buffer,
+                        SerializerOptions,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            return result ??
+                throw InvalidResponse(
+                    "KLIPY returned an empty response.");
+        }
+        catch (JsonException exception)
+        {
+            throw new GifProviderException(
+                ProviderId,
+                GifProviderFailure.InvalidResponse,
+                "KLIPY returned malformed JSON.",
+                exception);
+        }
+        catch (NotSupportedException exception)
+        {
+            throw new GifProviderException(
+                ProviderId,
+                GifProviderFailure.InvalidResponse,
+                "KLIPY returned an unsupported response.",
                 exception);
         }
     }
@@ -283,21 +349,25 @@ public sealed class KlipyGifProvider : IGifProvider
                 HttpStatusCode.Forbidden =>
                     GifProviderFailure.Unauthorized,
 
+                HttpStatusCode.NotFound =>
+                    GifProviderFailure.Unauthorized,
+
                 HttpStatusCode.TooManyRequests =>
                     GifProviderFailure.RateLimited,
 
-                HttpStatusCode.BadGateway =>
-                    GifProviderFailure.ServiceUnavailable,
+                HttpStatusCode.RequestTimeout =>
+                    GifProviderFailure.Timeout,
 
-                HttpStatusCode.ServiceUnavailable =>
-                    GifProviderFailure.ServiceUnavailable,
-
-                HttpStatusCode.GatewayTimeout =>
+                _ when
+                    (int)response.StatusCode >= 500 =>
                     GifProviderFailure.ServiceUnavailable,
 
                 _ =>
                     GifProviderFailure.Unknown
             };
+
+        TimeSpan? retryAfter =
+            response.Headers.RetryAfter?.Delta;
 
         string message =
             failure switch
@@ -307,6 +377,9 @@ public sealed class KlipyGifProvider : IGifProvider
 
                 GifProviderFailure.RateLimited =>
                     "KLIPY temporarily rate limited the request.",
+
+                GifProviderFailure.Timeout =>
+                    "The KLIPY request timed out.",
 
                 GifProviderFailure.ServiceUnavailable =>
                     "KLIPY is temporarily unavailable.",
@@ -318,149 +391,57 @@ public sealed class KlipyGifProvider : IGifProvider
         throw new GifProviderException(
             ProviderId,
             failure,
-            message);
+            message,
+            retryAfter: retryAfter);
     }
 
-    private static GifItem MapResult(
-        KlipyResultDto result)
+    private static CredentialValidationResult
+        ToCredentialValidationResult(
+            GifProviderException exception)
     {
-        if (string.IsNullOrWhiteSpace(result.Id))
-        {
-            throw InvalidResponse(
-                "A KLIPY result did not contain an ID.");
-        }
+        CredentialValidationFailure failure =
+            exception.Failure switch
+            {
+                GifProviderFailure.MissingCredential =>
+                    CredentialValidationFailure.MissingCredential,
 
-        KlipyMediaDto fullGif =
-            GetRequiredMedia(
-                result,
-                "gif");
+                GifProviderFailure.Unauthorized =>
+                    CredentialValidationFailure.InvalidCredential,
 
-        KlipyMediaDto preview =
-            GetMedia(result, "mediumgif") ??
-            GetMedia(result, "tinygif") ??
-            fullGif;
+                GifProviderFailure.RateLimited =>
+                    CredentialValidationFailure.RateLimited,
 
-        KlipyMediaDto thumbnail =
-            GetMedia(result, "tinygifpreview") ??
-            GetMedia(result, "tinygif") ??
-            preview;
+                GifProviderFailure.Network =>
+                    CredentialValidationFailure.Network,
 
-        if (!Uri.TryCreate(
-                fullGif.Url,
-                UriKind.Absolute,
-                out Uri? gifUri) ||
-            gifUri.Scheme != Uri.UriSchemeHttps)
-        {
-            throw InvalidResponse(
-                "KLIPY returned an invalid GIF URL.");
-        }
+                GifProviderFailure.Timeout =>
+                    CredentialValidationFailure.Timeout,
 
-        if (!Uri.TryCreate(
-                preview.Url,
-                UriKind.Absolute,
-                out Uri? previewUri) ||
-            previewUri.Scheme != Uri.UriSchemeHttps)
-        {
-            throw InvalidResponse(
-                "KLIPY returned an invalid preview URL.");
-        }
+                GifProviderFailure.ServiceUnavailable =>
+                    CredentialValidationFailure.ServiceUnavailable,
 
-        if (!Uri.TryCreate(
-                thumbnail.Url,
-                UriKind.Absolute,
-                out Uri? thumbnailUri) ||
-            thumbnailUri.Scheme != Uri.UriSchemeHttps)
-        {
-            throw InvalidResponse(
-                "KLIPY returned an invalid thumbnail URL.");
-        }
+                _ =>
+                    CredentialValidationFailure.Unknown
+            };
 
-        int width = 0;
-        int height = 0;
+        string message =
+            failure ==
+                CredentialValidationFailure.InvalidCredential
+                ? "KLIPY did not accept that API key."
+                : exception.Message;
 
-        if (fullGif.Dimensions.Length >= 2)
-        {
-            width = fullGif.Dimensions[0];
-            height = fullGif.Dimensions[1];
-        }
-
-        return new GifItem
-        {
-            ProviderId = ProviderId,
-            Id = result.Id,
-            Title = result.Title,
-            Description =
-                result.ContentDescription,
-            ThumbnailUri = thumbnailUri,
-            GifUri = gifUri,
-            PreviewUri = previewUri,
-            Width = width,
-            Height = height
-        };
-    }
-
-    private static KlipyMediaDto GetRequiredMedia(
-        KlipyResultDto result,
-        string format)
-    {
-        return GetMedia(result, format) ??
-            throw InvalidResponse(
-                $"KLIPY did not return the required {format} media.");
-    }
-
-    private static KlipyMediaDto? GetMedia(
-        KlipyResultDto result,
-        string format)
-    {
-        if (!result.MediaFormats.TryGetValue(
-                format,
-                out KlipyMediaDto? media))
-        {
-            return null;
-        }
-
-        return string.IsNullOrWhiteSpace(media.Url)
-            ? null
-            : media;
+        return CredentialValidationResult.Invalid(
+            message,
+            failure);
     }
 
     private static GifProviderException
-        InvalidResponse(string message)
+        InvalidResponse(
+            string message)
     {
         return new GifProviderException(
             ProviderId,
             GifProviderFailure.InvalidResponse,
             message);
-    }
-
-    private static string BuildSearchUri(
-        string apiKey,
-        GifSearchRequest request)
-    {
-        string uri =
-            "v2/search" +
-            "?key=" +
-            Escape(apiKey) +
-            "&q=" +
-            Escape(request.Query) +
-            "&limit=" +
-            request.PageSize +
-            "&media_filter=" +
-            Escape(MediaFilter);
-
-        if (!string.IsNullOrWhiteSpace(
-                request.ContinuationToken))
-        {
-            uri +=
-                "&pos=" +
-                Escape(request.ContinuationToken);
-        }
-
-        return uri;
-    }
-
-    private static string Escape(string value)
-    {
-        return Uri.EscapeDataString(value);
     }
 }

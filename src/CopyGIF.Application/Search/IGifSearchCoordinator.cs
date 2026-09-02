@@ -1,4 +1,4 @@
-﻿using CopyGIF.Core.Models;
+using CopyGIF.Core.Models;
 
 namespace CopyGIF.Application.Search;
 
@@ -8,8 +8,23 @@ public interface IGifSearchCoordinator
         string query,
         CancellationToken cancellationToken = default);
 
+    Task<GifSearchPage> TrendingAsync(
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException(
+            "This search coordinator does not support Trending.");
+    }
+
     Task<GifSearchPage> LoadMoreAsync(
         string query,
         string continuationToken,
         CancellationToken cancellationToken = default);
+
+    Task<GifSearchPage> LoadMoreTrendingAsync(
+        string continuationToken,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException(
+            "This search coordinator does not support Trending pagination.");
+    }
 }

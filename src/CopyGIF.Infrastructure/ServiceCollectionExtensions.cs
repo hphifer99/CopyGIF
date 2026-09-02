@@ -1,8 +1,12 @@
 using System.Net;
 using CopyGIF.Core.Contracts;
+using CopyGIF.Core.Models;
+using CopyGIF.Core.Policies;
 using CopyGIF.Infrastructure.Klipy;
+using CopyGIF.Infrastructure.Media;
 using CopyGIF.Infrastructure.Migration;
 using CopyGIF.Infrastructure.Storage;
+using CopyGIF.Infrastructure.Time;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CopyGIF.Infrastructure;
@@ -22,6 +26,20 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<
             AtomicFileWriter>();
+
+        services.AddSingleton<
+            OwnedPathGuard>();
+
+        services.AddSingleton(
+            PreviewCacheLimits.Default);
+
+        services.AddSingleton<
+            IPreviewCache,
+            PreviewCache>();
+
+        services.AddSingleton<
+            IClock,
+            SystemClock>();
 
         services.AddSingleton<
             CorruptFileRecovery>();
@@ -54,6 +72,47 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<
             IMigrationCoordinator,
             V1MigrationCoordinator>();
+
+        services.AddSingleton(
+            new ProviderDescriptor
+            {
+                Id =
+                    KlipyGifProvider.ProviderId,
+
+                DisplayName =
+                    "KLIPY",
+
+                Capabilities =
+                    ProviderCapabilities.Search |
+                    ProviderCapabilities.Trending |
+                    ProviderCapabilities.Pagination |
+                    ProviderCapabilities.CredentialValidation |
+                    ProviderCapabilities.ShareRegistration,
+
+                RequiresCredential =
+                    true,
+
+                AttributionText =
+                    "Powered by KLIPY",
+
+                AttributionUri =
+                    new Uri(
+                        "https://klipy.com/")
+            });
+
+        services.AddSingleton<
+            IHostAddressResolver,
+            SystemHostAddressResolver>();
+
+        services.AddSingleton(
+            serviceProvider =>
+                new MediaHostPolicy(
+                    serviceProvider
+                        .GetRequiredService<
+                            IHostAddressResolver>(),
+                    [
+                        "static.klipy.com"
+                    ]));
 
         services
             .AddHttpClient<KlipyGifProvider>(
@@ -93,6 +152,45 @@ public static class ServiceCollectionExtensions
         services.AddTransient<
             IGifProviderCredentialManager,
             KlipyCredentialManager>();
+
+        services
+            .AddHttpClient<
+                SecureGifDownloader>(
+                httpClient =>
+                {
+                    httpClient.Timeout =
+                        TimeSpan.FromSeconds(
+                            30);
+                })
+            .ConfigurePrimaryHttpMessageHandler(
+                () =>
+                    new SocketsHttpHandler
+                    {
+                        AllowAutoRedirect =
+                            false,
+
+                        AutomaticDecompression =
+                            DecompressionMethods.GZip |
+                            DecompressionMethods.Deflate |
+                            DecompressionMethods.Brotli,
+
+                        ConnectTimeout =
+                            TimeSpan.FromSeconds(
+                                10),
+
+                        MaxConnectionsPerServer =
+                            MediaPolicy
+                                .MaximumConcurrentMediaRequests,
+
+                        MaxResponseHeadersLength =
+                            32
+                    });
+
+        services.AddTransient<IGifDownloader>(
+            serviceProvider =>
+                serviceProvider
+                    .GetRequiredService<
+                        SecureGifDownloader>());
 
         return services;
     }

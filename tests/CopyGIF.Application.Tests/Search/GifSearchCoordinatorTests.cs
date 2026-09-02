@@ -1,4 +1,4 @@
-﻿using CopyGIF.Application.Providers;
+using CopyGIF.Application.Providers;
 using CopyGIF.Application.Search;
 using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
@@ -10,22 +10,15 @@ namespace CopyGIF.Application.Tests.Search;
 public sealed class GifSearchCoordinatorTests
 {
     [TestMethod]
-    public async Task SearchAsync_UsesConfiguredPageSize()
+    public async Task SearchAsync_UsesConfiguredPageSizeAndQuery()
     {
         FakeGifProvider provider =
             new();
 
         FakeSettingsStore settings =
             new(
-                new AppSettings
-                {
-                    Search =
-                        new SearchSettings
-                        {
-                            ResultsPerSearch =
-                                12
-                        }
-                });
+                CreateSettings(
+                    resultsPerSearch: 12));
 
         GifSearchCoordinator coordinator =
             CreateCoordinator(
@@ -36,17 +29,50 @@ public sealed class GifSearchCoordinatorTests
             "  cats  ");
 
         GifSearchRequest request =
-            provider.LastRequest ??
-            throw new AssertFailedException(
-                "Provider did not receive a request.");
+            GetLastRequest(
+                provider);
 
         Assert.AreEqual(
             "cats",
             request.Query);
 
         Assert.AreEqual(
+            GifSearchKind.Search,
+            request.Kind);
+
+        Assert.AreEqual(
             12,
             request.PageSize);
+
+        Assert.IsNull(
+            request.ContinuationToken);
+    }
+
+    [TestMethod]
+    public async Task TrendingAsync_CreatesTrendingRequest()
+    {
+        FakeGifProvider provider =
+            new();
+
+        GifSearchCoordinator coordinator =
+            CreateCoordinator(
+                provider,
+                new FakeSettingsStore(
+                    new AppSettings()));
+
+        await coordinator.TrendingAsync();
+
+        GifSearchRequest request =
+            GetLastRequest(
+                provider);
+
+        Assert.AreEqual(
+            GifSearchKind.Trending,
+            request.Kind);
+
+        Assert.AreEqual(
+            string.Empty,
+            request.Query);
 
         Assert.IsNull(
             request.ContinuationToken);
@@ -58,50 +84,67 @@ public sealed class GifSearchCoordinatorTests
         FakeGifProvider provider =
             new();
 
-        FakeSettingsStore settings =
-            new(
-                new AppSettings());
-
         GifSearchCoordinator coordinator =
             CreateCoordinator(
                 provider,
-                settings);
+                new FakeSettingsStore(
+                    new AppSettings()));
 
         await coordinator.LoadMoreAsync(
             "cats",
-            "page-two");
+            "3");
 
         GifSearchRequest request =
-            provider.LastRequest ??
-            throw new AssertFailedException(
-                "Provider did not receive a request.");
+            GetLastRequest(
+                provider);
 
         Assert.AreEqual(
-            "cats",
-            request.Query);
+            GifSearchKind.Search,
+            request.Kind);
 
         Assert.AreEqual(
-            "page-two",
+            "3",
             request.ContinuationToken);
     }
 
     [TestMethod]
-    public async Task SearchAsync_ClampsPageSizeToProviderMaximum()
+    public async Task LoadMoreTrendingAsync_PassesContinuationToken()
+    {
+        FakeGifProvider provider =
+            new();
+
+        GifSearchCoordinator coordinator =
+            CreateCoordinator(
+                provider,
+                new FakeSettingsStore(
+                    new AppSettings()));
+
+        await coordinator.LoadMoreTrendingAsync(
+            "4");
+
+        GifSearchRequest request =
+            GetLastRequest(
+                provider);
+
+        Assert.AreEqual(
+            GifSearchKind.Trending,
+            request.Kind);
+
+        Assert.AreEqual(
+            "4",
+            request.ContinuationToken);
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_NormalizesInvalidPageSize()
     {
         FakeGifProvider provider =
             new();
 
         FakeSettingsStore settings =
             new(
-                new AppSettings
-                {
-                    Search =
-                        new SearchSettings
-                        {
-                            ResultsPerSearch =
-                                500
-                        }
-                });
+                CreateSettings(
+                    resultsPerSearch: 500));
 
         GifSearchCoordinator coordinator =
             CreateCoordinator(
@@ -111,25 +154,23 @@ public sealed class GifSearchCoordinatorTests
         await coordinator.SearchAsync(
             "cats");
 
-        GifSearchRequest request =
-            provider.LastRequest ??
-            throw new AssertFailedException(
-                "Provider did not receive a request.");
-
         Assert.AreEqual(
-            50,
-            request.PageSize);
+            24,
+            GetLastRequest(
+                provider)
+                .PageSize);
     }
 
     [TestMethod]
-    public async Task SearchAsync_UsesActiveProvider()
+    public async Task SearchAsync_PassesSettingsToProviderAccessor()
     {
         FakeGifProvider provider =
             new();
 
-        FakeSettingsStore settings =
-            new(
-                new AppSettings());
+        AppSettings configuredSettings =
+            CreateSettings(
+                activeProviderId:
+                    "future");
 
         FakeProviderAccessor accessor =
             new(
@@ -138,17 +179,21 @@ public sealed class GifSearchCoordinatorTests
         GifSearchCoordinator coordinator =
             new(
                 accessor,
-                settings);
+                new FakeSettingsStore(
+                    configuredSettings));
 
         await coordinator.SearchAsync(
             "cats");
 
         Assert.AreEqual(
             1,
-            accessor.GetActiveProviderCallCount);
+            accessor.CallCount);
 
-        Assert.IsNotNull(
-            provider.LastRequest);
+        Assert.AreEqual(
+            "future",
+            accessor.LastSettings!
+                .Providers
+                .ActiveProviderId);
     }
 
     private static GifSearchCoordinator
@@ -162,6 +207,36 @@ public sealed class GifSearchCoordinatorTests
             settingsStore);
     }
 
+    private static GifSearchRequest GetLastRequest(
+        FakeGifProvider provider)
+    {
+        return provider.LastRequest ??
+            throw new AssertFailedException(
+                "Provider did not receive a request.");
+    }
+
+    private static AppSettings CreateSettings(
+        int resultsPerSearch = 24,
+        string activeProviderId = "klipy")
+    {
+        return new AppSettings
+        {
+            Search =
+                new SearchSettings
+                {
+                    ResultsPerSearch =
+                        resultsPerSearch
+                },
+
+            Providers =
+                new ProviderSettings
+                {
+                    ActiveProviderId =
+                        activeProviderId
+                }
+        };
+    }
+
     private sealed class FakeProviderAccessor :
         IActiveGifProviderAccessor
     {
@@ -171,19 +246,26 @@ public sealed class GifSearchCoordinatorTests
         public FakeProviderAccessor(
             IGifProvider provider)
         {
-            _provider =
-                provider;
+            _provider = provider;
         }
 
-        public int GetActiveProviderCallCount
+        public int CallCount
         {
             get;
             private set;
         }
 
-        public IGifProvider GetActiveProvider()
+        public AppSettings? LastSettings
         {
-            GetActiveProviderCallCount++;
+            get;
+            private set;
+        }
+
+        public IGifProvider GetActiveProvider(
+            AppSettings settings)
+        {
+            CallCount++;
+            LastSettings = settings;
 
             return _provider;
         }
@@ -197,13 +279,11 @@ public sealed class GifSearchCoordinatorTests
         public FakeSettingsStore(
             AppSettings settings)
         {
-            _settings =
-                settings;
+            _settings = settings;
         }
 
         public Task<AppSettings> LoadAsync(
-            CancellationToken cancellationToken =
-                default)
+            CancellationToken cancellationToken = default)
         {
             cancellationToken
                 .ThrowIfCancellationRequested();
@@ -214,14 +294,12 @@ public sealed class GifSearchCoordinatorTests
 
         public Task SaveAsync(
             AppSettings settings,
-            CancellationToken cancellationToken =
-                default)
+            CancellationToken cancellationToken = default)
         {
             cancellationToken
                 .ThrowIfCancellationRequested();
 
-            _settings =
-                settings;
+            _settings = settings;
 
             return Task.CompletedTask;
         }
@@ -230,8 +308,7 @@ public sealed class GifSearchCoordinatorTests
     private sealed class FakeGifProvider :
         IGifProvider
     {
-        public string Id =>
-            "test";
+        public string Id => "test";
 
         public string DisplayName =>
             "Test Provider";
@@ -242,34 +319,24 @@ public sealed class GifSearchCoordinatorTests
             private set;
         }
 
-        public Task<GifSearchPage>
-            SearchAsync(
-                GifSearchRequest request,
-                CancellationToken cancellationToken =
-                    default)
+        public Task<GifSearchPage> SearchAsync(
+            GifSearchRequest request,
+            CancellationToken cancellationToken = default)
         {
             cancellationToken
                 .ThrowIfCancellationRequested();
 
-            LastRequest =
-                request;
+            LastRequest = request;
 
             return Task.FromResult(
-                new GifSearchPage
-                {
-                    Items = []
-                });
+                GifSearchPage.Empty());
         }
 
         public Task<CredentialValidationResult>
             ValidateCredentialAsync(
                 string credential,
-                CancellationToken cancellationToken =
-                    default)
+                CancellationToken cancellationToken = default)
         {
-            cancellationToken
-                .ThrowIfCancellationRequested();
-
             return Task.FromResult(
                 CredentialValidationResult.Valid());
         }
@@ -277,12 +344,8 @@ public sealed class GifSearchCoordinatorTests
         public Task RegisterShareAsync(
             string itemId,
             string? searchQuery,
-            CancellationToken cancellationToken =
-                default)
+            CancellationToken cancellationToken = default)
         {
-            cancellationToken
-                .ThrowIfCancellationRequested();
-
             return Task.CompletedTask;
         }
     }

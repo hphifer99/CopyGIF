@@ -1,23 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>$(CopyGifWindowsTargetFramework)</TargetFramework>
-    <SupportedOSPlatformVersion>$(CopyGifWindowsMinimumVersion)</SupportedOSPlatformVersion>
-    <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>$(CopyGifWindowsTargetFramework)</TargetFramework>
+		<SupportedOSPlatformVersion>$(CopyGifWindowsMinimumVersion)</SupportedOSPlatformVersion>
+		<IsPackable>false</IsPackable>
+		<IsTestProject>true</IsTestProject>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="MSTest" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="MSTest" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\CopyGIF.Core\CopyGIF.Core.csproj" />
-    <ProjectReference Include="..\..\src\CopyGIF.Platform.Windows\CopyGIF.Platform.Windows.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\CopyGIF.Core\CopyGIF.Core.csproj" />
+		<ProjectReference Include="..\..\src\CopyGIF.Platform.Windows\CopyGIF.Platform.Windows.csproj" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
-  </ItemGroup>
+	<ItemGroup>
+		<Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+	</ItemGroup>
 
 </Project>

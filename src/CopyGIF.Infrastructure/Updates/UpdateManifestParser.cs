@@ -9,8 +9,8 @@ public sealed class UpdateManifestParser
     public const long MaximumPackageBytes =
         1024L * 1024L * 1024L;
 
-    private static readonly JsonSerializerOptions
-        SerializerOptions =
+    private readonly JsonSerializerOptions
+        _serializerOptions =
             new(JsonSerializerDefaults.Web)
             {
                 AllowTrailingCommas = false,
@@ -49,7 +49,7 @@ public sealed class UpdateManifestParser
             UpdateManifest manifest =
                 JsonSerializer.Deserialize<UpdateManifest>(
                     manifestBytes,
-                    SerializerOptions) ??
+                    _serializerOptions) ??
                 throw new InvalidDataException(
                     "The update manifest is empty.");
 

@@ -62,6 +62,9 @@ public static class StoragePolicy
     public const long MaximumMigrationStateFileBytes =
         1024L * 1024L;
 
+    public const long MaximumUpdateStateFileBytes =
+        1024L * 1024L;
+
     public const long MaximumUpdateManifestBytes =
         256L * 1024L;
 

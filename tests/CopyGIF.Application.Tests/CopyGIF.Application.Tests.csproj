@@ -1,22 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>$(CopyGifNetTargetFramework)</TargetFramework>
-    <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>$(CopyGifNetTargetFramework)</TargetFramework>
+		<IsPackable>false</IsPackable>
+		<IsTestProject>true</IsTestProject>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="MSTest" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="MSTest" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\CopyGIF.Application\CopyGIF.Application.csproj" />
-    <ProjectReference Include="..\..\src\CopyGIF.Core\CopyGIF.Core.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\CopyGIF.Application\CopyGIF.Application.csproj" />
+		<ProjectReference Include="..\..\src\CopyGIF.Core\CopyGIF.Core.csproj" />
+		<ProjectReference Include="..\CopyGIF.Testing\CopyGIF.Testing.csproj" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
-  </ItemGroup>
+	<ItemGroup>
+		<Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+	</ItemGroup>
 
 </Project>

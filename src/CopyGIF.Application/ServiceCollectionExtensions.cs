@@ -1,5 +1,10 @@
+using CopyGIF.Application.Credentials;
+using CopyGIF.Application.Library;
+using CopyGIF.Application.Media;
+using CopyGIF.Application.Onboarding;
 using CopyGIF.Application.Providers;
 using CopyGIF.Application.Search;
+using CopyGIF.Application.Settings;
 using CopyGIF.Application.Setup;
 using CopyGIF.Core.Contracts;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,8 +29,36 @@ public static class ServiceCollectionExtensions
             ActiveGifProviderAccessor>();
 
         services.AddTransient<
+            ISearchSuggestionCoordinator,
+            SearchSuggestionCoordinator>();
+
+        services.AddTransient<
             IGifSearchCoordinator,
             GifSearchCoordinator>();
+
+        services.AddTransient<
+            IPreviewCoordinator,
+            PreviewCoordinator>();
+
+        services.AddSingleton<
+            IGifLibraryCoordinator,
+            GifLibraryCoordinator>();
+
+        services.AddTransient<
+            IGifCopyCoordinator,
+            GifCopyCoordinator>();
+
+        services.AddSingleton<
+            ISettingsCoordinator,
+            SettingsCoordinator>();
+
+        services.AddTransient<
+            IApiCredentialCoordinator,
+            ApiCredentialCoordinator>();
+
+        services.AddTransient<
+            IOnboardingCoordinator,
+            OnboardingCoordinator>();
 
         services.AddTransient<
             IProviderSetupCoordinator,

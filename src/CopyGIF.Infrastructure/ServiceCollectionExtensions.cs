@@ -7,6 +7,7 @@ using CopyGIF.Infrastructure.Media;
 using CopyGIF.Infrastructure.Migration;
 using CopyGIF.Infrastructure.Storage;
 using CopyGIF.Infrastructure.Time;
+using CopyGIF.Infrastructure.Updates;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CopyGIF.Infrastructure;
@@ -56,12 +57,23 @@ public static class ServiceCollectionExtensions
             JsonLibraryStore>();
 
         services.AddSingleton<
+            ILibraryStorageMover,
+            LibraryStorageMover>();
+
+        services.AddSingleton<
             ISearchHistoryStore,
             JsonSearchHistoryStore>();
 
         services.AddSingleton<
             IMigrationStateStore,
             JsonMigrationStateStore>();
+
+        services.AddSingleton<
+            IUpdateStateStore,
+            JsonUpdateStateStore>();
+
+        services.AddSingleton<
+            UpdateManifestParser>();
 
         services.AddSingleton<
             V1SettingsReader>();
@@ -191,6 +203,76 @@ public static class ServiceCollectionExtensions
                 serviceProvider
                     .GetRequiredService<
                         SecureGifDownloader>());
+
+        services
+            .AddHttpClient<GitHubUpdateFeed>(
+                httpClient =>
+                {
+                    httpClient.Timeout =
+                        TimeSpan.FromSeconds(
+                            30);
+                })
+            .ConfigurePrimaryHttpMessageHandler(
+                () =>
+                    new SocketsHttpHandler
+                    {
+                        AllowAutoRedirect =
+                            false,
+
+                        AutomaticDecompression =
+                            DecompressionMethods.GZip |
+                            DecompressionMethods.Deflate |
+                            DecompressionMethods.Brotli,
+
+                        ConnectTimeout =
+                            TimeSpan.FromSeconds(
+                                10),
+
+                        MaxResponseHeadersLength =
+                            32
+                    });
+
+        services.AddTransient<IUpdateFeed>(
+            serviceProvider =>
+                serviceProvider
+                    .GetRequiredService<
+                        GitHubUpdateFeed>());
+
+        services
+            .AddHttpClient<
+                HttpUpdatePackageService>(
+                httpClient =>
+                {
+                    httpClient.Timeout =
+                        TimeSpan.FromMinutes(
+                            10);
+                })
+            .ConfigurePrimaryHttpMessageHandler(
+                () =>
+                    new SocketsHttpHandler
+                    {
+                        AllowAutoRedirect =
+                            false,
+
+                        AutomaticDecompression =
+                            DecompressionMethods.None,
+
+                        ConnectTimeout =
+                            TimeSpan.FromSeconds(
+                                10),
+
+                        MaxConnectionsPerServer =
+                            2,
+
+                        MaxResponseHeadersLength =
+                            32
+                    });
+
+        services.AddTransient<IUpdatePackageService>(
+            serviceProvider =>
+                serviceProvider
+                    .GetRequiredService<
+                        HttpUpdatePackageService>());
 
         return services;
     }

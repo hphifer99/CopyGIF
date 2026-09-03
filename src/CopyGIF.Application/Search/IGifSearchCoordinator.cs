@@ -8,6 +8,15 @@ public interface IGifSearchCoordinator
         string query,
         CancellationToken cancellationToken = default);
 
+    Task<GifSearchPage> SearchDebouncedAsync(
+        string query,
+        CancellationToken cancellationToken = default)
+    {
+        return SearchAsync(
+            query,
+            cancellationToken);
+    }
+
     Task<GifSearchPage> TrendingAsync(
         CancellationToken cancellationToken = default)
     {

@@ -300,7 +300,7 @@ public sealed class SettingsCoordinator :
         }
         catch (Exception exception)
         {
-            IReadOnlyList<Exception> rollbackFailures =
+            List<Exception> rollbackFailures =
                 await RollbackAsync(
                         libraryMove,
                         startupChanged,
@@ -465,7 +465,7 @@ public sealed class SettingsCoordinator :
         return transaction;
     }
 
-    private async Task<IReadOnlyList<Exception>>
+    private async Task<List<Exception>>
         RollbackAsync(
             LibraryMoveTransaction? libraryMove,
             bool startupChanged,
@@ -541,7 +541,7 @@ public sealed class SettingsCoordinator :
 
     private async Task RollbackLibraryMoveAsync(
         LibraryMoveTransaction transaction,
-        ICollection<Exception> failures)
+        List<Exception> failures)
     {
         HashSet<string> sourceFilesNotDeleted =
             transaction.MoveResult
@@ -643,7 +643,7 @@ public sealed class SettingsCoordinator :
 
     private static LibraryEntry ReplaceLocalPath(
         LibraryEntry entry,
-        IReadOnlyDictionary<string, string> movedPaths)
+        Dictionary<string, string> movedPaths)
     {
         if (string.IsNullOrWhiteSpace(
                 entry.LocalFilePath))

@@ -13,6 +13,10 @@ namespace CopyGIF.Infrastructure.Tests.Updates;
 [TestClass]
 public sealed class UpdateInfrastructureTests
 {
+    private static readonly JsonSerializerOptions
+        ManifestSerializerOptions =
+            new(JsonSerializerDefaults.Web);
+
     private string _testDirectory = null!;
 
     [TestInitialize]
@@ -279,8 +283,7 @@ public sealed class UpdateInfrastructureTests
 
         Assert.AreEqual(
             content.LongLength,
-            progress.Values
-                .Last()
+            progress.Values[^1]
                 .BytesReceived);
     }
 
@@ -478,8 +481,7 @@ public sealed class UpdateInfrastructureTests
     {
         return JsonSerializer.SerializeToUtf8Bytes(
             manifest,
-            new JsonSerializerOptions(
-                JsonSerializerDefaults.Web));
+            ManifestSerializerOptions);
     }
 
     private sealed class InlineProgress :

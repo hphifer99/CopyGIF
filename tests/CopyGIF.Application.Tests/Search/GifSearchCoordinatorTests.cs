@@ -582,8 +582,12 @@ public sealed class GifSearchCoordinatorTests
     private static GifSearchRequest GetLastRequest(
         FakeGifProvider provider)
     {
-        return provider.SearchRequests
-            .LastOrDefault() ??
+        IReadOnlyList<GifSearchRequest> requests =
+            provider.SearchRequests;
+
+        return requests.Count > 0
+            ? requests[^1]
+            :
             throw new AssertFailedException(
                 "Provider did not receive a request.");
     }

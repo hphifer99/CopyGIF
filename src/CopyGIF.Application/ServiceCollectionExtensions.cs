@@ -6,6 +6,8 @@ using CopyGIF.Application.Providers;
 using CopyGIF.Application.Search;
 using CopyGIF.Application.Settings;
 using CopyGIF.Application.Setup;
+using CopyGIF.Application.Startup;
+using CopyGIF.Application.Updates;
 using CopyGIF.Core.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -63,6 +65,14 @@ public static class ServiceCollectionExtensions
         services.AddTransient<
             IProviderSetupCoordinator,
             ProviderSetupCoordinator>();
+
+        services.AddSingleton<
+            IUpdateCoordinator,
+            UpdateCoordinator>();
+
+        services.AddSingleton<
+            IApplicationStartupCoordinator,
+            ApplicationStartupCoordinator>();
 
         return services;
     }

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="CopyGIF.App.Views.Pages.RecentsPage"
+    x:Name="Root"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CopyGIF.App.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid
+        Padding="{StaticResource CopyGifPagePadding}"
+        RowSpacing="16"
+        Style="{StaticResource CopyGifPageRootStyle}">
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid
+            Grid.Row="0"
+            Margin="{StaticResource CopyGifPageHeaderMargin}"
+            ColumnSpacing="12">
+
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel
+                Grid.Column="0"
+                Spacing="4">
+
+                <TextBlock
+                    Style="{StaticResource CopyGifPageTitleTextStyle}"
+                    Text="Recents" />
+
+                <TextBlock
+                    Style="{StaticResource CopyGifPageSubtitleTextStyle}"
+                    Text="GIFs you copied recently." />
+
+            </StackPanel>
+
+            <ProgressRing
+                x:Name="LoadingProgressRing"
+                Grid.Column="1"
+                Width="24"
+                Height="24"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="Loading Recents"
+                IsActive="{Binding IsBusy, ElementName=Root}" />
+
+            <Button
+                x:Name="RefreshButton"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="Refresh Recents"
+                Command="{Binding RefreshCommand, ElementName=Root}"
+                Content="Refresh" />
+
+            <Button
+                x:Name="ClearHistoryButton"
+                Grid.Column="3"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="Clear recent GIF history"
+                Command="{Binding ClearHistoryCommand, ElementName=Root}"
+                Content="Clear history" />
+
+        </Grid>
+
+        <controls:StatusBanner
+            x:Name="PageStatusBanner"
+            Grid.Row="1"
+            IsClosable="False"
+            Message="{Binding StatusMessage, ElementName=Root}"
+            Severity="{Binding StatusSeverity, ElementName=Root}"
+            Title="Recents status" />
+
+        <Grid Grid.Row="2">
+
+            <GridView
+                x:Name="RecentsGridView"
+                AutomationProperties.Name="Recently copied GIFs"
+                IsItemClickEnabled="False"
+                IsTabStop="False"
+                ItemTemplate="{Binding ItemTemplate, ElementName=Root}"
+                ItemsSource="{Binding ItemsSource, ElementName=Root}"
+                SelectionMode="None">
+
+                <GridView.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <ItemsWrapGrid Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </GridView.ItemsPanel>
+
+            </GridView>
+
+            <StackPanel
+                x:Name="EmptyStatePanel"
+                MaxWidth="420"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                AutomationProperties.LiveSetting="Polite"
+                Spacing="8">
+
+                <FontIcon
+                    HorizontalAlignment="Center"
+                    FontSize="40"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Glyph="&#xE81C;" />
+
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    Style="{StaticResource CopyGifSectionTitleTextStyle}"
+                    Text="No recent GIFs" />
+
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    TextAlignment="Center"
+                    Style="{StaticResource CopyGifPageSubtitleTextStyle}"
+                    Text="GIFs you copy will appear here for quick access." />
+
+            </StackPanel>
+
+        </Grid>
+
+    </Grid>
+
+</Page>

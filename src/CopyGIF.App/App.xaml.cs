@@ -1,101 +1,153 @@
-using CopyGIF.Application;
-using CopyGIF.Core.Contracts;
-using CopyGIF.Core.Models;
-using CopyGIF.Infrastructure;
-using CopyGIF.Platform.Windows;
-using CopyGIF.Presentation;
-using Microsoft.Extensions.DependencyInjection;
+using CopyGIF.Application.Startup;
+using CopyGIF.App.Composition;
 using Microsoft.UI.Xaml;
 using XamlApplication = Microsoft.UI.Xaml.Application;
 
 namespace CopyGIF.App;
 
-public partial class App : XamlApplication
+public partial class App :
+    XamlApplication
 {
-    private Window? _window;
+    private CopyGifHost? _host;
 
-    public IServiceProvider Services { get; }
+    private Window? _startupFailureWindow;
 
     public App()
     {
         InitializeComponent();
-
-        Services =
-            ConfigureServices();
     }
 
-    private static ServiceProvider
-        ConfigureServices()
-    {
-        ServiceCollection services =
-            new();
-
-        services
-            .AddCopyGifInfrastructure();
-
-        services
-            .AddCopyGifWindowsPlatform();
-
-        services
-            .AddCopyGifApplication();
-
-        services
-            .AddCopyGifPresentation();
-
-        services.AddTransient<
-            MainWindow>();
-
-        return services.BuildServiceProvider(
-            new ServiceProviderOptions
-            {
-                ValidateOnBuild = true,
-                ValidateScopes = true
-            });
-    }
+    public IServiceProvider Services =>
+        _host?.Services ??
+        throw new InvalidOperationException(
+            "CopyGIF services are not available before application launch.");
 
     protected override async void OnLaunched(
         LaunchActivatedEventArgs args)
     {
+        _ = args;
+
         try
         {
-            IMigrationCoordinator migrationCoordinator =
-                Services.GetRequiredService<
-                    IMigrationCoordinator>();
+            _host ??=
+                CopyGifHost.Create();
 
-            MigrationResult migrationResult =
-                await migrationCoordinator
-                    .MigrateIfNeededAsync();
+            string[] commandLine =
+                Environment.GetCommandLineArgs();
 
-            if (!migrationResult.Succeeded)
+            IReadOnlyList<string> arguments =
+                commandLine.Length > 1
+                    ? commandLine[1..]
+                    : [];
+
+            ApplicationStartupResult result =
+                await _host
+                    .StartAsync(
+                        arguments)
+                    .ConfigureAwait(true);
+
+            switch (result.Status)
             {
-                ShowStartupFailure(
-                    migrationResult.Message);
+                case ApplicationStartupStatus.Ready:
+                    return;
 
-                return;
+                case ApplicationStartupStatus.RedirectedToPrimary:
+                    await DisposeHostAsync()
+                        .ConfigureAwait(true);
+
+                    Exit();
+
+                    return;
+
+                case ApplicationStartupStatus.MigrationFailed:
+                    ShowStartupFailure(
+                        result.Message ??
+                        "CopyGIF could not safely migrate its saved data.");
+
+                    return;
+
+                case ApplicationStartupStatus.HotkeyRejected:
+                    ShowStartupFailure(
+                        result.Message ??
+                        "CopyGIF could not register its configured global hotkey.");
+
+                    return;
+
+                default:
+                    ShowStartupFailure(
+                        "CopyGIF startup returned an unsupported status.");
+
+                    return;
             }
-
-            _window =
-                Services.GetRequiredService<
-                    MainWindow>();
-
-            _window.Activate();
         }
         catch (Exception)
         {
             ShowStartupFailure(
-                "CopyGIF could not verify or migrate its saved data.");
+                "CopyGIF could not complete its safe startup checks.");
         }
     }
 
     private void ShowStartupFailure(
-        string? message)
+        string message)
     {
-        _window =
-            new StartupFailureWindow(
-                string.IsNullOrWhiteSpace(message)
+        if (_startupFailureWindow is not null)
+        {
+            return;
+        }
+
+        StartupFailureWindow window =
+            new(
+                string.IsNullOrWhiteSpace(
+                    message)
                     ? "CopyGIF could not start safely."
                     : message);
 
-        _window.Activate();
+        _startupFailureWindow =
+            window;
+
+        window.Closed +=
+            HandleStartupFailureClosed;
+
+        window.Activate();
+    }
+
+    private async void HandleStartupFailureClosed(
+        object sender,
+        WindowEventArgs eventArgs)
+    {
+        _ = sender;
+        _ = eventArgs;
+
+        if (_startupFailureWindow is not null)
+        {
+            _startupFailureWindow.Closed -=
+                HandleStartupFailureClosed;
+
+            _startupFailureWindow =
+                null;
+        }
+
+        await DisposeHostAsync()
+            .ConfigureAwait(true);
+
+        Exit();
+    }
+
+    private async ValueTask DisposeHostAsync()
+    {
+        CopyGifHost? host =
+            _host;
+
+        if (host is null)
+        {
+            return;
+        }
+
+        _host =
+            null;
+
+        await host
+            .DisposeAsync()
+            .ConfigureAwait(true);
     }
 }

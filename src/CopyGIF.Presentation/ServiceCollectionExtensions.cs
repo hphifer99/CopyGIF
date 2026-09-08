@@ -56,12 +56,6 @@ public static class ServiceCollectionExtensions
         services.AddTransient<
             MainViewModel>();
 
-        // Temporary compatibility registration for the
-        // pre-Batch-8 App shell. The current XAML still
-        // binds directly to this older flat view model.
-        services.AddTransient<
-            CopyGIF.Presentation.ViewModels.MainViewModel>();
-
         return services;
     }
 }

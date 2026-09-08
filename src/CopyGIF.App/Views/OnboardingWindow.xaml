@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="CopyGIF.App.Views.OnboardingWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CopyGIF.App.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Welcome to CopyGIF">
+
+    <Grid
+        x:Name="WindowRoot"
+        MinWidth="560"
+        MinHeight="480"
+        Padding="32"
+        RowSpacing="20"
+        Style="{StaticResource CopyGifPageRootStyle}">
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel
+            Grid.Row="0"
+            Spacing="6">
+
+            <TextBlock
+                Style="{StaticResource CopyGifPageTitleTextStyle}"
+                Text="{Binding StepTitle}" />
+
+            <TextBlock
+                Style="{StaticResource CopyGifPageSubtitleTextStyle}"
+                Text="{Binding StepDescription}" />
+
+        </StackPanel>
+
+        <StackPanel
+            Grid.Row="1"
+            Spacing="6">
+
+            <TextBlock
+                x:Name="StepProgressTextBlock"
+                AutomationProperties.LiveSetting="Polite"
+                Style="{StaticResource CopyGifStatusTextStyle}" />
+
+            <ProgressBar
+                AutomationProperties.Name="Onboarding progress"
+                Maximum="{Binding StepCount}"
+                Minimum="0"
+                Value="{Binding CurrentStepNumber}" />
+
+        </StackPanel>
+
+        <ScrollViewer
+            Grid.Row="2"
+            HorizontalScrollBarVisibility="Disabled"
+            HorizontalScrollMode="Disabled"
+            VerticalScrollBarVisibility="Auto"
+            VerticalScrollMode="Auto">
+
+            <ContentPresenter
+                x:Name="StepContentPresenter"
+                HorizontalContentAlignment="Stretch"
+                VerticalContentAlignment="Stretch"
+                Content="{Binding StepContent}"
+                ContentTemplate="{Binding StepContentTemplate}" />
+
+        </ScrollViewer>
+
+        <controls:StatusBanner
+            x:Name="PageStatusBanner"
+            Grid.Row="3"
+            IsClosable="False"
+            Message="{Binding StatusMessage}"
+            Severity="{Binding StatusSeverity}"
+            Title="Setup status" />
+
+        <Grid
+            Grid.Row="4"
+            ColumnSpacing="12">
+
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Button
+                x:Name="CancelButton"
+                Grid.Column="0"
+                AutomationProperties.Name="Cancel setup"
+                Command="{Binding CancelCommand}"
+                Content="Cancel" />
+
+            <Button
+                x:Name="BackButton"
+                Grid.Column="2"
+                AutomationProperties.Name="Previous setup step"
+                Command="{Binding BackCommand}"
+                Content="Back" />
+
+            <Button
+                x:Name="NextButton"
+                Grid.Column="3"
+                AutomationProperties.Name="Next setup step"
+                Command="{Binding NextCommand}"
+                Content="Next"
+                Style="{StaticResource CopyGifPrimaryButtonStyle}" />
+
+            <Button
+                x:Name="FinishButton"
+                Grid.Column="4"
+                AutomationProperties.Name="Finish setup"
+                Command="{Binding FinishCommand}"
+                Content="Finish"
+                Style="{StaticResource CopyGifPrimaryButtonStyle}" />
+
+        </Grid>
+
+    </Grid>
+
+</Window>

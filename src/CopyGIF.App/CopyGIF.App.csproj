@@ -15,6 +15,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Controls\GifCard.xaml" />
+    <None Remove="Controls\SearchHeader.xaml" />
+    <None Remove="Controls\StatusBanner.xaml" />
+    <None Remove="Resources\Colors.xaml" />
+    <None Remove="Resources\ControlStyles.xaml" />
+    <None Remove="Resources\Themes.xaml" />
+    <None Remove="Views\MainWindow.xaml" />
+    <None Remove="Views\OnboardingWindow.xaml" />
+    <None Remove="Views\Pages\FavoritesPage.xaml" />
+    <None Remove="Views\Pages\RecentsPage.xaml" />
+    <None Remove="Views\Pages\SearchPage.xaml" />
+    <None Remove="Views\SettingsWindow.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="Assets\SplashScreen.scale-200.png" />
     <Content Include="Assets\LockScreenLogo.scale-200.png" />
     <Content Include="Assets\Square150x150Logo.scale-200.png" />
@@ -44,6 +59,45 @@
     <ProjectReference Include="..\CopyGIF.Infrastructure\CopyGIF.Infrastructure.csproj" />
     <ProjectReference Include="..\CopyGIF.Platform.Windows\CopyGIF.Platform.Windows.csproj" />
     <ProjectReference Include="..\CopyGIF.Presentation\CopyGIF.Presentation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Page Update="Controls\GifCard.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Controls\SearchHeader.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Controls\StatusBanner.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Resources\Colors.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Resources\ControlStyles.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Resources\Themes.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Views\MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Views\OnboardingWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Views\Pages\FavoritesPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Views\Pages\RecentsPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Views\Pages\SearchPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Views\SettingsWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
 
   <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)' != 'true' and '$(EnableMsixTooling)' == 'true'">

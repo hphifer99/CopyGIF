@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="using:Windows.UI">
+
+    <ui:Color x:Key="CopyGifPurple300Color">#FFB6A7FF</ui:Color>
+    <ui:Color x:Key="CopyGifPurple600Color">#FF6C4DFF</ui:Color>
+    <ui:Color x:Key="CopyGifBlue400Color">#FF5B8CFF</ui:Color>
+    <ui:Color x:Key="CopyGifBlue600Color">#FF2F63E8</ui:Color>
+    <ui:Color x:Key="CopyGifPink500Color">#FFE149C2</ui:Color>
+    <ui:Color x:Key="CopyGifWhiteColor">#FFFFFFFF</ui:Color>
+    <ui:Color x:Key="CopyGifBlackColor">#FF000000</ui:Color>
+    <ui:Color x:Key="CopyGifTransparentColor">#00FFFFFF</ui:Color>
+
+</ResourceDictionary>

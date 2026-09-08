@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ResourceDictionary.ThemeDictionaries>
+
+        <ResourceDictionary x:Key="Light">
+            <SolidColorBrush
+                x:Key="CopyGifBrandPrimaryBrush"
+                Color="{StaticResource CopyGifPurple600Color}" />
+            <SolidColorBrush
+                x:Key="CopyGifBrandSecondaryBrush"
+                Color="{StaticResource CopyGifBlue600Color}" />
+            <SolidColorBrush
+                x:Key="CopyGifCardBackgroundBrush"
+                Color="#F8FFFFFF" />
+            <SolidColorBrush
+                x:Key="CopyGifCardBorderBrush"
+                Color="#18000000" />
+            <SolidColorBrush
+                x:Key="CopyGifCardSelectedBrush"
+                Color="#246C4DFF" />
+            <SolidColorBrush
+                x:Key="CopyGifPreviewOverlayBrush"
+                Color="#99000000" />
+        </ResourceDictionary>
+
+        <ResourceDictionary x:Key="Dark">
+            <SolidColorBrush
+                x:Key="CopyGifBrandPrimaryBrush"
+                Color="{StaticResource CopyGifPurple300Color}" />
+            <SolidColorBrush
+                x:Key="CopyGifBrandSecondaryBrush"
+                Color="{StaticResource CopyGifBlue400Color}" />
+            <SolidColorBrush
+                x:Key="CopyGifCardBackgroundBrush"
+                Color="#FF202020" />
+            <SolidColorBrush
+                x:Key="CopyGifCardBorderBrush"
+                Color="#24FFFFFF" />
+            <SolidColorBrush
+                x:Key="CopyGifCardSelectedBrush"
+                Color="#387A64FF" />
+            <SolidColorBrush
+                x:Key="CopyGifPreviewOverlayBrush"
+                Color="#B3000000" />
+        </ResourceDictionary>
+
+        <ResourceDictionary x:Key="HighContrast">
+            <SolidColorBrush
+                x:Key="CopyGifBrandPrimaryBrush"
+                Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush
+                x:Key="CopyGifBrandSecondaryBrush"
+                Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush
+                x:Key="CopyGifCardBackgroundBrush"
+                Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush
+                x:Key="CopyGifCardBorderBrush"
+                Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush
+                x:Key="CopyGifCardSelectedBrush"
+                Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush
+                x:Key="CopyGifPreviewOverlayBrush"
+                Color="{ThemeResource SystemColorWindowColor}" />
+        </ResourceDictionary>
+
+    </ResourceDictionary.ThemeDictionaries>
+
+</ResourceDictionary>

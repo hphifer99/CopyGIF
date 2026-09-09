@@ -28,7 +28,7 @@ public sealed class MediaCompositionTests
                 IPreviewCache>();
 
         Assert.IsInstanceOfType<
-            PreviewCache>(
+            SecurePreviewCache>(
             first);
 
         Assert.AreSame(

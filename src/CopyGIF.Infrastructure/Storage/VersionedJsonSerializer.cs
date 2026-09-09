@@ -219,8 +219,8 @@ public sealed class VersionedJsonSerializer
                     .MissingSchemaVersion();
             }
 
-            if (!versionElement.TryGetInt32(
-                    out int schemaVersion))
+            if (versionElement.ValueKind != JsonValueKind.Number ||
+                !versionElement.TryGetInt32(out int schemaVersion))
             {
                 return JsonReadResult<T>.Invalid();
             }

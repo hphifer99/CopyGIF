@@ -52,6 +52,11 @@ public sealed class GitHubUpdateFeed :
                 "Only the stable update channel is supported.");
         }
 
+        using CancellationTokenSource deadline =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(30));
+        cancellationToken = deadline.Token;
+
         Uri currentUri = LatestManifestUri;
 
         for (int redirectCount = 0;

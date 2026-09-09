@@ -189,7 +189,7 @@ public sealed class ApplicationStartupCoordinatorTests
     }
 
     [TestMethod]
-    public async Task InitializeAsync_HotkeyConflict_ReturnsUsefulFailureAndStops()
+    public async Task InitializeAsync_HotkeyConflict_KeepsTrayAvailableForRecovery()
     {
         AppSettings settings =
             CreateSettings(
@@ -211,7 +211,7 @@ public sealed class ApplicationStartupCoordinatorTests
                 []);
 
         Assert.AreEqual(
-            ApplicationStartupStatus.HotkeyRejected,
+            ApplicationStartupStatus.Ready,
             result.Status);
 
         Assert.AreEqual(
@@ -226,11 +226,11 @@ public sealed class ApplicationStartupCoordinatorTests
             harness.HotkeyService.RegisteredGesture);
 
         Assert.HasCount(
-            0,
+            1,
             harness.StartupService.RequestedStates);
 
         Assert.AreEqual(
-            0,
+            1,
             harness.TrayService.InitializeCallCount);
     }
 

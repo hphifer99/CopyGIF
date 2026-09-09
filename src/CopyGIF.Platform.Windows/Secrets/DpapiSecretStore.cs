@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
 using CopyGIF.Core.Contracts;
 
@@ -78,7 +78,7 @@ public sealed class DpapiSecretStore : ISecretStore
             _secretsDirectory);
 
         string path = GetSecretPath(name);
-        string temporaryPath = path + ".tmp";
+        string temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
 
         byte[] plainBytes =
             Encoding.UTF8.GetBytes(value);
@@ -126,8 +126,7 @@ public sealed class DpapiSecretStore : ISecretStore
         cancellationToken.ThrowIfCancellationRequested();
 
         string path = GetSecretPath(name);
-
-        TryDelete(path);
+        File.Delete(path);
 
         return Task.CompletedTask;
     }

@@ -84,6 +84,12 @@ public sealed class SecureGifDownloader :
                 "The GIF download purpose is not supported.");
         }
 
+        using CancellationTokenSource deadline =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(30));
+        CancellationToken callerToken = cancellationToken;
+        cancellationToken = deadline.Token;
+
         DownloadDestination destination =
             await GetDestinationAsync(
                     purpose,
@@ -152,6 +158,12 @@ public sealed class SecureGifDownloader :
 
                 Purpose = purpose
             };
+        }
+        catch (OperationCanceledException exception) when (!callerToken.IsCancellationRequested)
+        {
+            DeleteTemporaryFile(destination.OwnedRoot, temporaryPath);
+            throw new MediaDownloadException(MediaDownloadFailure.Timeout,
+                "The GIF download timed out.", exception);
         }
         catch (OperationCanceledException)
         {

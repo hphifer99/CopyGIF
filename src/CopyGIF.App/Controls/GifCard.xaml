@@ -1,125 +1,782 @@
-<?xml version="1.0" encoding="utf-8"?>
-<UserControl
-    x:Class="CopyGIF.App.Controls.GifCard"
-    x:Name="Root"
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    MinWidth="180"
-    Unloaded="Root_Unloaded"
-    mc:Ignorable="d">
+using System.Windows.Input;
+using CopyGIF.App.Services;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media.Imaging;
 
-    <Grid>
+namespace CopyGIF.App.Controls;
 
-        <Button
-            x:Name="SelectButton"
-            Padding="0"
-            AutomationProperties.Name="GIF result"
-            Background="Transparent"
-            BorderThickness="0"
-            Command="{Binding SelectCommand, ElementName=Root}"
-            CommandParameter="{Binding SelectCommandParameter, ElementName=Root}"
-            GotFocus="SelectButton_GotFocus"
-            HorizontalContentAlignment="Stretch"
-            LostFocus="SelectButton_LostFocus"
-            PointerEntered="SelectButton_PointerEntered"
-            PointerExited="SelectButton_PointerExited"
-            UseSystemFocusVisuals="True"
-            VerticalContentAlignment="Stretch">
+public sealed partial class GifCard :
+UserControl
+{
+private const int PreviewDecodePixelWidth =
+320;
 
-            <Border
-                Style="{StaticResource CopyGifCardBorderStyle}">
+public static readonly DependencyProperty
+TitleProperty =
+DependencyProperty.Register(
+nameof(Title),
+typeof(string),
+typeof(GifCard),
+new PropertyMetadata(
+string.Empty,
+HandleAccessibleTextChanged));
 
-                <Grid>
+public static readonly DependencyProperty
+ProviderNameProperty =
+DependencyProperty.Register(
+nameof(ProviderName),
+typeof(string),
+typeof(GifCard),
+new PropertyMetadata(
+string.Empty,
+HandleAccessibleTextChanged));
 
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="160" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+public static readonly DependencyProperty
+ThumbnailUriProperty =
+DependencyProperty.Register(
+nameof(ThumbnailUri),
+typeof(Uri),
+typeof(GifCard),
+new PropertyMetadata(
+null,
+HandleThumbnailUriChanged));
 
-                    <Grid
-                        Grid.Row="0"
-                        Background="{ThemeResource ControlFillColorSecondaryBrush}">
+public static readonly DependencyProperty
+PreviewUriProperty =
+DependencyProperty.Register(
+nameof(PreviewUri),
+typeof(Uri),
+typeof(GifCard),
+new PropertyMetadata(
+null,
+HandlePreviewUriChanged));
 
-                        <FontIcon
-                            x:Name="PlaceholderIcon"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            FontSize="32"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Glyph="&#xEB9F;" />
+public static readonly DependencyProperty
+IsFavoriteProperty =
+DependencyProperty.Register(
+nameof(IsFavorite),
+typeof(bool),
+typeof(GifCard),
+new PropertyMetadata(
+false,
+HandleIsFavoriteChanged));
 
-                        <Image
-                            x:Name="ThumbnailImage"
-                            AutomationProperties.AccessibilityView="Raw"
-                            Stretch="UniformToFill" />
+public static readonly DependencyProperty
+IsBusyProperty =
+DependencyProperty.Register(
+nameof(IsBusy),
+typeof(bool),
+typeof(GifCard),
+new PropertyMetadata(
+false,
+HandleIsBusyChanged));
 
-                        <Image
-                            x:Name="AnimatedImage"
-                            AutomationProperties.AccessibilityView="Raw"
-                            ImageFailed="AnimatedImage_ImageFailed"
-                            ImageOpened="AnimatedImage_ImageOpened"
-                            Opacity="0"
-                            Stretch="UniformToFill" />
+public static readonly DependencyProperty
+AnimatePreviewProperty =
+DependencyProperty.Register(
+nameof(AnimatePreview),
+typeof(bool),
+typeof(GifCard),
+new PropertyMetadata(
+true,
+HandleAnimationPreferenceChanged));
 
-                        <Grid
-                            x:Name="BusyOverlay"
-                            Background="{ThemeResource CopyGifPreviewOverlayBrush}">
+public static readonly DependencyProperty
+SystemAnimationsEnabledProperty =
+DependencyProperty.Register(
+nameof(SystemAnimationsEnabled),
+typeof(bool),
+typeof(GifCard),
+new PropertyMetadata(
+true,
+HandleAnimationPreferenceChanged));
 
-                            <ProgressRing
-                                Width="32"
-                                Height="32"
-                                AutomationProperties.Name="Copying GIF"
-                                IsActive="{Binding IsBusy, ElementName=Root}" />
+public static readonly DependencyProperty
+SelectCommandProperty =
+DependencyProperty.Register(
+nameof(SelectCommand),
+typeof(ICommand),
+typeof(GifCard),
+new PropertyMetadata(
+null));
 
-                        </Grid>
+public static readonly DependencyProperty
+SelectCommandParameterProperty =
+DependencyProperty.Register(
+nameof(SelectCommandParameter),
+typeof(object),
+typeof(GifCard),
+new PropertyMetadata(
+null));
 
-                    </Grid>
+public static readonly DependencyProperty
+ToggleFavoriteCommandProperty =
+DependencyProperty.Register(
+nameof(ToggleFavoriteCommand),
+typeof(ICommand),
+typeof(GifCard),
+new PropertyMetadata(
+null));
 
-                    <StackPanel
-                        Grid.Row="1"
-                        Padding="12"
-                        Spacing="4">
+public static readonly DependencyProperty
+ToggleFavoriteCommandParameterProperty =
+DependencyProperty.Register(
+nameof(ToggleFavoriteCommandParameter),
+typeof(object),
+typeof(GifCard),
+new PropertyMetadata(
+null));
 
-                        <TextBlock
-                            MaxLines="2"
-                            Text="{Binding Title, ElementName=Root}"
-                            TextTrimming="CharacterEllipsis"
-                            TextWrapping="Wrap" />
+public static readonly DependencyProperty LoadThumbnailCommandProperty =
+DependencyProperty.Register(nameof(LoadThumbnailCommand), typeof(ICommand),
+typeof(GifCard), new PropertyMetadata(null));
 
-                        <TextBlock
-                            x:Name="ProviderTextBlock"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            FontSize="12"
-                            Text="{Binding ProviderName, ElementName=Root}"
-                            TextTrimming="CharacterEllipsis" />
+public static readonly DependencyProperty StartPreviewCommandProperty =
+DependencyProperty.Register(nameof(StartPreviewCommand), typeof(ICommand),
+typeof(GifCard), new PropertyMetadata(null, HandleStartPreviewCommandChanged));
 
-                    </StackPanel>
+public static readonly DependencyProperty StopPreviewCommandProperty =
+DependencyProperty.Register(nameof(StopPreviewCommand), typeof(ICommand),
+typeof(GifCard), new PropertyMetadata(null));
 
-                </Grid>
+public ICommand? LoadThumbnailCommand
+{
+get => GetValue(LoadThumbnailCommandProperty) as ICommand;
+set => SetValue(LoadThumbnailCommandProperty, value);
+}
 
-            </Border>
+public ICommand? StartPreviewCommand
+{
+get => GetValue(StartPreviewCommandProperty) as ICommand;
+set => SetValue(StartPreviewCommandProperty, value);
+}
 
-        </Button>
+public ICommand? StopPreviewCommand
+{
+get => GetValue(StopPreviewCommandProperty) as ICommand;
+set => SetValue(StopPreviewCommandProperty, value);
+}
 
-        <Button
-            x:Name="FavoriteButton"
-            Margin="8"
-            HorizontalAlignment="Right"
-            VerticalAlignment="Top"
-            AutomationProperties.Name="Add GIF to Favorites"
-            Command="{Binding ToggleFavoriteCommand, ElementName=Root}"
-            CommandParameter="{Binding ToggleFavoriteCommandParameter, ElementName=Root}"
-            Style="{StaticResource CopyGifIconButtonStyle}"
-            ToolTipService.ToolTip="Toggle Favorite">
+private ICommand? _observedStartPreviewCommand;
+private bool _previewRequested;
+private XamlRoot? _observedRoot;
+private bool _isLoaded;
 
-            <FontIcon
-                x:Name="FavoriteIcon"
-                Glyph="&#xE734;" />
+private int _thumbnailVersion;
 
-        </Button>
+private BitmapImage? _previewBitmap;
 
-    </Grid>
+private bool _isPointerOver;
 
-</UserControl>
+private bool _hasKeyboardFocus;
+
+private bool _isPreviewReady;
+
+public GifCard()
+{
+InitializeComponent();
+Loaded += Root_Loaded;
+
+UpdateFavoriteState();
+UpdateBusyState();
+UpdateAccessibleText();
+RefreshThumbnail();
+}
+
+public string Title
+{
+get =>
+(string)GetValue(
+TitleProperty);
+
+set =>
+SetValue(
+TitleProperty,
+value);
+}
+
+public string ProviderName
+{
+get =>
+(string)GetValue(
+ProviderNameProperty);
+
+set =>
+SetValue(
+ProviderNameProperty,
+value);
+}
+
+public Uri? ThumbnailUri
+{
+get =>
+GetValue(
+ThumbnailUriProperty)
+as Uri;
+
+set =>
+SetValue(
+ThumbnailUriProperty,
+value);
+}
+
+public Uri? PreviewUri
+{
+get =>
+GetValue(
+PreviewUriProperty)
+as Uri;
+
+set =>
+SetValue(
+PreviewUriProperty,
+value);
+}
+
+public bool IsFavorite
+{
+get =>
+(bool)GetValue(
+IsFavoriteProperty);
+
+set =>
+SetValue(
+IsFavoriteProperty,
+value);
+}
+
+public bool IsBusy
+{
+get =>
+(bool)GetValue(
+IsBusyProperty);
+
+set =>
+SetValue(
+IsBusyProperty,
+value);
+}
+
+public bool AnimatePreview
+{
+get =>
+(bool)GetValue(
+AnimatePreviewProperty);
+
+set =>
+SetValue(
+AnimatePreviewProperty,
+value);
+}
+
+public bool SystemAnimationsEnabled
+{
+get =>
+(bool)GetValue(
+SystemAnimationsEnabledProperty);
+
+set =>
+SetValue(
+SystemAnimationsEnabledProperty,
+value);
+}
+
+public ICommand? SelectCommand
+{
+get =>
+GetValue(
+SelectCommandProperty)
+as ICommand;
+
+set =>
+SetValue(
+SelectCommandProperty,
+value);
+}
+
+public object? SelectCommandParameter
+{
+get =>
+GetValue(
+SelectCommandParameterProperty);
+
+set =>
+SetValue(
+SelectCommandParameterProperty,
+value);
+}
+
+public ICommand? ToggleFavoriteCommand
+{
+get =>
+GetValue(
+ToggleFavoriteCommandProperty)
+as ICommand;
+
+set =>
+SetValue(
+ToggleFavoriteCommandProperty,
+value);
+}
+
+public object? ToggleFavoriteCommandParameter
+{
+get =>
+GetValue(
+ToggleFavoriteCommandParameterProperty);
+
+set =>
+SetValue(
+ToggleFavoriteCommandParameterProperty,
+value);
+}
+
+private bool CanAnimatePreview =>
+AnimatePreview &&
+SystemAnimationsEnabled &&
+PreviewUri is not null;
+
+private static void HandleAccessibleTextChanged(
+DependencyObject sender,
+DependencyPropertyChangedEventArgs
+eventArgs)
+{
+_ = eventArgs;
+
+((GifCard)sender)
+.UpdateAccessibleText();
+}
+
+private static void HandleThumbnailUriChanged(
+DependencyObject sender,
+DependencyPropertyChangedEventArgs
+eventArgs)
+{
+_ = eventArgs;
+
+((GifCard)sender)
+.RefreshThumbnail();
+}
+
+private static void HandlePreviewUriChanged(
+DependencyObject sender,
+DependencyPropertyChangedEventArgs
+eventArgs)
+{
+_ = eventArgs;
+
+GifCard card =
+(GifCard)sender;
+
+card.ResetPreview();
+card.UpdatePreviewPlayback();
+}
+
+private static void HandleIsFavoriteChanged(
+DependencyObject sender,
+DependencyPropertyChangedEventArgs
+eventArgs)
+{
+_ = eventArgs;
+
+((GifCard)sender)
+.UpdateFavoriteState();
+}
+
+private static void HandleIsBusyChanged(
+DependencyObject sender,
+DependencyPropertyChangedEventArgs
+eventArgs)
+{
+_ = eventArgs;
+
+((GifCard)sender)
+.UpdateBusyState();
+}
+
+private static void HandleAnimationPreferenceChanged(
+DependencyObject sender,
+DependencyPropertyChangedEventArgs eventArgs)
+{
+GifCard card = (GifCard)sender;
+if (!card.AnimatePreview || !card.SystemAnimationsEnabled)
+{
+card._previewRequested = false;
+ExecuteIfAvailable(card.StopPreviewCommand);
+card.ResetPreview();
+}
+else
+{
+card.RequestPreview();
+}
+card.UpdatePreviewPlayback();
+}
+
+private static void HandleStartPreviewCommandChanged(
+DependencyObject sender, DependencyPropertyChangedEventArgs eventArgs)
+{
+GifCard card = (GifCard)sender;
+card.ObserveStartPreviewCommand();
+card.RequestPreview();
+}
+
+private void ObserveStartPreviewCommand()
+{
+if (_observedStartPreviewCommand is not null)
+{
+_observedStartPreviewCommand.CanExecuteChanged -= StartPreview_CanExecuteChanged;
+}
+_observedStartPreviewCommand = _isLoaded ? StartPreviewCommand : null;
+if (_observedStartPreviewCommand is not null)
+{
+_observedStartPreviewCommand.CanExecuteChanged += StartPreview_CanExecuteChanged;
+}
+}
+
+private void StartPreview_CanExecuteChanged(object? sender, EventArgs eventArgs)
+{
+RequestPreview();
+}
+
+private void SelectButton_PointerEntered(
+object sender,
+PointerRoutedEventArgs eventArgs)
+{
+_ = sender;
+_ = eventArgs;
+
+_isPointerOver = true;
+RequestPreview();
+UpdatePreviewPlayback();
+}
+
+private void SelectButton_PointerExited(
+object sender,
+PointerRoutedEventArgs eventArgs)
+{
+_ = sender;
+_ = eventArgs;
+
+_isPointerOver = false;
+StopInactivePreview();
+UpdatePreviewPlayback();
+}
+
+private void SelectButton_GotFocus(
+object sender,
+RoutedEventArgs eventArgs)
+{
+_ = sender;
+_ = eventArgs;
+
+_hasKeyboardFocus = true;
+RequestPreview();
+UpdatePreviewPlayback();
+}
+
+private void SelectButton_LostFocus(
+object sender,
+RoutedEventArgs eventArgs)
+{
+_ = sender;
+_ = eventArgs;
+
+_hasKeyboardFocus = false;
+StopInactivePreview();
+UpdatePreviewPlayback();
+}
+
+private void AnimatedImage_ImageOpened(
+object sender,
+RoutedEventArgs eventArgs)
+{
+_ = sender;
+_ = eventArgs;
+
+_isPreviewReady =
+true;
+
+UpdatePreviewPlayback();
+}
+
+private void AnimatedImage_ImageFailed(
+object sender,
+ExceptionRoutedEventArgs eventArgs)
+{
+_ = sender;
+_ = eventArgs;
+
+ResetPreview();
+}
+
+private void Root_Unloaded(
+object sender,
+RoutedEventArgs eventArgs)
+{
+_ = sender;
+_ = eventArgs;
+
+_isLoaded = false;
+_previewRequested = false;
+ObserveStartPreviewCommand();
+_thumbnailVersion++;
+ThumbnailImage.Source = null;
+_isPointerOver = false;
+_hasKeyboardFocus = false;
+if (_observedRoot is not null)
+{
+_observedRoot.Changed -= Root_Changed;
+_observedRoot = null;
+}
+ExecuteIfAvailable(StopPreviewCommand);
+ResetPreview();
+}
+
+private void Root_Loaded(object sender, RoutedEventArgs eventArgs)
+{
+_isLoaded = true;
+ObserveStartPreviewCommand();
+if (_observedRoot is not null)
+{
+_observedRoot.Changed -= Root_Changed;
+}
+_observedRoot = XamlRoot;
+if (_observedRoot is not null)
+{
+_observedRoot.Changed += Root_Changed;
+}
+ExecuteIfAvailable(LoadThumbnailCommand);
+RefreshThumbnail();
+RequestPreview();
+}
+
+private void Root_Changed(XamlRoot sender, XamlRootChangedEventArgs eventArgs)
+{
+if (!sender.IsHostVisible)
+{
+_previewRequested = false;
+_isPointerOver = false;
+_hasKeyboardFocus = false;
+ExecuteIfAvailable(StopPreviewCommand);
+ResetPreview();
+}
+}
+
+private void RequestPreview()
+{
+if (_isLoaded && !_previewRequested && XamlRoot?.IsHostVisible == true &&
+AnimatePreview && SystemAnimationsEnabled &&
+(_isPointerOver || _hasKeyboardFocus) &&
+StartPreviewCommand?.CanExecute(null) == true)
+{
+_previewRequested = true;
+StartPreviewCommand.Execute(null);
+}
+}
+
+private void StopInactivePreview()
+{
+if (!_isPointerOver && !_hasKeyboardFocus)
+{
+_previewRequested = false;
+ExecuteIfAvailable(StopPreviewCommand);
+ResetPreview();
+}
+}
+
+private static void ExecuteIfAvailable(ICommand? command)
+{
+if (command?.CanExecute(null) == true)
+{
+command.Execute(null);
+}
+}
+
+private static bool IsSafeLocalSource(Uri? uri)
+{
+return uri is { IsAbsoluteUri: true, IsFile: true, IsUnc: false } &&
+string.IsNullOrEmpty(uri.Host) &&
+string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment);
+}
+
+private void RefreshThumbnail()
+{
+_ = RefreshThumbnailAsync();
+}
+
+private async Task RefreshThumbnailAsync()
+{
+int version = ++_thumbnailVersion;
+Uri? thumbnailUri = ThumbnailUri;
+ThumbnailImage.Source = null;
+PlaceholderIcon.Visibility = Visibility.Visible;
+
+if (!_isLoaded || thumbnailUri is null || !IsSafeLocalSource(thumbnailUri))
+{
+return;
+}
+
+BitmapImage bitmap = new BitmapImage
+{
+AutoPlay = false,
+DecodePixelWidth = PreviewDecodePixelWidth
+};
+
+bool loaded = await LocalBitmapLoader.TryLoadAsync(bitmap, thumbnailUri);
+if (version != _thumbnailVersion || !_isLoaded || !loaded)
+{
+return;
+}
+
+ThumbnailImage.Source = bitmap;
+PlaceholderIcon.Visibility = Visibility.Collapsed;
+}
+
+private void EnsurePreviewLoaded()
+{
+if (_previewBitmap is not null ||
+PreviewUri is not Uri previewUri || !IsSafeLocalSource(previewUri))
+{
+return;
+}
+
+BitmapImage bitmap = new BitmapImage
+{
+AutoPlay = false,
+DecodePixelWidth = PreviewDecodePixelWidth
+};
+_previewBitmap = bitmap;
+_ = LoadPreviewAsync(bitmap, previewUri);
+}
+
+private async Task LoadPreviewAsync(BitmapImage bitmap, Uri previewUri)
+{
+bool loaded = await LocalBitmapLoader.TryLoadAsync(bitmap, previewUri);
+if (!ReferenceEquals(_previewBitmap, bitmap) || !_isLoaded)
+{
+return;
+}
+
+if (!loaded)
+{
+ResetPreview();
+return;
+}
+
+AnimatedImage.Source = bitmap;
+_isPreviewReady = true;
+UpdatePreviewPlayback();
+}
+
+private void UpdatePreviewPlayback()
+{
+bool shouldPlay =
+_isLoaded && XamlRoot?.IsHostVisible == true &&
+CanAnimatePreview &&
+(_isPointerOver || _hasKeyboardFocus);
+
+if (!shouldPlay)
+{
+StopPreviewPlayback();
+
+return;
+}
+
+EnsurePreviewLoaded();
+
+if (!_isPreviewReady ||
+_previewBitmap is null)
+{
+return;
+}
+
+AnimatedImage.Opacity =
+1;
+
+if (_previewBitmap.IsAnimatedBitmap &&
+!_previewBitmap.IsPlaying)
+{
+_previewBitmap.Play();
+}
+}
+
+private void StopPreviewPlayback()
+{
+if (_previewBitmap?.IsPlaying ==
+true)
+{
+_previewBitmap.Stop();
+}
+
+AnimatedImage.Opacity =
+0;
+}
+
+private void ResetPreview()
+{
+StopPreviewPlayback();
+
+AnimatedImage.Source =
+null;
+
+_previewBitmap =
+null;
+
+_isPreviewReady =
+false;
+}
+
+private void UpdateFavoriteState()
+{
+FavoriteIcon.Glyph =
+IsFavorite
+? "\uE735"
+: "\uE734";
+
+AutomationProperties.SetName(
+FavoriteButton,
+IsFavorite
+? "Remove GIF from Favorites"
+: "Add GIF to Favorites");
+}
+
+private void UpdateBusyState()
+{
+BusyOverlay.Visibility =
+IsBusy
+? Visibility.Visible
+: Visibility.Collapsed;
+
+SelectButton.IsEnabled =
+!IsBusy;
+}
+
+private void UpdateAccessibleText()
+{
+string accessibleTitle =
+string.IsNullOrWhiteSpace(
+Title)
+? "GIF result"
+: $"Copy GIF: {Title.Trim()}";
+
+AutomationProperties.SetName(
+SelectButton,
+accessibleTitle);
+
+AutomationProperties.SetHelpText(
+SelectButton,
+string.IsNullOrWhiteSpace(
+ProviderName)
+? "Press Enter to copy this GIF."
+: $"Provided by {ProviderName.Trim()}. Press Enter to copy this GIF.");
+
+ProviderTextBlock.Visibility =
+string.IsNullOrWhiteSpace(
+ProviderName)
+? Visibility.Collapsed
+: Visibility.Visible;
+}
+}

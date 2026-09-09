@@ -118,10 +118,13 @@ public sealed class PreviewCoordinator :
                     cancellationToken)
                 .ConfigureAwait(false);
 
-        return cachedEntry is null
-            ? sourceUri
-            : CreateFileUri(
-                cachedEntry.FilePath);
+        if (cachedEntry is null)
+        {
+            throw new InvalidDataException(
+                "The preview is unavailable in the validated local cache.");
+        }
+
+        return CreateFileUri(cachedEntry.FilePath);
     }
 
     private static Uri CreateFileUri(

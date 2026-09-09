@@ -258,6 +258,17 @@ public sealed class CopyGifHost :
                     cancellationToken)
                 .ConfigureAwait(true);
 
+            if (result.HotkeyFailure != HotkeyRegistrationFailure.None && !onboarding.IsRequired)
+            {
+                await _windowManager.ShowSettingsAsync(cancellationToken).ConfigureAwait(true);
+                if (_windowManager.SettingsWindow is SettingsWindow settingsWindow)
+                {
+                    settingsWindow.StatusMessage =
+                        "The hotkey is unavailable. Choose another hotkey in General settings.";
+                    settingsWindow.StatusSeverity = InfoBarSeverity.Warning;
+                }
+            }
+
             Interlocked.Exchange(
                 ref _startState,
                 2);

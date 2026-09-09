@@ -11,6 +11,92 @@ namespace CopyGIF.Presentation.Tests.Search;
 public sealed class SearchViewModelTests
 {
     [TestMethod]
+    public async Task TypingDuringDebounce_CancelsOlderQueryAndKeepsLatestResults()
+    {
+        TaskCompletionSource<GifSearchPage> firstResponse =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken firstToken = default;
+        FakeSearchCoordinator search = new()
+        {
+            SearchHandler = (query, token) =>
+            {
+                if (query == "c")
+                {
+                    firstToken = token;
+                    return firstResponse.Task;
+                }
+                return Task.FromResult(new GifSearchPage { Items = [CreateGif("latest")] });
+            }
+        };
+        using SearchViewModel viewModel = CreateViewModel(searchCoordinator: search);
+        viewModel.Query = "c";
+        Task first = viewModel.SearchDebouncedCommand.ExecuteAsync(null);
+        viewModel.Query = "cats";
+
+        Assert.IsTrue(firstToken.IsCancellationRequested);
+        Assert.IsTrue(viewModel.SearchDebouncedCommand.CanExecute(null));
+        await viewModel.SearchDebouncedCommand.ExecuteAsync(null);
+
+        firstResponse.SetResult(new GifSearchPage { Items = [CreateGif("stale")] });
+        await first;
+
+        Assert.AreEqual("cats", viewModel.ActiveQuery);
+        Assert.AreEqual("latest", viewModel.Results.Single().Id);
+        Assert.AreEqual(AsyncOperationStatus.Succeeded, viewModel.OperationState.Status);
+    }
+
+    [TestMethod]
+    public async Task EnterDuringDebounce_StartsImmediateSearch()
+    {
+        TaskCompletionSource<GifSearchPage> response =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken pendingToken = default;
+        FakeSearchCoordinator search = new()
+        {
+            SearchHandler = (_, token) =>
+            {
+                pendingToken = token;
+                return response.Task;
+            }
+        };
+        using SearchViewModel viewModel = CreateViewModel(searchCoordinator: search);
+        viewModel.Query = "cats";
+        Task pending = viewModel.SearchDebouncedCommand.ExecuteAsync(null);
+        search.SearchHandler = (_, _) => Task.FromResult(
+            new GifSearchPage { Items = [CreateGif("submitted")] });
+
+        Assert.IsTrue(viewModel.SearchCommand.CanExecute(null));
+        await viewModel.SearchCommand.ExecuteAsync(null);
+        Assert.IsTrue(pendingToken.IsCancellationRequested);
+        Assert.AreEqual(1, search.SearchCount);
+
+        response.SetResult(new GifSearchPage { Items = [CreateGif("stale")] });
+        await pending;
+        Assert.AreEqual("submitted", viewModel.Results.Single().Id);
+    }
+
+    [TestMethod]
+    public async Task ClearingDuringSearch_RejectsLateResults()
+    {
+        TaskCompletionSource<GifSearchPage> response =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeSearchCoordinator search = new() { SearchHandler = (_, _) => response.Task };
+        using SearchViewModel viewModel = CreateViewModel(searchCoordinator: search);
+        viewModel.Query = "cats";
+        Task pending = viewModel.SearchCommand.ExecuteAsync(null);
+
+        Assert.IsTrue(viewModel.ClearQueryCommand.CanExecute(null));
+        viewModel.ClearQueryCommand.Execute(null);
+        response.SetResult(new GifSearchPage { Items = [CreateGif("stale")] });
+        await pending;
+
+        Assert.AreEqual(string.Empty, viewModel.Query);
+        Assert.AreEqual(0, viewModel.Results.Count);
+        Assert.AreEqual(GifSearchMode.None, viewModel.Mode);
+        Assert.IsFalse(viewModel.IsBusy);
+    }
+
+    [TestMethod]
     public void SearchCommand_IsDisabledForEmptyQuery()
     {
         SearchViewModel viewModel =
@@ -685,6 +771,8 @@ public sealed class SearchViewModelTests
     private sealed class FakeSearchCoordinator :
         IGifSearchCoordinator
     {
+        public Func<string, CancellationToken, Task<GifSearchPage>>? SearchHandler { get; set; }
+
         public GifSearchPage SearchResult
         {
             get;
@@ -774,6 +862,12 @@ public sealed class SearchViewModelTests
             LastQuery =
                 query;
 
+            if (SearchHandler is not null)
+            {
+                return SearchHandler(query, cancellationToken);
+            }
+
+
             if (SearchException is not null)
             {
                 throw SearchException;
@@ -794,6 +888,12 @@ public sealed class SearchViewModelTests
 
             LastQuery =
                 query;
+
+            if (SearchHandler is not null)
+            {
+                return SearchHandler(query, cancellationToken);
+            }
+
 
             if (SearchException is not null)
             {

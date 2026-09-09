@@ -11,313 +11,114 @@ public sealed class PreviewCoordinatorTests
     [TestMethod]
     public async Task GetThumbnailSourceAsync_WithCacheHit_ReturnsFileUri()
     {
-        GifItem item =
-            CreateItem();
-
-        string cachedPath =
-            Path.GetFullPath(
-                Path.Combine(
-                    "cache",
-                    "cat-thumbnail.cache"));
-
-        FakePreviewCache cache =
-            new()
-            {
-                TryGetHandler =
-                    (sourceUri, kind, _) =>
-                    {
-                        Assert.AreEqual(
-                            item.ThumbnailUri,
-                            sourceUri);
-
-                        Assert.AreEqual(
-                            PreviewCacheKind.Thumbnail,
-                            kind);
-
-                        return Task.FromResult<PreviewCacheEntry?>(
-                            CreateCacheEntry(
-                                sourceUri,
-                                kind,
-                                cachedPath));
-                    }
-            };
-
-        PreviewCoordinator coordinator =
-            CreateCoordinator(
-                cache);
-
-        Uri result =
-            await coordinator.GetThumbnailSourceAsync(
-                item);
-
-        Assert.IsTrue(
-            result.IsFile);
-
-        Assert.AreEqual(
-            Path.GetFullPath(
-                cachedPath),
-            Path.GetFullPath(
-                result.LocalPath));
+        GifItem item = CreateItem();
+        PreviewCoordinator coordinator = CreateCoordinator(CacheFor(item.ThumbnailUri, PreviewCacheKind.Thumbnail));
+        Uri result = await coordinator.GetThumbnailSourceAsync(item);
+        Assert.IsTrue(result.IsFile);
+        Assert.AreEqual(Path.GetFullPath("validated.cache"), result.LocalPath);
     }
 
     [TestMethod]
-    public async Task GetThumbnailSourceAsync_WithCacheMiss_ReturnsRemoteUri()
+    public async Task GetThumbnailSourceAsync_WithCacheMiss_DoesNotReturnRemoteUri()
     {
-        GifItem item =
-            CreateItem();
-
-        PreviewCoordinator coordinator =
-            CreateCoordinator(
-                new FakePreviewCache());
-
-        Uri result =
-            await coordinator.GetThumbnailSourceAsync(
-                item);
-
-        Assert.AreEqual(
-            item.ThumbnailUri,
-            result);
+        PreviewCoordinator coordinator = CreateCoordinator(new FakePreviewCache());
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(() =>
+            coordinator.GetThumbnailSourceAsync(CreateItem()));
     }
 
     [TestMethod]
-    public async Task GetAnimatedSourceAsync_WhenAnimationsDisabled_UsesThumbnail()
+    public async Task GetAnimatedSourceAsync_WhenAnimationsDisabled_UsesCachedThumbnail()
     {
-        GifItem item =
-            CreateItem();
-
-        List<PreviewCacheKind> requestedKinds = [];
-
-        FakePreviewCache cache =
-            new()
-            {
-                TryGetHandler =
-                    (_, kind, _) =>
-                    {
-                        requestedKinds.Add(
-                            kind);
-
-                        return Task.FromResult<PreviewCacheEntry?>(
-                            null);
-                    }
-            };
-
-        PreviewCoordinator coordinator =
-            CreateCoordinator(
-                cache,
-                animatePreviews: false);
-
-        Uri result =
-            await coordinator.GetAnimatedSourceAsync(
-                item,
-                reducedMotion: false);
-
-        Assert.AreEqual(
-            item.ThumbnailUri,
-            result);
-
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                PreviewCacheKind.Thumbnail
-            },
-            requestedKinds);
+        GifItem item = CreateItem();
+        PreviewCoordinator coordinator = CreateCoordinator(
+            CacheFor(item.ThumbnailUri, PreviewCacheKind.Thumbnail), animatePreviews: false);
+        Assert.IsTrue((await coordinator.GetAnimatedSourceAsync(item, false)).IsFile);
     }
 
     [TestMethod]
-    public async Task GetAnimatedSourceAsync_WithReducedMotion_UsesThumbnail()
+    public async Task GetAnimatedSourceAsync_WithReducedMotion_UsesCachedThumbnail()
     {
-        GifItem item =
-            CreateItem();
-
-        PreviewCoordinator coordinator =
-            CreateCoordinator(
-                new FakePreviewCache(),
-                animatePreviews: true);
-
-        Uri result =
-            await coordinator.GetAnimatedSourceAsync(
-                item,
-                reducedMotion: true);
-
-        Assert.AreEqual(
-            item.ThumbnailUri,
-            result);
+        GifItem item = CreateItem();
+        PreviewCoordinator coordinator = CreateCoordinator(
+            CacheFor(item.ThumbnailUri, PreviewCacheKind.Thumbnail));
+        Assert.IsTrue((await coordinator.GetAnimatedSourceAsync(item, true)).IsFile);
     }
 
     [TestMethod]
-    public async Task GetAnimatedSourceAsync_WithAnimationEnabled_UsesPreviewUri()
+    public async Task GetAnimatedSourceAsync_WithAnimationEnabled_UsesCachedPreview()
     {
-        GifItem item =
-            CreateItem();
-
-        PreviewCoordinator coordinator =
-            CreateCoordinator(
-                new FakePreviewCache(),
-                animatePreviews: true);
-
-        Uri result =
-            await coordinator.GetAnimatedSourceAsync(
-                item,
-                reducedMotion: false);
-
-        Assert.AreEqual(
-            item.PreviewUri,
-            result);
+        GifItem item = CreateItem();
+        PreviewCoordinator coordinator = CreateCoordinator(
+            CacheFor(item.PreviewUri!, PreviewCacheKind.Preview));
+        Assert.IsTrue((await coordinator.GetAnimatedSourceAsync(item, false)).IsFile);
     }
 
     [TestMethod]
-    public async Task GetAnimatedSourceAsync_WithoutPreviewUri_UsesGifUri()
+    public async Task GetAnimatedSourceAsync_WithoutPreviewUri_UsesCachedGif()
     {
-        GifItem original =
-            CreateItem();
-
-        GifItem item =
-            original with
-            {
-                PreviewUri = null
-            };
-
-        PreviewCoordinator coordinator =
-            CreateCoordinator(
-                new FakePreviewCache(),
-                animatePreviews: true);
-
-        Uri result =
-            await coordinator.GetAnimatedSourceAsync(
-                item,
-                reducedMotion: false);
-
-        Assert.AreEqual(
-            item.GifUri,
-            result);
+        GifItem item = CreateItem() with { PreviewUri = null };
+        PreviewCoordinator coordinator = CreateCoordinator(
+            CacheFor(item.GifUri, PreviewCacheKind.Preview));
+        Assert.IsTrue((await coordinator.GetAnimatedSourceAsync(item, false)).IsFile);
     }
 
     [TestMethod]
     public async Task InvalidateAsync_RemovesThumbnailAndPreviewEntries()
     {
-        GifItem item =
-            CreateItem();
-
-        List<(Uri SourceUri, PreviewCacheKind Kind)>
-            removals = [];
-
-        FakePreviewCache cache =
-            new()
+        GifItem item = CreateItem();
+        List<(Uri, PreviewCacheKind)> removed = [];
+        FakePreviewCache cache = new()
+        {
+            RemoveHandler = (uri, kind, _) =>
             {
-                RemoveHandler =
-                    (sourceUri, kind, _) =>
-                    {
-                        removals.Add(
-                            (sourceUri, kind));
-
-                        return Task.CompletedTask;
-                    }
-            };
-
-        PreviewCoordinator coordinator =
-            CreateCoordinator(
-                cache);
-
-        await coordinator.InvalidateAsync(
-            item);
-
-        Assert.HasCount(
-            2,
-            removals);
-
-        Assert.AreEqual(
-            (item.ThumbnailUri,
-                PreviewCacheKind.Thumbnail),
-            removals[0]);
-
-        Assert.AreEqual(
-            (item.PreviewUri!,
-                PreviewCacheKind.Preview),
-            removals[1]);
+                removed.Add((uri, kind));
+                return Task.CompletedTask;
+            }
+        };
+        await CreateCoordinator(cache).InvalidateAsync(item);
+        CollectionAssert.AreEqual(
+            new[] { (item.ThumbnailUri, PreviewCacheKind.Thumbnail), (item.PreviewUri!, PreviewCacheKind.Preview) },
+            removed);
     }
 
     [TestMethod]
     public async Task CleanupAsync_UsesPreviewCache()
     {
-        FakePreviewCache cache =
-            new();
-
-        PreviewCoordinator coordinator =
-            CreateCoordinator(
-                cache);
-
-        await coordinator.CleanupAsync();
-
-        Assert.AreEqual(
-            1,
-            cache.CleanupCallCount);
+        FakePreviewCache cache = new();
+        await CreateCoordinator(cache).CleanupAsync();
+        Assert.AreEqual(1, cache.CleanupCallCount);
     }
 
-    private static PreviewCoordinator CreateCoordinator(
-        FakePreviewCache cache,
-        bool animatePreviews = true)
+    private static FakePreviewCache CacheFor(Uri expectedUri, PreviewCacheKind expectedKind) => new()
     {
-        FakeSettingsStore settingsStore =
-            new()
+        TryGetHandler = (uri, kind, _) =>
+        {
+            Assert.AreEqual(expectedUri, uri);
+            Assert.AreEqual(expectedKind, kind);
+            return Task.FromResult<PreviewCacheEntry?>(new PreviewCacheEntry
             {
-                Value =
-                    new AppSettings
-                    {
-                        Search =
-                            new SearchSettings
-                            {
-                                AnimatePreviews =
-                                    animatePreviews
-                            }
-                    }
-            };
+                SourceUri = uri,
+                Kind = kind,
+                FilePath = Path.GetFullPath("validated.cache"),
+                SizeBytes = 128,
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                LastAccessedAtUtc = DateTimeOffset.UtcNow
+            });
+        }
+    };
 
-        return new PreviewCoordinator(
-            settingsStore,
-            cache);
-    }
-
-    private static GifItem CreateItem()
-    {
-        return new GifItem
+    private static PreviewCoordinator CreateCoordinator(FakePreviewCache cache, bool animatePreviews = true) =>
+        new(new FakeSettingsStore
         {
-            ProviderId = "klipy",
-            Id = "cat-1",
-            ThumbnailUri =
-                new Uri(
-                    "https://static.klipy.com/cat-thumb.gif"),
-            PreviewUri =
-                new Uri(
-                    "https://static.klipy.com/cat-preview.gif"),
-            GifUri =
-                new Uri(
-                    "https://static.klipy.com/cat.gif")
-        };
-    }
+            Value = new AppSettings { Search = new SearchSettings { AnimatePreviews = animatePreviews } }
+        }, cache);
 
-    private static PreviewCacheEntry CreateCacheEntry(
-        Uri sourceUri,
-        PreviewCacheKind kind,
-        string filePath)
+    private static GifItem CreateItem() => new()
     {
-        DateTimeOffset timestamp =
-            new(
-                2026,
-                9,
-                3,
-                12,
-                0,
-                0,
-                TimeSpan.Zero);
-
-        return new PreviewCacheEntry
-        {
-            SourceUri = sourceUri,
-            Kind = kind,
-            FilePath = filePath,
-            SizeBytes = 128,
-            CreatedAtUtc = timestamp,
-            LastAccessedAtUtc = timestamp
-        };
-    }
+        ProviderId = "klipy",
+        Id = "cat-1",
+        ThumbnailUri = new Uri("https://static.klipy.com/cat-thumb.gif"),
+        PreviewUri = new Uri("https://static.klipy.com/cat-preview.gif"),
+        GifUri = new Uri("https://static.klipy.com/cat.gif")
+    };
 }

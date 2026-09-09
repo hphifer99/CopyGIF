@@ -358,14 +358,11 @@ public sealed partial class SearchHeader :
         _ = sender;
         _ = eventArgs;
 
-        Query =
-            string.Empty;
-
-        SearchBox.Text =
-            string.Empty;
-
         ExecuteCommand(
             ClearCommand);
+
+        Query = string.Empty;
+        SearchBox.Text = string.Empty;
 
         FocusSearchBox();
     }

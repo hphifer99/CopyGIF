@@ -1,68 +1,399 @@
-<?xml version="1.0" encoding="utf-8"?>
-<UserControl
-    x:Class="CopyGIF.App.Controls.SearchHeader"
-    x:Name="Root"
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d">
+ using System.Collections;
+using System.Globalization;
+using System.Windows.Input;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 
-    <Grid ColumnSpacing="8">
+namespace CopyGIF.App.Controls;
 
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
+public sealed partial class SearchHeader :
+    UserControl
+{
+    public static readonly DependencyProperty
+        QueryProperty =
+            DependencyProperty.Register(
+                nameof(Query),
+                typeof(string),
+                typeof(SearchHeader),
+                new PropertyMetadata(
+                    string.Empty,
+                    HandleQueryChanged));
 
-        <AutoSuggestBox
-            x:Name="SearchBox"
-            Grid.Column="0"
-            AutomationProperties.Name="Search GIFs"
-            ItemsSource="{Binding Suggestions, ElementName=Root}"
-            PlaceholderText="{Binding PlaceholderText, ElementName=Root}"
-            QuerySubmitted="SearchBox_QuerySubmitted"
-            SuggestionChosen="SearchBox_SuggestionChosen"
-            Text="{Binding Query, ElementName=Root, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-            TextChanged="SearchBox_TextChanged" />
+    public static readonly DependencyProperty
+        SuggestionsProperty =
+            DependencyProperty.Register(
+                nameof(Suggestions),
+                typeof(IEnumerable),
+                typeof(SearchHeader),
+                new PropertyMetadata(
+                    null));
 
-        <Button
-            x:Name="ClearButton"
-            Grid.Column="1"
-            AutomationProperties.Name="Clear search"
-            Click="ClearButton_Click"
-            Style="{StaticResource CopyGifIconButtonStyle}"
-            ToolTipService.ToolTip="Clear search">
+    public static readonly DependencyProperty
+        PlaceholderTextProperty =
+            DependencyProperty.Register(
+                nameof(PlaceholderText),
+                typeof(string),
+                typeof(SearchHeader),
+                new PropertyMetadata(
+                    "Search GIFs"));
 
-            <FontIcon Glyph="&#xE894;" />
+    public static readonly DependencyProperty
+        SearchCommandProperty =
+            DependencyProperty.Register(
+                nameof(SearchCommand),
+                typeof(ICommand),
+                typeof(SearchHeader),
+                new PropertyMetadata(
+                    null));
 
-        </Button>
+    public static readonly DependencyProperty
+        DebouncedSearchCommandProperty =
+            DependencyProperty.Register(
+                nameof(DebouncedSearchCommand),
+                typeof(ICommand),
+                typeof(SearchHeader),
+                new PropertyMetadata(
+                    null));
 
-        <Button
-            Grid.Column="2"
-            AutomationProperties.Name="Search"
-            Command="{Binding SearchCommand, ElementName=Root}"
-            Content="Search"
-            Style="{StaticResource CopyGifPrimaryButtonStyle}" />
+    public static readonly DependencyProperty
+        RefreshSuggestionsCommandProperty =
+            DependencyProperty.Register(
+                nameof(RefreshSuggestionsCommand),
+                typeof(ICommand),
+                typeof(SearchHeader),
+                new PropertyMetadata(
+                    null));
 
-        <ProgressRing
-            x:Name="SearchProgressRing"
-            Grid.Column="3"
-            Width="24"
-            Height="24"
-            AutomationProperties.Name="Search in progress"
-            IsActive="{Binding IsBusy, ElementName=Root}" />
+    public static readonly DependencyProperty
+        ClearCommandProperty =
+            DependencyProperty.Register(
+                nameof(ClearCommand),
+                typeof(ICommand),
+                typeof(SearchHeader),
+                new PropertyMetadata(
+                    null));
 
-        <Button
-            x:Name="CancelButton"
-            Grid.Column="4"
-            AutomationProperties.Name="Cancel search"
-            Command="{Binding CancelCommand, ElementName=Root}"
-            Content="Cancel" />
+    public static readonly DependencyProperty
+        CancelCommandProperty =
+            DependencyProperty.Register(
+                nameof(CancelCommand),
+                typeof(ICommand),
+                typeof(SearchHeader),
+                new PropertyMetadata(
+                    null));
 
-    </Grid>
+    public static readonly DependencyProperty
+        IsBusyProperty =
+            DependencyProperty.Register(
+                nameof(IsBusy),
+                typeof(bool),
+                typeof(SearchHeader),
+                new PropertyMetadata(
+                    false,
+                    HandleIsBusyChanged));
 
-</UserControl>
+    public SearchHeader()
+    {
+        InitializeComponent();
+
+        UpdateVisualState();
+    }
+
+    public string Query
+    {
+        get =>
+            (string)GetValue(
+                QueryProperty);
+
+        set =>
+            SetValue(
+                QueryProperty,
+                value);
+    }
+
+    public IEnumerable? Suggestions
+    {
+        get =>
+            GetValue(
+                SuggestionsProperty)
+                as IEnumerable;
+
+        set =>
+            SetValue(
+                SuggestionsProperty,
+                value);
+    }
+
+    public string PlaceholderText
+    {
+        get =>
+            (string)GetValue(
+                PlaceholderTextProperty);
+
+        set =>
+            SetValue(
+                PlaceholderTextProperty,
+                value);
+    }
+
+    public ICommand? SearchCommand
+    {
+        get =>
+            GetValue(
+                SearchCommandProperty)
+                as ICommand;
+
+        set =>
+            SetValue(
+                SearchCommandProperty,
+                value);
+    }
+
+    public ICommand? DebouncedSearchCommand
+    {
+        get =>
+            GetValue(
+                DebouncedSearchCommandProperty)
+                as ICommand;
+
+        set =>
+            SetValue(
+                DebouncedSearchCommandProperty,
+                value);
+    }
+
+    public ICommand? RefreshSuggestionsCommand
+    {
+        get =>
+            GetValue(
+                RefreshSuggestionsCommandProperty)
+                as ICommand;
+
+        set =>
+            SetValue(
+                RefreshSuggestionsCommandProperty,
+                value);
+    }
+
+    public ICommand? ClearCommand
+    {
+        get =>
+            GetValue(
+                ClearCommandProperty)
+                as ICommand;
+
+        set =>
+            SetValue(
+                ClearCommandProperty,
+                value);
+    }
+
+    public ICommand? CancelCommand
+    {
+        get =>
+            GetValue(
+                CancelCommandProperty)
+                as ICommand;
+
+        set =>
+            SetValue(
+                CancelCommandProperty,
+                value);
+    }
+
+    public bool IsBusy
+    {
+        get =>
+            (bool)GetValue(
+                IsBusyProperty);
+
+        set =>
+            SetValue(
+                IsBusyProperty,
+                value);
+    }
+
+    public void FocusSearchBox()
+    {
+        SearchBox.Focus(
+            FocusState.Programmatic);
+
+        FindDescendantTextBox(
+                SearchBox)?
+            .SelectAll();
+    }
+
+    private static TextBox? FindDescendantTextBox(
+        DependencyObject root)
+    {
+        int childCount =
+            VisualTreeHelper.GetChildrenCount(
+                root);
+
+        for (int index = 0;
+             index<childCount;
+             index++)
+        {
+            DependencyObject child =
+                VisualTreeHelper.GetChild(
+                    root,
+                    index);
+
+            if (child is TextBox textBox)
+            {
+                return textBox;
+            }
+
+            TextBox? descendant =
+                FindDescendantTextBox(
+                    child);
+
+            if (descendant is not null)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
+    }
+
+    private static void HandleQueryChanged(
+        DependencyObject sender,
+        DependencyPropertyChangedEventArgs
+            eventArgs)
+    {
+        _ = eventArgs;
+
+        ((SearchHeader)sender)
+            .UpdateVisualState();
+    }
+
+    private static void HandleIsBusyChanged(
+        DependencyObject sender,
+        DependencyPropertyChangedEventArgs
+            eventArgs)
+    {
+        _ = eventArgs;
+
+        ((SearchHeader)sender)
+            .UpdateVisualState();
+    }
+
+    private void SearchBox_TextChanged(
+        AutoSuggestBox sender,
+        AutoSuggestBoxTextChangedEventArgs
+            eventArgs)
+    {
+        Query =
+            sender.Text;
+
+        UpdateVisualState();
+
+        if (eventArgs.Reason !=
+            AutoSuggestionBoxTextChangeReason
+                .UserInput)
+        {
+            return;
+        }
+
+        ExecuteCommand(
+            RefreshSuggestionsCommand);
+
+        ExecuteCommand(
+            DebouncedSearchCommand);
+    }
+
+    private void SearchBox_SuggestionChosen(
+        AutoSuggestBox sender,
+        AutoSuggestBoxSuggestionChosenEventArgs
+            eventArgs)
+    {
+        string selectedText =
+            Convert.ToString(
+                eventArgs.SelectedItem,
+                CultureInfo.CurrentCulture) ??
+            string.Empty;
+
+        sender.Text =
+            selectedText;
+
+        Query =
+            selectedText;
+    }
+
+    private void SearchBox_QuerySubmitted(
+        AutoSuggestBox sender,
+        AutoSuggestBoxQuerySubmittedEventArgs
+            eventArgs)
+    {
+        if (eventArgs.ChosenSuggestion is not null)
+        {
+            string selectedText =
+                Convert.ToString(
+                    eventArgs.ChosenSuggestion,
+                    CultureInfo.CurrentCulture) ??
+                string.Empty;
+
+            sender.Text =
+                selectedText;
+
+            Query =
+                selectedText;
+        }
+        else
+        {
+            Query =
+                sender.Text;
+        }
+
+        ExecuteCommand(
+            SearchCommand);
+    }
+
+    private void ClearButton_Click(
+        object sender,
+        RoutedEventArgs eventArgs)
+    {
+        _ = sender;
+        _ = eventArgs;
+
+        ExecuteCommand(
+            ClearCommand);
+
+        Query = string.Empty;
+        SearchBox.Text = string.Empty;
+
+        FocusSearchBox();
+    }
+
+    private void UpdateVisualState()
+    {
+        ClearButton.Visibility =
+            string.IsNullOrEmpty(
+                Query)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+
+        SearchProgressRing.Visibility =
+            IsBusy
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+        CancelButton.Visibility =
+            IsBusy
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+    }
+
+    private static void ExecuteCommand(
+        ICommand? command)
+    {
+        if (command?.CanExecute(
+                null) == true)
+        {
+            command.Execute(
+                null);
+        }
+    }
+}

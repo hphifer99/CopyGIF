@@ -189,28 +189,40 @@ public sealed class KlipyGifProvider : IGifProvider
             string requestUri,
             CancellationToken cancellationToken)
     {
-        using HttpRequestMessage request =
-            new(
-                HttpMethod.Get,
-                requestUri);
+        using CancellationTokenSource deadline =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(20));
+        CancellationToken callerToken = cancellationToken;
+        cancellationToken = deadline.Token;
 
-        using HttpResponseMessage response =
-            await SendRequestAsync(
-                    request,
+        try
+        {
+            using HttpRequestMessage request = new(
+                HttpMethod.Get,
+                    requestUri);
+
+            using HttpResponseMessage response =
+                await SendRequestAsync(
+                        request,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            EnsureSuccess(
+                response);
+
+            return await ReadResponseAsync(
+                    response,
                     cancellationToken)
                 .ConfigureAwait(false);
-
-        EnsureSuccess(
-            response);
-
-        return await ReadResponseAsync(
-                response,
-                cancellationToken)
-            .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception) when (!callerToken.IsCancellationRequested)
+        {
+            throw new GifProviderException(ProviderId, GifProviderFailure.Timeout,
+                "The KLIPY request timed out.", exception);
+        }
     }
 
-    private async Task<HttpResponseMessage>
-        SendRequestAsync(
+    private async Task<HttpResponseMessage> SendRequestAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
     {

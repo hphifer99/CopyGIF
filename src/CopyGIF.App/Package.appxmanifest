@@ -3,8 +3,9 @@
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  IgnorableNamespaces="uap desktop rescap">
 
   <Identity
     Name="87793c2e-d33d-49cd-b5b0-5b6fd1cbf79f"
@@ -48,6 +49,18 @@
           Image="Assets\SplashScreen.png" />
 
       </uap:VisualElements>
+
+      <Extensions>
+        <desktop:Extension
+          Category="windows.startupTask"
+          Executable="$targetnametoken$.exe"
+          EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask
+            TaskId="CopyGIFStartup"
+            Enabled="false"
+            DisplayName="CopyGIF" />
+        </desktop:Extension>
+      </Extensions>
 
     </Application>
   </Applications>

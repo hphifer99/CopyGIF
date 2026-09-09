@@ -127,7 +127,8 @@ public sealed class SearchViewModel :
                     ExecuteQuerySearchAsync(
                         false,
                         cancellationToken),
-                CanSearch);
+                CanSearch,
+                AsyncRelayCommandOptions.AllowConcurrentExecutions);
 
         SearchDebouncedCommand =
             new AsyncRelayCommand(
@@ -135,7 +136,8 @@ public sealed class SearchViewModel :
                     ExecuteQuerySearchAsync(
                         true,
                         cancellationToken),
-                CanSearch);
+                CanSearch,
+                AsyncRelayCommandOptions.AllowConcurrentExecutions);
 
         TrendingCommand =
             new AsyncRelayCommand(
@@ -150,7 +152,8 @@ public sealed class SearchViewModel :
         RefreshSuggestionsCommand =
             new AsyncRelayCommand(
                 RefreshSuggestionsAsync,
-                CanRefreshSuggestions);
+                CanRefreshSuggestions,
+                AsyncRelayCommandOptions.AllowConcurrentExecutions);
 
         ClearSuggestionHistoryCommand =
             new AsyncRelayCommand(
@@ -216,6 +219,14 @@ public sealed class SearchViewModel :
                     ref _query,
                     normalized))
             {
+                _operationCancellation?.Cancel();
+                CancelSuggestionOperation();
+
+                if (normalized.Length == 0)
+                {
+                    ClearQuery();
+                }
+
                 OnPropertyChanged(
                     nameof(CanSubmitQuery));
 
@@ -360,9 +371,7 @@ public sealed class SearchViewModel :
 
     private bool CanSearch()
     {
-        return
-            !IsBusy &&
-            CanSubmitQuery;
+        return !_disposed && CanSubmitQuery;
     }
 
     private bool CanStartOperation()
@@ -399,9 +408,7 @@ public sealed class SearchViewModel :
 
     private bool CanRefreshSuggestions()
     {
-        return
-            !IsBusy &&
-            !IsSuggestionBusy;
+        return !_disposed;
     }
 
     private bool CanClearSuggestionHistory()
@@ -413,10 +420,8 @@ public sealed class SearchViewModel :
 
     private bool CanClearQuery()
     {
-        return
-            !IsBusy &&
-            !string.IsNullOrEmpty(
-                Query);
+        return !_disposed &&
+            (!string.IsNullOrEmpty(Query) || HasResults || IsBusy || HasMoreResults);
     }
 
     private bool CanCancel()
@@ -476,6 +481,12 @@ public sealed class SearchViewModel :
                 await LoadFavoriteIdentitiesAsync(
                     operation.Token);
 
+            operation.Token.ThrowIfCancellationRequested();
+            if (!ReferenceEquals(_operationCancellation, operation) || _disposed)
+            {
+                return;
+            }
+
             ApplyPage(
                 page,
                 favorites,
@@ -488,6 +499,11 @@ public sealed class SearchViewModel :
                 operation.IsCancellationRequested ||
                 cancellationToken.IsCancellationRequested)
         {
+            if (!ReferenceEquals(_operationCancellation, operation) || _disposed)
+            {
+                return;
+            }
+
             OperationState =
                 AsyncOperationState.Cancelled(
                     "Search cancelled.");
@@ -498,11 +514,21 @@ public sealed class SearchViewModel :
         }
         catch (GifProviderException exception)
         {
+            if (!ReferenceEquals(_operationCancellation, operation) || _disposed)
+            {
+                return;
+            }
+
             ApplyProviderFailure(
                 exception);
         }
         catch (Exception)
         {
+            if (!ReferenceEquals(_operationCancellation, operation) || _disposed)
+            {
+                return;
+            }
+
             OperationState =
                 AsyncOperationState.Failed(
                     "GIF search failed.");
@@ -553,6 +579,12 @@ public sealed class SearchViewModel :
                 await LoadFavoriteIdentitiesAsync(
                     operation.Token);
 
+            operation.Token.ThrowIfCancellationRequested();
+            if (!ReferenceEquals(_operationCancellation, operation) || _disposed)
+            {
+                return;
+            }
+
             ApplyPage(
                 page,
                 favorites,
@@ -565,6 +597,11 @@ public sealed class SearchViewModel :
                 operation.IsCancellationRequested ||
                 cancellationToken.IsCancellationRequested)
         {
+            if (!ReferenceEquals(_operationCancellation, operation) || _disposed)
+            {
+                return;
+            }
+
             OperationState =
                 AsyncOperationState.Cancelled(
                     "Trending request cancelled.");
@@ -575,11 +612,21 @@ public sealed class SearchViewModel :
         }
         catch (GifProviderException exception)
         {
+            if (!ReferenceEquals(_operationCancellation, operation) || _disposed)
+            {
+                return;
+            }
+
             ApplyProviderFailure(
                 exception);
         }
         catch (Exception)
         {
+            if (!ReferenceEquals(_operationCancellation, operation) || _disposed)
+            {
+                return;
+            }
+
             OperationState =
                 AsyncOperationState.Failed(
                     "Unable to load Trending GIFs.");
@@ -654,6 +701,12 @@ public sealed class SearchViewModel :
                 await LoadFavoriteIdentitiesAsync(
                     operation.Token);
 
+            operation.Token.ThrowIfCancellationRequested();
+            if (!ReferenceEquals(_operationCancellation, operation) || _disposed)
+            {
+                return;
+            }
+
             ApplyPage(
                 page,
                 favorites,
@@ -668,6 +721,11 @@ public sealed class SearchViewModel :
                 operation.IsCancellationRequested ||
                 cancellationToken.IsCancellationRequested)
         {
+            if (!ReferenceEquals(_operationCancellation, operation) || _disposed)
+            {
+                return;
+            }
+
             OperationState =
                 AsyncOperationState.Cancelled(
                     "Load more cancelled.");
@@ -678,11 +736,21 @@ public sealed class SearchViewModel :
         }
         catch (GifProviderException exception)
         {
+            if (!ReferenceEquals(_operationCancellation, operation) || _disposed)
+            {
+                return;
+            }
+
             ApplyProviderFailure(
                 exception);
         }
         catch (Exception)
         {
+            if (!ReferenceEquals(_operationCancellation, operation) || _disposed)
+            {
+                return;
+            }
+
             OperationState =
                 AsyncOperationState.Failed(
                     "Unable to load more GIFs.");
@@ -860,8 +928,12 @@ public sealed class SearchViewModel :
 
     private void ClearQuery()
     {
-        Query =
-            string.Empty;
+        CancellationTokenSource? previous = _operationCancellation;
+        _operationCancellation = null;
+        previous?.Cancel();
+        CancelSuggestionOperation();
+
+        Query = string.Empty;
 
         _activeQuery =
             null;

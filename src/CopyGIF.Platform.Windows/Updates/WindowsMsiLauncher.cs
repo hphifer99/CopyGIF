@@ -43,7 +43,9 @@ internal sealed class WindowsMsiLauncher :
 
         ProcessStartInfo startInfo = new()
         {
-            FileName = "msiexec.exe",
+            FileName = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.System),
+                "msiexec.exe"),
             UseShellExecute = true,
             Verb = "runas"
         };

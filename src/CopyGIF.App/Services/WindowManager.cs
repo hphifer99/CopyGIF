@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using CopyGIF.Application.Onboarding;
 using CopyGIF.Application.Settings;
 using CopyGIF.Application.Startup;
@@ -478,6 +477,11 @@ public sealed class WindowManager :
             return;
         }
 
+        _settings = await _settingsCoordinator.LoadAsync(cancellationToken)
+            .ConfigureAwait(true);
+        await _themeManager.ApplyThemeAsync(_settings.Appearance.Theme)
+            .ConfigureAwait(true);
+
         MainWindow window =
             EnsureMainWindow();
 
@@ -542,10 +546,7 @@ public sealed class WindowManager :
 
         if (persistenceFailure is not null)
         {
-            ExceptionDispatchInfo
-                .Capture(
-                    persistenceFailure)
-                .Throw();
+            ReportOperationFailure(persistenceFailure);
         }
     }
 
@@ -585,8 +586,10 @@ public sealed class WindowManager :
             return;
         }
 
-        WindowSettings current =
-            _settings.Window;
+        AppSettings latestSettings = await _settingsCoordinator
+            .LoadAsync(cancellationToken).ConfigureAwait(true);
+        _settings = latestSettings;
+        WindowSettings current = latestSettings.Window;
 
         bool savePosition =
             current.PlacementMode ==
@@ -651,7 +654,7 @@ public sealed class WindowManager :
         }
 
         AppSettings proposedSettings =
-            _settings with
+            latestSettings with
             {
                 Window =
                     updatedWindow

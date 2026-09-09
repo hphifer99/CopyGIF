@@ -59,6 +59,11 @@ public sealed class HttpUpdatePackageService :
             manifest,
             expectedChannel: "stable");
 
+        using CancellationTokenSource deadline =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(600));
+        cancellationToken = deadline.Token;
+
         _paths.EnsureDirectoriesExist();
 
         string ownedRoot =

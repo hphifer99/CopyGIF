@@ -34,9 +34,23 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(
             PreviewCacheLimits.Default);
 
-        services.AddSingleton<
-            IPreviewCache,
-            PreviewCache>();
+        services.AddSingleton<PreviewCache>();
+
+        services.AddSingleton<IPreviewCache, SecurePreviewCache>();
+
+        services.AddHttpClient(nameof(SecurePreviewCache), client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+        })
+        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            AutomaticDecompression = DecompressionMethods.GZip |
+                DecompressionMethods.Deflate | DecompressionMethods.Brotli,
+            ConnectTimeout = TimeSpan.FromSeconds(10),
+            MaxConnectionsPerServer = MediaPolicy.MaximumConcurrentMediaRequests,
+            MaxResponseHeadersLength = 32
+        });
 
         services.AddSingleton<
             IClock,

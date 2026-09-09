@@ -86,6 +86,8 @@ public sealed class GifCardViewModel :
         _currentSource =
             item.ThumbnailUri;
 
+        LoadThumbnailCommand = new AsyncRelayCommand(LoadThumbnailAsync);
+
         CopyCommand =
             new AsyncRelayCommand(
                 CopyAsync,
@@ -108,6 +110,8 @@ public sealed class GifCardViewModel :
     }
 
     public GifItem Item { get; }
+
+    public IAsyncRelayCommand LoadThumbnailCommand { get; }
 
     public IAsyncRelayCommand CopyCommand { get; }
 

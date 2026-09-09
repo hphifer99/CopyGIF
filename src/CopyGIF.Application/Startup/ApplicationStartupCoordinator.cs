@@ -256,6 +256,7 @@ public sealed class ApplicationStartupCoordinator :
                     cancellationToken)
                 .ConfigureAwait(false);
 
+        HotkeyRegistrationResult? hotkeyWarning = null;
         bool hotkeyChanged = false;
         bool startupChanged = false;
 
@@ -275,22 +276,12 @@ public sealed class ApplicationStartupCoordinator :
 
                 if (!hotkeyResult.Succeeded)
                 {
-                    return new ApplicationStartupResult
-                    {
-                        Status =
-                            ApplicationStartupStatus
-                                .HotkeyRejected,
-                        SingleInstance = singleInstance,
-                        Migration = migration,
-                        Settings = settings,
-                        Onboarding = onboarding,
-                        HotkeyFailure =
-                            hotkeyResult.Failure,
-                        Message = hotkeyResult.Message
-                    };
+                    hotkeyWarning = hotkeyResult;
                 }
-
-                hotkeyChanged = true;
+                else
+                {
+                    hotkeyChanged = true;
+                }
             }
 
             if (previousStartupState !=
@@ -317,7 +308,9 @@ public sealed class ApplicationStartupCoordinator :
                 SingleInstance = singleInstance,
                 Migration = migration,
                 Settings = settings,
-                Onboarding = onboarding
+                Onboarding = onboarding,
+                HotkeyFailure = hotkeyWarning?.Failure ?? HotkeyRegistrationFailure.None,
+                Message = hotkeyWarning?.Message
             };
         }
         catch (Exception exception)

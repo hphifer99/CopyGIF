@@ -63,7 +63,7 @@
 
                     <TextBlock
                         Style="{StaticResource CopyGifPageSubtitleTextStyle}"
-                        Text="CopyGIF stores this credential using Windows-protected credential storage."
+                        Text="Create or copy an API key in the KLIPY Partner Portal, then paste it below. CopyGIF protects the saved key with Windows credential encryption."
                         TextWrapping="Wrap" />
 
                     <PasswordBox
@@ -77,12 +77,7 @@
                         HorizontalAlignment="Left"
                         AutomationProperties.Name="Open API key help"
                         Command="{Binding OpenCredentialHelpCommand}"
-                        Content="How do I get an API key?" />
-
-                    <TextBlock
-                        AutomationProperties.LiveSetting="Polite"
-                        Style="{StaticResource CopyGifStatusTextStyle}"
-                        Text="{Binding Message.Text}" />
+                        Content="Open KLIPY API keys" />
 
                 </StackPanel>
 

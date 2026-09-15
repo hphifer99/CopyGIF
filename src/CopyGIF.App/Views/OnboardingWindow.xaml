@@ -19,7 +19,6 @@
 
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -39,25 +38,8 @@
 
         </StackPanel>
 
-        <StackPanel
-            Grid.Row="1"
-            Spacing="6">
-
-            <TextBlock
-                x:Name="StepProgressTextBlock"
-                AutomationProperties.LiveSetting="Polite"
-                Style="{StaticResource CopyGifStatusTextStyle}" />
-
-            <ProgressBar
-                AutomationProperties.Name="Onboarding progress"
-                Maximum="{Binding StepCount}"
-                Minimum="0"
-                Value="{Binding CurrentStepNumber}" />
-
-        </StackPanel>
-
         <ScrollViewer
-            Grid.Row="2"
+            Grid.Row="1"
             HorizontalScrollBarVisibility="Disabled"
             HorizontalScrollMode="Disabled"
             VerticalScrollBarVisibility="Auto"
@@ -67,56 +49,24 @@
                 x:Name="StepContentPresenter"
                 HorizontalContentAlignment="Stretch"
                 VerticalContentAlignment="Stretch"
-                Content="{Binding StepContent}"
-                ContentTemplate="{Binding StepContentTemplate}" />
+                Content="{x:Bind StepContent, Mode=OneWay}"
+                ContentTemplate="{x:Bind StepContentTemplate, Mode=OneWay}" />
 
         </ScrollViewer>
 
         <controls:StatusBanner
             x:Name="PageStatusBanner"
-            Grid.Row="3"
+            Grid.Row="2"
             IsClosable="False"
             Message="{Binding StatusMessage}"
             Severity="{Binding StatusSeverity}"
             Title="Setup status" />
 
-        <Grid
-            Grid.Row="4"
-            ColumnSpacing="12">
-
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <Button
-                x:Name="CancelButton"
-                Grid.Column="0"
-                AutomationProperties.Name="Cancel setup"
-                Command="{Binding CancelCommand}"
-                Content="Cancel" />
-
-            <Button
-                x:Name="BackButton"
-                Grid.Column="2"
-                AutomationProperties.Name="Previous setup step"
-                Command="{Binding BackCommand}"
-                Content="Back" />
-
-            <Button
-                x:Name="NextButton"
-                Grid.Column="3"
-                AutomationProperties.Name="Next setup step"
-                Command="{Binding NextCommand}"
-                Content="Next"
-                Style="{StaticResource CopyGifPrimaryButtonStyle}" />
+        <Grid Grid.Row="3">
 
             <Button
                 x:Name="FinishButton"
-                Grid.Column="4"
+                HorizontalAlignment="Right"
                 AutomationProperties.Name="Finish setup"
                 Command="{Binding FinishCommand}"
                 Content="Finish"

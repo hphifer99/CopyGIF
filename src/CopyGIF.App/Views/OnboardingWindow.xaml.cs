@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using CopyGIF.App.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -16,21 +17,13 @@ public sealed partial class OnboardingWindow :
     private string _stepDescription =
         "Complete the initial setup to start finding and copying GIFs.";
 
-    private int _currentStepNumber =
-        1;
-
-    private int _stepCount =
-        1;
-
     private object? _stepContent;
 
     private DataTemplate? _stepContentTemplate;
 
     private bool _isBusy;
 
-    private bool _canGoBack;
-
-    private bool _isFinalStep;
+    private bool _canFinish;
 
     private string _statusMessage =
         string.Empty;
@@ -38,13 +31,7 @@ public sealed partial class OnboardingWindow :
     private InfoBarSeverity _statusSeverity =
         InfoBarSeverity.Informational;
 
-    private ICommand? _backCommand;
-
-    private ICommand? _nextCommand;
-
     private ICommand? _finishCommand;
-
-    private ICommand? _cancelCommand;
 
     public OnboardingWindow()
     {
@@ -53,9 +40,12 @@ public sealed partial class OnboardingWindow :
         WindowRoot.DataContext =
             this;
 
+        WindowTitleBar.Apply(
+            this,
+            WindowRoot);
+
         UpdateVisualState();
         UpdateStatus();
-        UpdateProgressText();
     }
 
     public event PropertyChangedEventHandler?
@@ -84,54 +74,6 @@ public sealed partial class OnboardingWindow :
             SetProperty(
                 ref _stepDescription,
                 value ?? string.Empty);
-    }
-
-    public int CurrentStepNumber
-    {
-        get =>
-            _currentStepNumber;
-
-        set
-        {
-            if (value < 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(value),
-                    value,
-                    "The current step number cannot be negative.");
-            }
-
-            if (SetProperty(
-                    ref _currentStepNumber,
-                    value))
-            {
-                UpdateProgressText();
-            }
-        }
-    }
-
-    public int StepCount
-    {
-        get =>
-            _stepCount;
-
-        set
-        {
-            if (value < 1)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(value),
-                    value,
-                    "The onboarding step count must be at least one.");
-            }
-
-            if (SetProperty(
-                    ref _stepCount,
-                    value))
-            {
-                UpdateProgressText();
-            }
-        }
     }
 
     public object? StepContent
@@ -172,31 +114,15 @@ public sealed partial class OnboardingWindow :
         }
     }
 
-    public bool CanGoBack
+    public bool CanFinish
     {
         get =>
-            _canGoBack;
+            _canFinish;
 
         set
         {
             if (SetProperty(
-                    ref _canGoBack,
-                    value))
-            {
-                UpdateVisualState();
-            }
-        }
-    }
-
-    public bool IsFinalStep
-    {
-        get =>
-            _isFinalStep;
-
-        set
-        {
-            if (SetProperty(
-                    ref _isFinalStep,
+                    ref _canFinish,
                     value))
             {
                 UpdateVisualState();
@@ -231,28 +157,6 @@ public sealed partial class OnboardingWindow :
                 value);
     }
 
-    public ICommand? BackCommand
-    {
-        get =>
-            _backCommand;
-
-        set =>
-            SetProperty(
-                ref _backCommand,
-                value);
-    }
-
-    public ICommand? NextCommand
-    {
-        get =>
-            _nextCommand;
-
-        set =>
-            SetProperty(
-                ref _nextCommand,
-                value);
-    }
-
     public ICommand? FinishCommand
     {
         get =>
@@ -261,17 +165,6 @@ public sealed partial class OnboardingWindow :
         set =>
             SetProperty(
                 ref _finishCommand,
-                value);
-    }
-
-    public ICommand? CancelCommand
-    {
-        get =>
-            _cancelCommand;
-
-        set =>
-            SetProperty(
-                ref _cancelCommand,
                 value);
     }
 
@@ -301,28 +194,9 @@ public sealed partial class OnboardingWindow :
 
     private void UpdateVisualState()
     {
-        BackButton.IsEnabled =
-            CanGoBack &&
-            !IsBusy;
-
-        CancelButton.IsEnabled =
-            !IsBusy;
-
-        NextButton.IsEnabled =
-            !IsBusy;
-
         FinishButton.IsEnabled =
+            CanFinish &&
             !IsBusy;
-
-        NextButton.Visibility =
-            IsFinalStep
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-
-        FinishButton.Visibility =
-            IsFinalStep
-                ? Visibility.Visible
-                : Visibility.Collapsed;
     }
 
     private void UpdateStatus()
@@ -330,11 +204,5 @@ public sealed partial class OnboardingWindow :
         PageStatusBanner.IsOpen =
             !string.IsNullOrWhiteSpace(
                 StatusMessage);
-    }
-
-    private void UpdateProgressText()
-    {
-        StepProgressTextBlock.Text =
-            $"Step {CurrentStepNumber} of {StepCount}";
     }
 }

@@ -71,26 +71,32 @@ public sealed class ArchitectureTests
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["CommunityToolkit.Mvvm"] = "8.4.2",
-                ["Microsoft.Extensions.DependencyInjection"] = "10.0.11",
-                ["Microsoft.Extensions.DependencyInjection.Abstractions"] = "10.0.11",
-                ["Microsoft.Extensions.Http"] = "10.0.11",
+                ["Microsoft.Extensions.DependencyInjection"] = "10.0.12",
+                ["Microsoft.Extensions.DependencyInjection.Abstractions"] = "10.0.12",
+                ["Microsoft.Extensions.Http"] = "10.0.12",
                 ["Microsoft.Windows.SDK.BuildTools"] = "10.0.28000.2705",
                 ["Microsoft.WindowsAppSDK"] = "2.4.0",
                 ["MSTest"] = "4.3.3",
-                ["System.Security.Cryptography.ProtectedData"] = "10.0.11"
+                ["System.Security.Cryptography.ProtectedData"] = "10.0.12"
             };
 
     [TestMethod]
     public void Repository_UsesFrozenDirectoryAndProjectCasing()
     {
-        string repositoryRoot = RepositoryRootLocator.Find();
+        string repositoryRoot =
+            RepositoryRootLocator.Find();
 
-        string[] rootDirectoryNames = Directory
-            .EnumerateDirectories(repositoryRoot)
-            .Select(Path.GetFileName)
-            .Where(name => name is not null)
-            .Cast<string>()
-            .ToArray();
+        string[] rootDirectoryNames =
+            Directory
+                .EnumerateDirectories(
+                    repositoryRoot)
+                .Select(
+                    Path.GetFileName)
+                .Where(
+                    name =>
+                        name is not null)
+                .Cast<string>()
+                .ToArray();
 
         CollectionAssert.Contains(
             rootDirectoryNames,
@@ -102,18 +108,22 @@ public sealed class ArchitectureTests
                 StringComparer.Ordinal),
             "The test root must be named exactly 'tests'.");
 
-        string appDirectory = Path.Combine(
-            repositoryRoot,
-            "src",
-            "CopyGIF.App");
+        string appDirectory =
+            Path.Combine(
+                repositoryRoot,
+                "src",
+                "CopyGIF.App");
 
-        string[] appFileNames = Directory
-            .EnumerateFiles(appDirectory)
-            .Select(
-                path =>
-                    Path.GetFileName(path))
-            .OfType<string>()
-            .ToArray();
+        string[] appFileNames =
+            Directory
+                .EnumerateFiles(
+                    appDirectory)
+                .Select(
+                    path =>
+                        Path.GetFileName(
+                            path))
+                .OfType<string>()
+                .ToArray();
 
         CollectionAssert.Contains(
             appFileNames,
@@ -129,18 +139,31 @@ public sealed class ArchitectureTests
     [TestMethod]
     public void V1Solution_RemainsV1Only()
     {
-        string repositoryRoot = RepositoryRootLocator.Find();
+        string repositoryRoot =
+            RepositoryRootLocator.Find();
 
-        XDocument solution = XDocument.Load(
-            Path.Combine(repositoryRoot, "CopyGIF.slnx"));
+        XDocument solution =
+            XDocument.Load(
+                Path.Combine(
+                    repositoryRoot,
+                    "CopyGIF.slnx"));
 
-        string[] projectPaths = solution
-            .Descendants()
-            .Where(element => element.Name.LocalName == "Project")
-            .Select(element => element.Attribute("Path")?.Value)
-            .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Cast<string>()
-            .ToArray();
+        string[] projectPaths =
+            solution
+                .Descendants()
+                .Where(
+                    element =>
+                        element.Name.LocalName ==
+                        "Project")
+                .Select(
+                    element =>
+                        element.Attribute("Path")?.Value)
+                .Where(
+                    path =>
+                        !string.IsNullOrWhiteSpace(
+                            path))
+                .Cast<string>()
+                .ToArray();
 
         CollectionAssert.AreEquivalent(
             new[]
@@ -153,18 +176,24 @@ public sealed class ArchitectureTests
     [TestMethod]
     public void V2Solution_ContainsOnlyExpectedV2Projects()
     {
-        string repositoryRoot = RepositoryRootLocator.Find();
+        string repositoryRoot =
+            RepositoryRootLocator.Find();
 
-        XDocument solution = XDocument.Load(
-            Path.Combine(repositoryRoot, "CopyGIF.V2.slnx"));
+        XDocument solution =
+            XDocument.Load(
+                Path.Combine(
+                    repositoryRoot,
+                    "CopyGIF.V2.slnx"));
 
-        string[] productionProjects = GetProjectsInSolutionFolder(
-            solution,
-            "/src/");
+        string[] productionProjects =
+            GetProjectsInSolutionFolder(
+                solution,
+                "/src/");
 
-        string[] testProjects = GetProjectsInSolutionFolder(
-            solution,
-            "/tests/");
+        string[] testProjects =
+            GetProjectsInSolutionFolder(
+                solution,
+                "/tests/");
 
         CollectionAssert.AreEquivalent(
             ExpectedProductionProjectPaths,
@@ -174,17 +203,28 @@ public sealed class ArchitectureTests
             ExpectedTestProjectPaths,
             testProjects);
 
-        string[] allProjects = solution
-            .Descendants()
-            .Where(element => element.Name.LocalName == "Project")
-            .Select(element => element.Attribute("Path")?.Value)
-            .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Cast<string>()
-            .ToArray();
+        string[] allProjects =
+            solution
+                .Descendants()
+                .Where(
+                    element =>
+                        element.Name.LocalName ==
+                        "Project")
+                .Select(
+                    element =>
+                        element.Attribute("Path")?.Value)
+                .Where(
+                    path =>
+                        !string.IsNullOrWhiteSpace(
+                            path))
+                .Cast<string>()
+                .ToArray();
 
-        string[] allExpectedProjects = ExpectedProductionProjectPaths
-            .Concat(ExpectedTestProjectPaths)
-            .ToArray();
+        string[] allExpectedProjects =
+            ExpectedProductionProjectPaths
+                .Concat(
+                    ExpectedTestProjectPaths)
+                .ToArray();
 
         CollectionAssert.AreEquivalent(
             allExpectedProjects,
@@ -192,25 +232,30 @@ public sealed class ArchitectureTests
 
         Assert.IsFalse(
             allProjects.Any(
-                path => path.StartsWith(
-                    "CopyGIF/",
-                    StringComparison.OrdinalIgnoreCase)),
+                path =>
+                    path.StartsWith(
+                        "CopyGIF/",
+                        StringComparison.OrdinalIgnoreCase)),
             "The V2 solution must not reference the V1 project.");
     }
 
     [TestMethod]
     public void ProductionProjectReferences_FollowFrozenDependencyRules()
     {
-        string repositoryRoot = RepositoryRootLocator.Find();
+        string repositoryRoot =
+            RepositoryRootLocator.Find();
 
-        foreach (string relativeProjectPath in ExpectedProductionProjectPaths)
+        foreach (string relativeProjectPath
+                 in ExpectedProductionProjectPaths)
         {
-            string projectPath = ToPhysicalPath(
-                repositoryRoot,
-                relativeProjectPath);
+            string projectPath =
+                ToPhysicalPath(
+                    repositoryRoot,
+                    relativeProjectPath);
 
-            string projectName = Path.GetFileNameWithoutExtension(
-                projectPath);
+            string projectName =
+                Path.GetFileNameWithoutExtension(
+                    projectPath);
 
             Assert.IsTrue(
                 AllowedProductionReferences.TryGetValue(
@@ -218,8 +263,9 @@ public sealed class ArchitectureTests
                     out string[]? expectedReferences),
                 $"No dependency rule exists for {projectName}.");
 
-            string[] actualReferences = ReadProjectReferenceNames(
-                projectPath);
+            string[] actualReferences =
+                ReadProjectReferenceNames(
+                    projectPath);
 
             CollectionAssert.AreEquivalent(
                 expectedReferences!,
@@ -231,22 +277,28 @@ public sealed class ArchitectureTests
     [TestMethod]
     public void Core_HasNoPackageDependencies()
     {
-        string repositoryRoot = RepositoryRootLocator.Find();
+        string repositoryRoot =
+            RepositoryRootLocator.Find();
 
-        string coreProjectPath = Path.Combine(
-            repositoryRoot,
-            "src",
-            "CopyGIF.Core",
-            "CopyGIF.Core.csproj");
+        string coreProjectPath =
+            Path.Combine(
+                repositoryRoot,
+                "src",
+                "CopyGIF.Core",
+                "CopyGIF.Core.csproj");
 
-        XDocument project = XDocument.Load(coreProjectPath);
+        XDocument project =
+            XDocument.Load(
+                coreProjectPath);
 
-        XElement[] packageReferences = project
-            .Descendants()
-            .Where(
-                element =>
-                    element.Name.LocalName == "PackageReference")
-            .ToArray();
+        XElement[] packageReferences =
+            project
+                .Descendants()
+                .Where(
+                    element =>
+                        element.Name.LocalName ==
+                        "PackageReference")
+                .ToArray();
 
         Assert.AreEqual(
             0,
@@ -257,25 +309,35 @@ public sealed class ArchitectureTests
     [TestMethod]
     public void V2Projects_UseCentralPackageVersions()
     {
-        string repositoryRoot = RepositoryRootLocator.Find();
+        string repositoryRoot =
+            RepositoryRootLocator.Find();
 
-        string[] projectFiles = Directory
-            .EnumerateFiles(
-                Path.Combine(repositoryRoot, "src"),
-                "*.csproj",
-                SearchOption.AllDirectories)
-            .Concat(
-                Directory.EnumerateFiles(
-                    Path.Combine(repositoryRoot, "tests"),
+        string[] projectFiles =
+            Directory
+                .EnumerateFiles(
+                    Path.Combine(
+                        repositoryRoot,
+                        "src"),
                     "*.csproj",
-                    SearchOption.AllDirectories))
-            .ToArray();
+                    SearchOption.AllDirectories)
+                .Concat(
+                    Directory.EnumerateFiles(
+                        Path.Combine(
+                            repositoryRoot,
+                            "tests"),
+                        "*.csproj",
+                        SearchOption.AllDirectories))
+                .ToArray();
 
-        foreach (string projectFile in projectFiles)
+        foreach (string projectFile
+                 in projectFiles)
         {
-            XDocument project = XDocument.Load(projectFile);
+            XDocument project =
+                XDocument.Load(
+                    projectFile);
 
-            foreach (XElement packageReference in project
+            foreach (XElement packageReference
+                     in project
                          .Descendants()
                          .Where(
                              element =>
@@ -283,7 +345,8 @@ public sealed class ArchitectureTests
                                  "PackageReference"))
             {
                 Assert.IsNull(
-                    packageReference.Attribute("Version"),
+                    packageReference.Attribute(
+                        "Version"),
                     $"Package versions must be centralized. File: {projectFile}");
 
                 Assert.IsFalse(
@@ -291,19 +354,22 @@ public sealed class ArchitectureTests
                         .Elements()
                         .Any(
                             element =>
-                                element.Name.LocalName == "Version"),
+                                element.Name.LocalName ==
+                                "Version"),
                     $"Package versions must be centralized. File: {projectFile}");
             }
         }
 
-        XDocument packageFile = XDocument.Load(
-            Path.Combine(
-                repositoryRoot,
-                "Directory.Packages.props"));
+        XDocument packageFile =
+            XDocument.Load(
+                Path.Combine(
+                    repositoryRoot,
+                    "Directory.Packages.props"));
 
-        string? centralManagement = GetPropertyValue(
-            packageFile,
-            "ManagePackageVersionsCentrally");
+        string? centralManagement =
+            GetPropertyValue(
+                packageFile,
+                "ManagePackageVersionsCentrally");
 
         Assert.AreEqual(
             "true",
@@ -311,19 +377,21 @@ public sealed class ArchitectureTests
             true,
             "Central package management must be enabled.");
 
-        Dictionary<string, string> actualVersions = packageFile
-            .Descendants()
-            .Where(
-                element =>
-                    element.Name.LocalName == "PackageVersion")
-            .ToDictionary(
-                element =>
-                    element.Attribute("Include")?.Value
-                    ?? string.Empty,
-                element =>
-                    element.Attribute("Version")?.Value
-                    ?? string.Empty,
-                StringComparer.Ordinal);
+        Dictionary<string, string> actualVersions =
+            packageFile
+                .Descendants()
+                .Where(
+                    element =>
+                        element.Name.LocalName ==
+                        "PackageVersion")
+                .ToDictionary(
+                    element =>
+                        element.Attribute("Include")?.Value ??
+                        string.Empty,
+                    element =>
+                        element.Attribute("Version")?.Value ??
+                        string.Empty,
+                    StringComparer.Ordinal);
 
         foreach (KeyValuePair<string, string> expectedPackage
                  in ExpectedPackageVersions)
@@ -350,12 +418,14 @@ public sealed class ArchitectureTests
     [TestMethod]
     public void V2BuildPolicy_IsX64Only()
     {
-        string repositoryRoot = RepositoryRootLocator.Find();
+        string repositoryRoot =
+            RepositoryRootLocator.Find();
 
-        XDocument buildProperties = XDocument.Load(
-            Path.Combine(
-                repositoryRoot,
-                "Directory.Build.props"));
+        XDocument buildProperties =
+            XDocument.Load(
+                Path.Combine(
+                    repositoryRoot,
+                    "Directory.Build.props"));
 
         Assert.AreEqual(
             "x64",
@@ -382,21 +452,29 @@ public sealed class ArchitectureTests
                 buildProperties,
                 "RuntimeIdentifiers"));
 
-        string[] projectFiles = Directory
-            .EnumerateFiles(
-                Path.Combine(repositoryRoot, "src"),
-                "*.csproj",
-                SearchOption.AllDirectories)
-            .Concat(
-                Directory.EnumerateFiles(
-                    Path.Combine(repositoryRoot, "tests"),
+        string[] projectFiles =
+            Directory
+                .EnumerateFiles(
+                    Path.Combine(
+                        repositoryRoot,
+                        "src"),
                     "*.csproj",
-                    SearchOption.AllDirectories))
-            .ToArray();
+                    SearchOption.AllDirectories)
+                .Concat(
+                    Directory.EnumerateFiles(
+                        Path.Combine(
+                            repositoryRoot,
+                            "tests"),
+                        "*.csproj",
+                        SearchOption.AllDirectories))
+                .ToArray();
 
-        foreach (string projectFile in projectFiles)
+        foreach (string projectFile
+                 in projectFiles)
         {
-            string projectContents = File.ReadAllText(projectFile);
+            string projectContents =
+                File.ReadAllText(
+                    projectFile);
 
             Assert.IsFalse(
                 projectContents.Contains(
@@ -411,16 +489,22 @@ public sealed class ArchitectureTests
                 $"ARM64 configuration found in {projectFile}.");
         }
 
-        XDocument solution = XDocument.Load(
-            Path.Combine(repositoryRoot, "CopyGIF.V2.slnx"));
+        XDocument solution =
+            XDocument.Load(
+                Path.Combine(
+                    repositoryRoot,
+                    "CopyGIF.V2.slnx"));
 
-        XElement[] solutionPlatforms = solution
-            .Descendants()
-            .Where(
-                element =>
-                    element.Name.LocalName == "Platform" &&
-                    element.Parent?.Name.LocalName == "Configurations")
-            .ToArray();
+        XElement[] solutionPlatforms =
+            solution
+                .Descendants()
+                .Where(
+                    element =>
+                        element.Name.LocalName ==
+                            "Platform" &&
+                        element.Parent?.Name.LocalName ==
+                            "Configurations")
+                .ToArray();
 
         Assert.AreEqual(
             1,
@@ -429,16 +513,20 @@ public sealed class ArchitectureTests
 
         Assert.AreEqual(
             "x64",
-            solutionPlatforms[0].Attribute("Name")?.Value,
+            solutionPlatforms[0]
+                .Attribute("Name")?.Value,
             "The V2 solution platform must be x64.");
 
-        XElement[] projectPlatformMappings = solution
-            .Descendants()
-            .Where(
-                element =>
-                    element.Name.LocalName == "Platform" &&
-                    element.Parent?.Name.LocalName == "Project")
-            .ToArray();
+        XElement[] projectPlatformMappings =
+            solution
+                .Descendants()
+                .Where(
+                    element =>
+                        element.Name.LocalName ==
+                            "Platform" &&
+                        element.Parent?.Name.LocalName ==
+                            "Project")
+                .ToArray();
 
         Assert.AreEqual(
             ExpectedProductionProjectPaths.Length +
@@ -446,11 +534,13 @@ public sealed class ArchitectureTests
             projectPlatformMappings.Length,
             "Every V2 solution project must have an explicit platform mapping.");
 
-        foreach (XElement platformMapping in projectPlatformMappings)
+        foreach (XElement platformMapping
+                 in projectPlatformMappings)
         {
             Assert.AreEqual(
                 "x64",
-                platformMapping.Attribute("Project")?.Value,
+                platformMapping
+                    .Attribute("Project")?.Value,
                 "Every V2 project must map to x64.");
         }
     }
@@ -458,7 +548,8 @@ public sealed class ArchitectureTests
     [TestMethod]
     public void V2Projects_UseFrozenTargetFrameworks()
     {
-        string repositoryRoot = RepositoryRootLocator.Find();
+        string repositoryRoot =
+            RepositoryRootLocator.Find();
 
         HashSet<string> windowsProjects =
             new(StringComparer.Ordinal)
@@ -468,31 +559,42 @@ public sealed class ArchitectureTests
                 "CopyGIF.Platform.Windows.Tests"
             };
 
-        string[] projectFiles = Directory
-            .EnumerateFiles(
-                Path.Combine(repositoryRoot, "src"),
-                "*.csproj",
-                SearchOption.AllDirectories)
-            .Concat(
-                Directory.EnumerateFiles(
-                    Path.Combine(repositoryRoot, "tests"),
+        string[] projectFiles =
+            Directory
+                .EnumerateFiles(
+                    Path.Combine(
+                        repositoryRoot,
+                        "src"),
                     "*.csproj",
-                    SearchOption.AllDirectories))
-            .ToArray();
+                    SearchOption.AllDirectories)
+                .Concat(
+                    Directory.EnumerateFiles(
+                        Path.Combine(
+                            repositoryRoot,
+                            "tests"),
+                        "*.csproj",
+                        SearchOption.AllDirectories))
+                .ToArray();
 
-        foreach (string projectFile in projectFiles)
+        foreach (string projectFile
+                 in projectFiles)
         {
-            string projectName = Path.GetFileNameWithoutExtension(
-                projectFile);
+            string projectName =
+                Path.GetFileNameWithoutExtension(
+                    projectFile);
 
-            XDocument project = XDocument.Load(projectFile);
+            XDocument project =
+                XDocument.Load(
+                    projectFile);
 
-            string? actualTargetFramework = GetPropertyValue(
-                project,
-                "TargetFramework");
+            string? actualTargetFramework =
+                GetPropertyValue(
+                    project,
+                    "TargetFramework");
 
             string expectedTargetFramework =
-                windowsProjects.Contains(projectName)
+                windowsProjects.Contains(
+                    projectName)
                     ? "$(CopyGifWindowsTargetFramework)"
                     : "$(CopyGifNetTargetFramework)";
 
@@ -502,10 +604,11 @@ public sealed class ArchitectureTests
                 $"Unexpected target framework in {projectName}.");
         }
 
-        XDocument buildProperties = XDocument.Load(
-            Path.Combine(
-                repositoryRoot,
-                "Directory.Build.props"));
+        XDocument buildProperties =
+            XDocument.Load(
+                Path.Combine(
+                    repositoryRoot,
+                    "Directory.Build.props"));
 
         Assert.AreEqual(
             "net10.0",
@@ -529,27 +632,36 @@ public sealed class ArchitectureTests
     [TestMethod]
     public void PackageManifest_RequestsOnlyApprovedCapabilities()
     {
-        string repositoryRoot = RepositoryRootLocator.Find();
+        string repositoryRoot =
+            RepositoryRootLocator.Find();
 
-        string manifestPath = Path.Combine(
-            repositoryRoot,
-            "src",
-            "CopyGIF.App",
-            "Package.appxmanifest");
+        string manifestPath =
+            Path.Combine(
+                repositoryRoot,
+                "src",
+                "CopyGIF.App",
+                "Package.appxmanifest");
 
-        XDocument manifest = XDocument.Load(manifestPath);
+        XDocument manifest =
+            XDocument.Load(
+                manifestPath);
 
-        string[] capabilities = manifest
-            .Descendants()
-            .Where(
-                element =>
-                    element.Name.LocalName == "Capability")
-            .Select(
-                element =>
-                    element.Attribute("Name")?.Value)
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Cast<string>()
-            .ToArray();
+        string[] capabilities =
+            manifest
+                .Descendants()
+                .Where(
+                    element =>
+                        element.Name.LocalName ==
+                        "Capability")
+                .Select(
+                    element =>
+                        element.Attribute("Name")?.Value)
+                .Where(
+                    name =>
+                        !string.IsNullOrWhiteSpace(
+                            name))
+                .Cast<string>()
+                .ToArray();
 
         CollectionAssert.AreEquivalent(
             new[]
@@ -558,7 +670,9 @@ public sealed class ArchitectureTests
             },
             capabilities);
 
-        string manifestText = File.ReadAllText(manifestPath);
+        string manifestText =
+            File.ReadAllText(
+                manifestPath);
 
         Assert.IsFalse(
             manifestText.Contains(
@@ -566,18 +680,22 @@ public sealed class ArchitectureTests
                 StringComparison.OrdinalIgnoreCase),
             "CopyGIF must not request the systemAIModels capability.");
 
-        string[] targetDeviceFamilies = manifest
-            .Descendants()
-            .Where(
-                element =>
-                    element.Name.LocalName ==
-                    "TargetDeviceFamily")
-            .Select(
-                element =>
-                    element.Attribute("Name")?.Value)
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Cast<string>()
-            .ToArray();
+        string[] targetDeviceFamilies =
+            manifest
+                .Descendants()
+                .Where(
+                    element =>
+                        element.Name.LocalName ==
+                        "TargetDeviceFamily")
+                .Select(
+                    element =>
+                        element.Attribute("Name")?.Value)
+                .Where(
+                    name =>
+                        !string.IsNullOrWhiteSpace(
+                            name))
+                .Cast<string>()
+                .ToArray();
 
         CollectionAssert.AreEquivalent(
             new[]
@@ -586,14 +704,15 @@ public sealed class ArchitectureTests
             },
             targetDeviceFamilies);
 
-        string minimumVersion = manifest
-            .Descendants()
-            .Single(
-                element =>
-                    element.Name.LocalName ==
-                    "TargetDeviceFamily")
-            .Attribute("MinVersion")?.Value
-            ?? string.Empty;
+        string minimumVersion =
+            manifest
+                .Descendants()
+                .Single(
+                    element =>
+                        element.Name.LocalName ==
+                        "TargetDeviceFamily")
+                .Attribute("MinVersion")?.Value ??
+            string.Empty;
 
         Assert.AreEqual(
             "10.0.17763.0",
@@ -603,44 +722,59 @@ public sealed class ArchitectureTests
     [TestMethod]
     public void GlobalJson_PinsStableDotNet10()
     {
-        string repositoryRoot = RepositoryRootLocator.Find();
+        string repositoryRoot =
+            RepositoryRootLocator.Find();
 
-        string globalJsonPath = Path.Combine(
-            repositoryRoot,
-            "global.json");
+        string globalJsonPath =
+            Path.Combine(
+                repositoryRoot,
+                "global.json");
 
-        using JsonDocument document = JsonDocument.Parse(
-            File.ReadAllText(globalJsonPath));
+        using JsonDocument document =
+            JsonDocument.Parse(
+                File.ReadAllText(
+                    globalJsonPath));
 
-        JsonElement sdk = document
-            .RootElement
-            .GetProperty("sdk");
+        JsonElement sdk =
+            document
+                .RootElement
+                .GetProperty(
+                    "sdk");
 
         Assert.AreEqual(
             "10.0.400",
-            sdk.GetProperty("version").GetString());
+            sdk.GetProperty(
+                    "version")
+                .GetString());
 
         Assert.AreEqual(
             "latestFeature",
-            sdk.GetProperty("rollForward").GetString());
+            sdk.GetProperty(
+                    "rollForward")
+                .GetString());
 
         Assert.IsFalse(
-            sdk.GetProperty("allowPrerelease").GetBoolean());
+            sdk.GetProperty(
+                    "allowPrerelease")
+                .GetBoolean());
     }
 
-    private static string[] GetProjectsInSolutionFolder(
-        XDocument solution,
-        string folderName)
+    private static string[]
+        GetProjectsInSolutionFolder(
+            XDocument solution,
+            string folderName)
     {
-        XElement? folder = solution
-            .Descendants()
-            .SingleOrDefault(
-                element =>
-                    element.Name.LocalName == "Folder" &&
-                    string.Equals(
-                        element.Attribute("Name")?.Value,
-                        folderName,
-                        StringComparison.Ordinal));
+        XElement? folder =
+            solution
+                .Descendants()
+                .SingleOrDefault(
+                    element =>
+                        element.Name.LocalName ==
+                            "Folder" &&
+                        string.Equals(
+                            element.Attribute("Name")?.Value,
+                            folderName,
+                            StringComparison.Ordinal));
 
         if (folder is null)
         {
@@ -654,47 +788,60 @@ public sealed class ArchitectureTests
             .Elements()
             .Where(
                 element =>
-                    element.Name.LocalName == "Project")
+                    element.Name.LocalName ==
+                    "Project")
             .Select(
                 element =>
                     element.Attribute("Path")?.Value)
-            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Where(
+                path =>
+                    !string.IsNullOrWhiteSpace(
+                        path))
             .Cast<string>()
             .ToArray();
     }
 
-    private static string[] ReadProjectReferenceNames(
-        string projectPath)
+    private static string[]
+        ReadProjectReferenceNames(
+            string projectPath)
     {
-        XDocument project = XDocument.Load(projectPath);
+        XDocument project =
+            XDocument.Load(
+                projectPath);
 
         string projectDirectory =
-            Path.GetDirectoryName(projectPath)
-            ?? throw new InvalidOperationException(
+            Path.GetDirectoryName(
+                projectPath) ??
+            throw new InvalidOperationException(
                 "Project directory could not be determined.");
 
-        List<string> references = [];
+        List<string> references =
+            [];
 
-        foreach (XElement projectReference in project
+        foreach (XElement projectReference
+                 in project
                      .Descendants()
                      .Where(
                          element =>
                              element.Name.LocalName ==
                              "ProjectReference"))
         {
-            string? include = projectReference
-                .Attribute("Include")
-                ?.Value;
+            string? include =
+                projectReference
+                    .Attribute("Include")
+                    ?.Value;
 
-            if (string.IsNullOrWhiteSpace(include))
+            if (string.IsNullOrWhiteSpace(
+                    include))
             {
                 continue;
             }
 
-            string referencedProjectPath = Path.GetFullPath(
-                Path.Combine(
-                    projectDirectory,
-                    include));
+            string referencedProjectPath =
+                Path.GetFullPath(
+                    Path.Combine(
+                        projectDirectory,
+                        include));
 
             references.Add(
                 Path.GetFileNameWithoutExtension(
@@ -717,7 +864,8 @@ public sealed class ArchitectureTests
             .Descendants()
             .FirstOrDefault(
                 element =>
-                    element.Name.LocalName == propertyName)
+                    element.Name.LocalName ==
+                        propertyName)
             ?.Value
             .Trim();
     }
@@ -726,14 +874,16 @@ public sealed class ArchitectureTests
         string repositoryRoot,
         string relativePath)
     {
-        string[] segments = relativePath.Split('/');
+        string[] segments =
+            relativePath.Split('/');
 
         return Path.Combine(
             new[]
             {
                 repositoryRoot
             }
-            .Concat(segments)
+            .Concat(
+                segments)
             .ToArray());
     }
 }

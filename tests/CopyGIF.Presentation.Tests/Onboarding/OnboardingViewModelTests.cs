@@ -28,7 +28,7 @@ public sealed class OnboardingViewModelTests
 
                         CredentialHelpUri =
                             new Uri(
-                                "https://klipy.com/developers")
+                                "https://partner.klipy.com/api-keys")
                     }
             };
 
@@ -89,7 +89,7 @@ public sealed class OnboardingViewModelTests
 
                         CredentialHelpUri =
                             new Uri(
-                                "https://klipy.com/developers")
+                                "https://partner.klipy.com/api-keys")
                     }
             };
 
@@ -109,6 +109,27 @@ public sealed class OnboardingViewModelTests
 
         Assert.IsTrue(
             viewModel.IsCompleted);
+
+        Assert.IsNull(
+            viewModel.Message);
+    }
+
+    [TestMethod]
+    public async Task Credential_WhenEntered_ClearsSetupPrompt()
+    {
+        OnboardingViewModel viewModel =
+            new(
+                CreateRequiredCoordinator());
+
+        await viewModel
+            .LoadCommand
+            .ExecuteAsync(null);
+
+        Assert.IsNotNull(
+            viewModel.Message);
+
+        viewModel.Credential =
+            "valid-key";
 
         Assert.IsNull(
             viewModel.Message);
@@ -307,7 +328,7 @@ public sealed class OnboardingViewModelTests
 
                     CredentialHelpUri =
                         new Uri(
-                            "https://klipy.com/developers")
+                            "https://partner.klipy.com/api-keys")
                 }
         };
     }
@@ -318,7 +339,7 @@ public sealed class OnboardingViewModelTests
         public Uri CredentialHelpUri
         { get; } =
             new(
-                "https://klipy.com/developers");
+                "https://partner.klipy.com/api-keys");
 
         public OnboardingState State
         {
@@ -338,7 +359,7 @@ public sealed class OnboardingViewModelTests
 
                 CredentialHelpUri =
                     new Uri(
-                        "https://klipy.com/developers")
+                        "https://partner.klipy.com/api-keys")
             };
 
         public CredentialValidationResult CompletionResult

@@ -9,7 +9,7 @@ public sealed class OnboardingCoordinator :
 {
     private static readonly Uri KlipyCredentialHelpUri =
         new(
-            "https://klipy.com/developers");
+            "https://partner.klipy.com/api-keys");
 
     private readonly IApiCredentialCoordinator
         _credentialCoordinator;

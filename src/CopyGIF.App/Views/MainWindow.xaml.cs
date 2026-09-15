@@ -1,3 +1,4 @@
+using CopyGIF.App.Services;
 using CopyGIF.App.Views.Pages;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -20,6 +21,10 @@ public sealed partial class MainWindow :
     public MainWindow()
     {
         InitializeComponent();
+
+        WindowTitleBar.Apply(
+            this,
+            WindowRoot);
 
         SearchPage =
             new SearchPage();

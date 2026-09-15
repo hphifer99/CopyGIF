@@ -336,7 +336,7 @@ public sealed class WindowManager :
     }
 
     public Task CompleteOnboardingAsync(
-        CancellationToken cancellationToken = default)
+    CancellationToken cancellationToken = default)
     {
         return ExecuteSerializedAsync(
             async operationToken =>
@@ -346,11 +346,11 @@ public sealed class WindowManager :
                 _onboardingRequired =
                     false;
 
-                CloseOnboardingWindow();
-
                 await ShowPickerCoreAsync(
                         operationToken)
                     .ConfigureAwait(true);
+
+                CloseOnboardingWindow();
             },
             cancellationToken);
     }

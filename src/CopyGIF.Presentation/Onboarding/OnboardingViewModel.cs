@@ -97,6 +97,9 @@ public sealed class OnboardingViewModel :
                     ref _credential,
                     normalized))
             {
+                Message =
+                    null;
+
                 OnPropertyChanged(
                     nameof(HasCredentialInput));
 

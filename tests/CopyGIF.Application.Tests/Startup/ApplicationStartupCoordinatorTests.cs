@@ -73,7 +73,9 @@ public sealed class ApplicationStartupCoordinatorTests
         harness.MigrationCoordinator.Result =
             new MigrationResult
             {
-                Status = MigrationStatus.RolledBack,
+                Status =
+                    MigrationStatus.RolledBack,
+
                 Message =
                     "The prior data was restored."
             };
@@ -116,19 +118,23 @@ public sealed class ApplicationStartupCoordinatorTests
     {
         AppSettings settings =
             CreateSettings(
-                hotkey: "Ctrl+Alt+G",
-                startWithWindows: true);
+                hotkey:
+                    "Ctrl+Alt+G",
+                startWithWindows:
+                    true);
 
         OnboardingState onboarding =
             CreateOnboardingState(
-                isRequired: false);
+                isRequired:
+                    false);
 
         Harness harness =
             new(
                 settings,
                 onboarding);
 
-        harness.StartupService.IsEnabled = false;
+        harness.StartupService.IsEnabled =
+            false;
 
         ApplicationStartupResult result =
             await harness.Coordinator.InitializeAsync(
@@ -154,7 +160,9 @@ public sealed class ApplicationStartupCoordinatorTests
             {
                 true
             },
-            harness.StartupService.RequestedStates.ToArray());
+            harness.StartupService
+                .RequestedStates
+                .ToArray());
 
         Assert.AreEqual(
             1,
@@ -166,13 +174,16 @@ public sealed class ApplicationStartupCoordinatorTests
     {
         OnboardingState onboarding =
             CreateOnboardingState(
-                isRequired: true);
+                isRequired:
+                    true);
 
         Harness harness =
             new(
-                onboarding: onboarding);
+                onboarding:
+                    onboarding);
 
-        harness.StartupService.IsEnabled = true;
+        harness.StartupService.IsEnabled =
+            true;
 
         ApplicationStartupResult result =
             await harness.Coordinator.InitializeAsync(
@@ -193,7 +204,8 @@ public sealed class ApplicationStartupCoordinatorTests
     {
         AppSettings settings =
             CreateSettings(
-                hotkey: "Ctrl+Alt+G");
+                hotkey:
+                    "Ctrl+Alt+G");
 
         Harness harness =
             new(
@@ -239,8 +251,10 @@ public sealed class ApplicationStartupCoordinatorTests
     {
         AppSettings settings =
             CreateSettings(
-                hotkey: "Ctrl+Alt+G",
-                startWithWindows: true);
+                hotkey:
+                    "Ctrl+Alt+G",
+                startWithWindows:
+                    true);
 
         Harness harness =
             new(
@@ -250,7 +264,8 @@ public sealed class ApplicationStartupCoordinatorTests
             .TryRegisterAsync(
                 settings.Hotkey);
 
-        harness.StartupService.IsEnabled = true;
+        harness.StartupService.IsEnabled =
+            true;
 
         ApplicationStartupResult result =
             await harness.Coordinator.InitializeAsync(
@@ -273,14 +288,18 @@ public sealed class ApplicationStartupCoordinatorTests
     {
         AppSettings settings =
             CreateSettings(
-                hotkey: "Ctrl+Alt+G",
-                startWithWindows: true);
+                hotkey:
+                    "Ctrl+Alt+G",
+                startWithWindows:
+                    true);
 
         Harness harness =
             new(
                 settings);
 
-        harness.StartupService.IsEnabled = false;
+        harness.StartupService.IsEnabled =
+            false;
+
         harness.StartupService.SetEnabledHandler =
             static (enabled, _) =>
                 enabled
@@ -289,8 +308,9 @@ public sealed class ApplicationStartupCoordinatorTests
                     : Task.CompletedTask;
 
         await Assert.ThrowsExactlyAsync<IOException>(
-            () => harness.Coordinator.InitializeAsync(
-                []));
+            () =>
+                harness.Coordinator.InitializeAsync(
+                    []));
 
         Assert.IsNull(
             harness.HotkeyService.RegisteredGesture);
@@ -305,7 +325,9 @@ public sealed class ApplicationStartupCoordinatorTests
                 true,
                 false
             },
-            harness.StartupService.RequestedStates.ToArray());
+            harness.StartupService
+                .RequestedStates
+                .ToArray());
 
         Assert.AreEqual(
             0,
@@ -317,8 +339,10 @@ public sealed class ApplicationStartupCoordinatorTests
     {
         AppSettings settings =
             CreateSettings(
-                hotkey: "Ctrl+Alt+H",
-                startWithWindows: false);
+                hotkey:
+                    "Ctrl+Alt+H",
+                startWithWindows:
+                    false);
 
         Harness harness =
             new(
@@ -328,15 +352,18 @@ public sealed class ApplicationStartupCoordinatorTests
             .TryRegisterAsync(
                 "Ctrl+Alt+G");
 
-        harness.StartupService.IsEnabled = true;
+        harness.StartupService.IsEnabled =
+            true;
+
         harness.TrayService.InitializeHandler =
             static _ =>
                 throw new IOException(
                     "Tray initialization failed.");
 
         await Assert.ThrowsExactlyAsync<IOException>(
-            () => harness.Coordinator.InitializeAsync(
-                []));
+            () =>
+                harness.Coordinator.InitializeAsync(
+                    []));
 
         Assert.AreEqual(
             "Ctrl+Alt+G",
@@ -351,7 +378,9 @@ public sealed class ApplicationStartupCoordinatorTests
                 false,
                 true
             },
-            harness.StartupService.RequestedStates.ToArray());
+            harness.StartupService
+                .RequestedStates
+                .ToArray());
     }
 
     [TestMethod]
@@ -359,8 +388,10 @@ public sealed class ApplicationStartupCoordinatorTests
     {
         AppSettings settings =
             CreateSettings(
-                hotkey: "Ctrl+Alt+H",
-                startWithWindows: false);
+                hotkey:
+                    "Ctrl+Alt+H",
+                startWithWindows:
+                    false);
 
         Harness harness =
             new(
@@ -370,7 +401,8 @@ public sealed class ApplicationStartupCoordinatorTests
             .TryRegisterAsync(
                 "Ctrl+Alt+G");
 
-        harness.StartupService.IsEnabled = true;
+        harness.StartupService.IsEnabled =
+            true;
 
         using CancellationTokenSource cancellation =
             new();
@@ -386,9 +418,10 @@ public sealed class ApplicationStartupCoordinatorTests
 
         await Assert.ThrowsExactlyAsync<
             OperationCanceledException>(
-            () => harness.Coordinator.InitializeAsync(
-                [],
-                cancellation.Token));
+            () =>
+                harness.Coordinator.InitializeAsync(
+                    [],
+                    cancellation.Token));
 
         Assert.AreEqual(
             "Ctrl+Alt+G",
@@ -404,7 +437,8 @@ public sealed class ApplicationStartupCoordinatorTests
         Harness harness =
             new();
 
-        harness.StartupService.IsEnabled = true;
+        harness.StartupService.IsEnabled =
+            true;
 
         ApplicationStartupResult first =
             await harness.Coordinator.InitializeAsync(
@@ -440,41 +474,64 @@ public sealed class ApplicationStartupCoordinatorTests
         Harness harness =
             new();
 
-        int activationCount = 0;
-        int hotkeyCount = 0;
-        int openCount = 0;
-        int settingsCount = 0;
-        int exitCount = 0;
-        IReadOnlyList<string>? activationArguments = null;
+        int activationCount =
+            0;
+
+        int hotkeyCount =
+            0;
+
+        int openCount =
+            0;
+
+        int settingsCount =
+            0;
+
+        int exitCount =
+            0;
+
+        IReadOnlyList<string>? activationArguments =
+            null;
 
         harness.Coordinator.ActivationRequested +=
             (_, eventArgs) =>
             {
                 activationCount++;
+
                 activationArguments =
                     eventArgs.Arguments;
             };
 
         harness.Coordinator.HotkeyActivated +=
-            (_, _) => hotkeyCount++;
+            (_, _) =>
+                hotkeyCount++;
 
         harness.Coordinator.OpenRequested +=
-            (_, _) => openCount++;
+            (_, _) =>
+                openCount++;
 
         harness.Coordinator.SettingsRequested +=
-            (_, _) => settingsCount++;
+            (_, _) =>
+                settingsCount++;
 
         harness.Coordinator.ExitRequested +=
-            (_, _) => exitCount++;
+            (_, _) =>
+                exitCount++;
 
         harness.SingleInstanceService
             .RaiseActivationRequested(
                 "--open");
 
-        harness.HotkeyService.RaiseActivated();
-        harness.TrayService.RaiseOpenRequested();
-        harness.TrayService.RaiseSettingsRequested();
-        harness.TrayService.RaiseExitRequested();
+        harness.HotkeyService
+            .RaiseActivated();
+
+        harness.TrayService
+            .RaiseOpenRequested();
+
+        harness.TrayService
+            .RaiseSettingsRequested();
+
+        harness.TrayService
+            .RaiseExitRequested();
 
         Assert.AreEqual(
             1,
@@ -510,14 +567,17 @@ public sealed class ApplicationStartupCoordinatorTests
         Harness harness =
             new();
 
-        int eventCount = 0;
+        int eventCount =
+            0;
 
         harness.Coordinator.OpenRequested +=
-            (_, _) => eventCount++;
+            (_, _) =>
+                eventCount++;
 
         harness.Coordinator.Dispose();
 
-        harness.TrayService.RaiseOpenRequested();
+        harness.TrayService
+            .RaiseOpenRequested();
 
         Assert.AreEqual(
             0,
@@ -525,8 +585,9 @@ public sealed class ApplicationStartupCoordinatorTests
 
         await Assert.ThrowsExactlyAsync<
             ObjectDisposedException>(
-            () => harness.Coordinator.InitializeAsync(
-                []));
+            () =>
+                harness.Coordinator.InitializeAsync(
+                    []));
     }
 
     [TestMethod]
@@ -538,13 +599,15 @@ public sealed class ApplicationStartupCoordinatorTests
         harness.SingleInstanceService.Result =
             new SingleInstanceResult
             {
-                Status = (SingleInstanceStatus)999
+                Status =
+                    (SingleInstanceStatus)999
             };
 
         await Assert.ThrowsExactlyAsync<
             InvalidDataException>(
-            () => harness.Coordinator.InitializeAsync(
-                []));
+            () =>
+                harness.Coordinator.InitializeAsync(
+                    []));
 
         Assert.AreEqual(
             0,
@@ -559,8 +622,9 @@ public sealed class ApplicationStartupCoordinatorTests
 
         await Assert.ThrowsExactlyAsync<
             ArgumentNullException>(
-            () => harness.Coordinator.InitializeAsync(
-                null!));
+            () =>
+                harness.Coordinator.InitializeAsync(
+                    null!));
 
         Assert.HasCount(
             0,
@@ -569,12 +633,16 @@ public sealed class ApplicationStartupCoordinatorTests
     }
 
     private static AppSettings CreateSettings(
-        string hotkey = AppSettings.DefaultHotkey,
-        bool startWithWindows = true)
+        string hotkey =
+            AppSettings.DefaultHotkey,
+        bool startWithWindows =
+            true)
     {
         return new AppSettings
         {
-            Hotkey = hotkey,
+            Hotkey =
+                hotkey,
+
             Startup =
                 new StartupSettings
                 {
@@ -590,12 +658,18 @@ public sealed class ApplicationStartupCoordinatorTests
     {
         return new OnboardingState
         {
-            IsRequired = isRequired,
-            ProviderId = "klipy",
-            ProviderDisplayName = "KLIPY",
+            IsRequired =
+                isRequired,
+
+            ProviderId =
+                "klipy",
+
+            ProviderDisplayName =
+                "KLIPY",
+
             CredentialHelpUri =
                 new Uri(
-                    "https://klipy.com/developers")
+                    "https://partner.klipy.com/api-keys")
         };
     }
 
@@ -606,12 +680,14 @@ public sealed class ApplicationStartupCoordinatorTests
             OnboardingState? onboarding = null)
         {
             SettingsCoordinator.Settings =
-                settings ?? CreateSettings();
+                settings ??
+                CreateSettings();
 
             OnboardingCoordinator.State =
                 onboarding ??
                 CreateOnboardingState(
-                    isRequired: false);
+                    isRequired:
+                        false);
 
             Coordinator =
                 new ApplicationStartupCoordinator(
@@ -628,51 +704,66 @@ public sealed class ApplicationStartupCoordinatorTests
         public FakeSingleInstanceService
             SingleInstanceService
         { get; } =
-                new();
+            new();
 
-        public FakeApplicationPaths Paths { get; } =
+        public FakeApplicationPaths Paths
+        { get; } =
             new();
 
         public FakeMigrationCoordinator
             MigrationCoordinator
         { get; } =
-                new();
+            new();
 
         public FakeSettingsCoordinator
             SettingsCoordinator
         { get; } =
-                new();
+            new();
 
         public FakeOnboardingCoordinator
             OnboardingCoordinator
         { get; } =
-                new();
-
-        public FakeHotkeyService HotkeyService { get; } =
             new();
 
-        public FakeStartupService StartupService { get; } =
+        public FakeHotkeyService HotkeyService
+        { get; } =
             new();
 
-        public FakeTrayService TrayService { get; } =
+        public FakeStartupService StartupService
+        { get; } =
             new();
 
-        public ApplicationStartupCoordinator Coordinator { get; }
+        public FakeTrayService TrayService
+        { get; } =
+            new();
+
+        public ApplicationStartupCoordinator Coordinator
+        { get; }
     }
 
     private sealed class FakeSettingsCoordinator :
         ISettingsCoordinator
     {
-        public AppSettings Settings { get; set; } =
+        public AppSettings Settings
+        {
+            get;
+            set;
+        } =
             new();
 
-        public int LoadCallCount { get; private set; }
+        public int LoadCallCount
+        {
+            get;
+            private set;
+        }
 
         public Task<AppSettings> LoadAsync(
             CancellationToken cancellationToken = default)
         {
             LoadCallCount++;
-            cancellationToken.ThrowIfCancellationRequested();
+
+            cancellationToken
+                .ThrowIfCancellationRequested();
 
             return Task.FromResult(
                 Settings);
@@ -682,8 +773,11 @@ public sealed class ApplicationStartupCoordinatorTests
             AppSettings settings,
             CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            Settings = settings;
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            Settings =
+                settings;
 
             return Task.FromResult(
                 SettingsSaveResult.Success(
@@ -694,8 +788,11 @@ public sealed class ApplicationStartupCoordinatorTests
             RestoreDefaultsAsync(
                 CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            Settings = new AppSettings();
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            Settings =
+                new AppSettings();
 
             return Task.FromResult(
                 SettingsSaveResult.Success(
@@ -706,7 +803,8 @@ public sealed class ApplicationStartupCoordinatorTests
             ChooseLibraryStorageRootAsync(
                 CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            cancellationToken
+                .ThrowIfCancellationRequested();
 
             return Task.FromResult<
                 SettingsSaveResult?>(
@@ -717,11 +815,20 @@ public sealed class ApplicationStartupCoordinatorTests
     private sealed class FakeOnboardingCoordinator :
         IOnboardingCoordinator
     {
-        public OnboardingState State { get; set; } =
+        public OnboardingState State
+        {
+            get;
+            set;
+        } =
             CreateOnboardingState(
-                isRequired: false);
+                isRequired:
+                    false);
 
-        public int GetStateCallCount { get; private set; }
+        public int GetStateCallCount
+        {
+            get;
+            private set;
+        }
 
         public Uri CredentialHelpUri =>
             State.CredentialHelpUri;
@@ -730,7 +837,9 @@ public sealed class ApplicationStartupCoordinatorTests
             CancellationToken cancellationToken = default)
         {
             GetStateCallCount++;
-            cancellationToken.ThrowIfCancellationRequested();
+
+            cancellationToken
+                .ThrowIfCancellationRequested();
 
             return Task.FromResult(
                 State);
@@ -741,7 +850,8 @@ public sealed class ApplicationStartupCoordinatorTests
                 string credential,
                 CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            cancellationToken
+                .ThrowIfCancellationRequested();
 
             return Task.FromResult(
                 CredentialValidationResult.Valid());
@@ -750,7 +860,8 @@ public sealed class ApplicationStartupCoordinatorTests
         public Task<bool> OpenCredentialHelpAsync(
             CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            cancellationToken
+                .ThrowIfCancellationRequested();
 
             return Task.FromResult(
                 true);

@@ -19,6 +19,7 @@ public sealed class WinUiShellStructureTests
         "Resources/ControlStyles.xaml",
         "Resources/Themes.xaml",
         "Services/ThemeManager.cs",
+        "Services/WindowTitleBar.cs",
         "Services/WindowManager.cs",
         "Services/WinUiDispatcher.cs",
         "Views/MainWindow.xaml",
@@ -188,12 +189,9 @@ public sealed class WinUiShellStructureTests
         string[] onboardingRequirements =
         [
             "x:Name=\"StepContentPresenter\"",
-            "Content=\"{Binding StepContent}\"",
-            "ContentTemplate=\"{Binding StepContentTemplate}\"",
-            "Command=\"{Binding BackCommand}\"",
-            "Command=\"{Binding NextCommand}\"",
-            "Command=\"{Binding FinishCommand}\"",
-            "Command=\"{Binding CancelCommand}\""
+            "Content=\"{x:Bind StepContent, Mode=OneWay}\"",
+            "ContentTemplate=\"{x:Bind StepContentTemplate, Mode=OneWay}\"",
+            "Command=\"{Binding FinishCommand}\""
         ];
 
         foreach (string requiredText
@@ -204,6 +202,75 @@ public sealed class WinUiShellStructureTests
                 requiredText,
                 $"OnboardingWindow is missing required shell text: {requiredText}");
         }
+
+        string[] obsoleteSingleStepText =
+        [
+            "StepProgressTextBlock",
+            "BackCommand",
+            "NextCommand",
+            "CancelCommand"
+        ];
+
+        foreach (string obsoleteText
+                 in obsoleteSingleStepText)
+        {
+            Assert.IsFalse(
+                onboardingXaml.Contains(
+                    obsoleteText,
+                    StringComparison.Ordinal),
+                $"Single-step onboarding still contains obsolete UI text: {obsoleteText}");
+        }
+    }
+
+    [TestMethod]
+    public void OnboardingCompletion_ActivatesPickerBeforeClosingSetupWindow()
+    {
+        string windowManagerSource =
+            ReadAppSource(
+                "Services",
+                "WindowManager.cs");
+
+        int methodStartIndex =
+            windowManagerSource.IndexOf(
+                "public Task CompleteOnboardingAsync(",
+                StringComparison.Ordinal);
+
+        Assert.IsTrue(
+            methodStartIndex >= 0,
+            "The onboarding completion method must exist.");
+
+        int methodEndIndex =
+            windowManagerSource.IndexOf(
+                "public Task ExitAsync(",
+                methodStartIndex,
+                StringComparison.Ordinal);
+
+        Assert.IsTrue(
+            methodEndIndex > methodStartIndex,
+            "The onboarding completion method must exist.");
+
+        string completionSource =
+            windowManagerSource[
+                methodStartIndex..methodEndIndex];
+
+        int showPickerIndex =
+            completionSource.IndexOf(
+                "await ShowPickerCoreAsync(",
+                StringComparison.Ordinal);
+
+        Assert.IsTrue(
+            showPickerIndex >= 0,
+            "Onboarding completion must show the picker.");
+
+        int closeOnboardingIndex =
+            completionSource.IndexOf(
+                "CloseOnboardingWindow();",
+                showPickerIndex,
+                StringComparison.Ordinal);
+
+        Assert.IsTrue(
+            closeOnboardingIndex > showPickerIndex,
+            "The picker must be active before the onboarding window closes.");
     }
 
     [TestMethod]

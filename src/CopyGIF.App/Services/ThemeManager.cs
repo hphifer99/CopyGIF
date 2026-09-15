@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using CopyGIF.Core.Settings;
 using Microsoft.UI.Xaml;
 using Windows.UI.ViewManagement;
@@ -25,6 +27,15 @@ public sealed class ThemeManager :
     private AppTheme _selectedTheme =
         AppTheme.System;
 
+    private bool
+        _systemEventSubscriptionAttempted;
+
+    private bool
+        _highContrastChangedSubscribed;
+
+    private bool
+        _animationsEnabledChangedSubscribed;
+
     private bool _disposed;
 
     public ThemeManager(
@@ -34,12 +45,6 @@ public sealed class ThemeManager :
             dispatcher ??
             throw new ArgumentNullException(
                 nameof(dispatcher));
-
-        _accessibilitySettings.HighContrastChanged +=
-            HandleHighContrastChanged;
-
-        _uiSettings.AdvancedEffectsEnabledChanged +=
-            HandleAnimationsEnabledChanged;
     }
 
     public event EventHandler? ThemeChanged;
@@ -68,6 +73,7 @@ public sealed class ThemeManager :
             root);
 
         EnsureUiThread();
+        EnsureSystemEventSubscriptions();
 
         if (!_roots.Add(
                 root))
@@ -140,11 +146,7 @@ public sealed class ThemeManager :
         _disposed =
             true;
 
-        _accessibilitySettings.HighContrastChanged -=
-            HandleHighContrastChanged;
-
-        _uiSettings.AdvancedEffectsEnabledChanged -=
-            HandleAnimationsEnabledChanged;
+        UnsubscribeFromSystemEvents();
 
         foreach (FrameworkElement root in _roots)
         {
@@ -156,6 +158,82 @@ public sealed class ThemeManager :
 
         GC.SuppressFinalize(
             this);
+    }
+
+    private void EnsureSystemEventSubscriptions()
+    {
+        if (_systemEventSubscriptionAttempted)
+        {
+            return;
+        }
+
+        _systemEventSubscriptionAttempted =
+            true;
+
+        try
+        {
+            _accessibilitySettings.HighContrastChanged +=
+                HandleHighContrastChanged;
+
+            _highContrastChangedSubscribed =
+                true;
+        }
+        catch (COMException exception)
+        {
+            Debug.WriteLine(
+                $"CopyGIF could not monitor high-contrast changes: {exception}");
+        }
+
+        try
+        {
+            _uiSettings.AdvancedEffectsEnabledChanged +=
+                HandleAnimationsEnabledChanged;
+
+            _animationsEnabledChangedSubscribed =
+                true;
+        }
+        catch (COMException exception)
+        {
+            Debug.WriteLine(
+                $"CopyGIF could not monitor animation-setting changes: {exception}");
+        }
+    }
+
+    private void UnsubscribeFromSystemEvents()
+    {
+        if (_highContrastChangedSubscribed)
+        {
+            try
+            {
+                _accessibilitySettings.HighContrastChanged -=
+                    HandleHighContrastChanged;
+            }
+            catch (COMException exception)
+            {
+                Debug.WriteLine(
+                    $"CopyGIF could not stop monitoring high-contrast changes: {exception}");
+            }
+
+            _highContrastChangedSubscribed =
+                false;
+        }
+
+        if (_animationsEnabledChangedSubscribed)
+        {
+            try
+            {
+                _uiSettings.AdvancedEffectsEnabledChanged -=
+                    HandleAnimationsEnabledChanged;
+            }
+            catch (COMException exception)
+            {
+                Debug.WriteLine(
+                    $"CopyGIF could not stop monitoring animation-setting changes: {exception}");
+            }
+
+            _animationsEnabledChangedSubscribed =
+                false;
+        }
     }
 
     private void ApplySelectedThemeCore()

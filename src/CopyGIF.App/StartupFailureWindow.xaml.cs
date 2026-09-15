@@ -1,3 +1,4 @@
+using CopyGIF.App.Services;
 using Microsoft.UI.Xaml;
 
 namespace CopyGIF.App;
@@ -12,6 +13,10 @@ public sealed partial class StartupFailureWindow :
             message);
 
         InitializeComponent();
+
+        WindowTitleBar.Apply(
+            this,
+            WindowRoot);
 
         MessageTextBlock.Text =
             message.Trim();

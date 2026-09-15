@@ -135,7 +135,19 @@ public sealed class CopyGifHost :
         }
         catch
         {
-            serviceProvider.Dispose();
+            try
+            {
+                serviceProvider
+                    .DisposeAsync()
+                    .AsTask()
+                    .GetAwaiter()
+                    .GetResult();
+            }
+            catch (Exception disposalException)
+            {
+                Debug.WriteLine(
+                    $"CopyGIF could not completely dispose its failed startup container: {disposalException}");
+            }
 
             throw;
         }
@@ -258,14 +270,22 @@ public sealed class CopyGifHost :
                     cancellationToken)
                 .ConfigureAwait(true);
 
-            if (result.HotkeyFailure != HotkeyRegistrationFailure.None && !onboarding.IsRequired)
+            if (result.HotkeyFailure != HotkeyRegistrationFailure.None &&
+                !onboarding.IsRequired)
             {
-                await _windowManager.ShowSettingsAsync(cancellationToken).ConfigureAwait(true);
-                if (_windowManager.SettingsWindow is SettingsWindow settingsWindow)
+                await _windowManager
+                    .ShowSettingsAsync(
+                        cancellationToken)
+                    .ConfigureAwait(true);
+
+                if (_windowManager.SettingsWindow is
+                    SettingsWindow settingsWindow)
                 {
                     settingsWindow.StatusMessage =
                         "The hotkey is unavailable. Choose another hotkey in General settings.";
-                    settingsWindow.StatusSeverity = InfoBarSeverity.Warning;
+
+                    settingsWindow.StatusSeverity =
+                        InfoBarSeverity.Warning;
                 }
             }
 
@@ -649,19 +669,7 @@ public sealed class CopyGifHost :
                     "Connect GIF provider",
 
                 StepDescription =
-                    "Enter the provider credential required to search and copy GIFs.",
-
-                CurrentStepNumber =
-                    1,
-
-                StepCount =
-                    1,
-
-                IsFinalStep =
-                    true,
-
-                CanGoBack =
-                    false,
+                    "Add your KLIPY API key to start searching and copying GIFs.",
 
                 StepContent =
                     viewModel,
@@ -680,6 +688,8 @@ public sealed class CopyGifHost :
             {
                 if (eventArgs.PropertyName is
                     nameof(OnboardingViewModel.IsBusy) or
+                    nameof(OnboardingViewModel.IsLoaded) or
+                    nameof(OnboardingViewModel.Credential) or
                     nameof(OnboardingViewModel.Message))
                 {
                     ApplyOnboardingWindowState(
@@ -731,9 +741,6 @@ public sealed class CopyGifHost :
                             InfoBarSeverity.Error;
                     }
                 });
-
-        window.CancelCommand =
-            viewModel.CancelCommand;
 
         bool loaded =
             false;
@@ -803,6 +810,10 @@ public sealed class CopyGifHost :
     {
         window.IsBusy =
             viewModel.IsBusy;
+
+        window.CanFinish =
+            viewModel.CompleteCommand
+                .CanExecute(null);
 
         window.StatusMessage =
             viewModel.Message?.Text ??

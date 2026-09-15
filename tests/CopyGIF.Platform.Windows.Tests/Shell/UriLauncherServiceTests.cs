@@ -16,7 +16,7 @@ public sealed class UriLauncherServiceTests
 
         Uri uri =
             new(
-                "https://klipy.com/developers");
+                "https://partner.klipy.com/api-keys");
 
         bool result =
             await service.TryLaunchAsync(uri);
@@ -92,15 +92,21 @@ public sealed class UriLauncherServiceTests
         public RecordingUriLaunchNativeApi(
             bool result)
         {
-            _result = result;
+            _result =
+                result;
         }
 
-        public Uri? LaunchedUri { get; private set; }
+        public Uri? LaunchedUri
+        {
+            get;
+            private set;
+        }
 
         public bool TryLaunch(
             Uri uri)
         {
-            LaunchedUri = uri;
+            LaunchedUri =
+                uri;
 
             return _result;
         }

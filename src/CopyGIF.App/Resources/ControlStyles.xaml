@@ -97,7 +97,9 @@
 
     <Style
         x:Key="CopyGifPrimaryButtonStyle"
+        BasedOn="{StaticResource AccentButtonStyle}"
         TargetType="Button">
+        <Setter Property="CornerRadius" Value="6" />
         <Setter Property="MinHeight" Value="40" />
         <Setter Property="Padding" Value="16,8" />
         <Setter Property="FontWeight" Value="SemiBold" />

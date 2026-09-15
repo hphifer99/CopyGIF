@@ -35,7 +35,7 @@ public sealed class OnboardingCoordinatorTests
 
         Assert.AreEqual(
             new Uri(
-                "https://klipy.com/developers"),
+                "https://partner.klipy.com/api-keys"),
             state.CredentialHelpUri);
     }
 
@@ -142,7 +142,7 @@ public sealed class OnboardingCoordinatorTests
 
         Assert.AreEqual(
             new Uri(
-                "https://klipy.com/developers"),
+                "https://partner.klipy.com/api-keys"),
             uriLauncher.LaunchRequests[0]);
     }
 

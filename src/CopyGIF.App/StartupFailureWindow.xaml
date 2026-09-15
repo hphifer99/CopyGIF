@@ -7,8 +7,9 @@
     Title="CopyGIF startup problem">
 
     <Grid
+        x:Name="WindowRoot"
         Padding="32"
-        Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        Style="{StaticResource CopyGifPageRootStyle}">
 
         <StackPanel
             MaxWidth="560"

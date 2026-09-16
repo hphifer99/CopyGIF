@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.UI;
+using Windows.UI.ViewManagement;
 
 namespace CopyGIF.App.Services;
 
@@ -33,6 +34,48 @@ internal static class WindowTitleBar
 
         ArgumentNullException.ThrowIfNull(
             root);
+
+        AccessibilitySettings accessibilitySettings = new();
+        bool highContrastSubscribed = false;
+        bool closed = false;
+        try
+        {
+            accessibilitySettings.HighContrastChanged += HandleHighContrastChanged;
+            highContrastSubscribed = true;
+        }
+        catch (COMException exception)
+        {
+            Debug.WriteLine($"Unable to monitor title bar contrast changes: {exception.Message}");
+        }
+        window.Closed += HandleClosed;
+
+        void HandleHighContrastChanged(AccessibilitySettings sender, object args)
+        {
+            root.DispatcherQueue.TryEnqueue(() =>
+            {
+                if (!closed)
+                {
+                    ApplyColors(window, root);
+                }
+            });
+        }
+
+        void HandleClosed(object sender, WindowEventArgs args)
+        {
+            closed = true;
+            if (highContrastSubscribed)
+            {
+                try
+                {
+                    accessibilitySettings.HighContrastChanged -= HandleHighContrastChanged;
+                }
+                catch (COMException exception)
+                {
+                    Debug.WriteLine($"Unable to stop monitoring title bar contrast changes: {exception.Message}");
+                }
+            }
+            window.Closed -= HandleClosed;
+        }
 
         ApplyColors(
             window,
@@ -109,6 +152,26 @@ internal static class WindowTitleBar
 
         try
         {
+            if (new AccessibilitySettings().HighContrast)
+            {
+                // Null restores Windows-owned caption colors for every
+                // high-contrast palette, including custom user palettes.
+                AppWindowTitleBar titleBar = window.AppWindow.TitleBar;
+                titleBar.BackgroundColor = null;
+                titleBar.InactiveBackgroundColor = null;
+                titleBar.ForegroundColor = null;
+                titleBar.InactiveForegroundColor = null;
+                titleBar.ButtonBackgroundColor = null;
+                titleBar.ButtonInactiveBackgroundColor = null;
+                titleBar.ButtonForegroundColor = null;
+                titleBar.ButtonInactiveForegroundColor = null;
+                titleBar.ButtonHoverBackgroundColor = null;
+                titleBar.ButtonHoverForegroundColor = null;
+                titleBar.ButtonPressedBackgroundColor = null;
+                titleBar.ButtonPressedForegroundColor = null;
+                return;
+            }
+
             window.AppWindow.TitleBar.BackgroundColor =
                 background;
 

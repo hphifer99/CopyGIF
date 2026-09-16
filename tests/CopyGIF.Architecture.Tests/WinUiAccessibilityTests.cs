@@ -23,6 +23,7 @@ public sealed class WinUiAccessibilityTests
                     "AutomationProperties.Name=\"Search GIFs\"",
                     "AutomationProperties.Name=\"Clear search\"",
                     "AutomationProperties.Name=\"Search\"",
+                    "AutomationProperties.Name=\"Search in progress\"",
                     "AutomationProperties.Name=\"Cancel search\""
                 ],
 
@@ -49,17 +50,12 @@ public sealed class WinUiAccessibilityTests
 
                 ["Views/OnboardingWindow.xaml"] =
                 [
-                    "AutomationProperties.Name=\"Onboarding progress\"",
-                    "AutomationProperties.Name=\"Cancel setup\"",
-                    "AutomationProperties.Name=\"Previous setup step\"",
-                    "AutomationProperties.Name=\"Next setup step\"",
                     "AutomationProperties.Name=\"Finish setup\""
                 ],
 
                 ["Views/Pages/SearchPage.xaml"] =
                 [
                     "AutomationProperties.Name=\"GIF search results\"",
-                    "AutomationProperties.Name=\"Loading GIFs\"",
                     "AutomationProperties.Name=\"Load more GIFs\""
                 ],
 
@@ -103,7 +99,6 @@ public sealed class WinUiAccessibilityTests
         string[] liveRegionFiles =
         [
             "Controls/StatusBanner.xaml",
-            "Views/OnboardingWindow.xaml",
             "Views/Pages/SearchPage.xaml",
             "Views/Pages/FavoritesPage.xaml",
             "Views/Pages/RecentsPage.xaml"
@@ -121,6 +116,11 @@ public sealed class WinUiAccessibilityTests
                 "AutomationProperties.LiveSetting=\"Polite\"",
                 $"{relativePath} must expose status changes as a polite live region.");
         }
+
+        StringAssert.Contains(
+            ReadAppSource("Views/OnboardingWindow.xaml"),
+            "<controls:StatusBanner",
+            "Onboarding must use the shared accessible status control.");
 
         string appXaml =
             ReadAppSource(

@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using CopyGIF.App.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -61,6 +62,7 @@ public sealed partial class SettingsWindow :
     public SettingsWindow()
     {
         InitializeComponent();
+        WindowTitleBar.Apply(this, WindowRoot);
 
         WindowRoot.DataContext =
             this;

@@ -356,16 +356,6 @@ public sealed partial class SearchPage :
                 ? Visibility.Collapsed
                 : Visibility.Visible;
 
-        LoadingTextBlock.Visibility =
-            IsBusy
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-
-        LoadingProgressRing.Visibility =
-            IsBusy
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-
         LoadMoreButton.Visibility =
             CanLoadMore &&
             !IsBusy

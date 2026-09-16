@@ -76,8 +76,8 @@ public sealed class ArchitectureTests
                 ["Microsoft.Extensions.Http"] = "10.0.12",
                 ["Microsoft.Windows.SDK.BuildTools"] = "10.0.28000.2705",
                 ["Microsoft.WindowsAppSDK"] = "2.4.0",
-                ["MSTest"] = "4.3.3",
-                ["System.Security.Cryptography.ProtectedData"] = "10.0.12"
+                ["MSTest"] = "4.4.0",
+                ["System.Security.Cryptography.ProtectedData"] = "10.0.11"
             };
 
     [TestMethod]

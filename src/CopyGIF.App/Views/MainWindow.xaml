@@ -8,13 +8,11 @@
     mc:Ignorable="d"
     Title="CopyGIF">
 
-    <Grid
+	<Grid
         x:Name="WindowRoot"
-        MinWidth="640"
-        MinHeight="480"
         Style="{StaticResource CopyGifPageRootStyle}">
 
-        <NavigationView
+		<NavigationView
             x:Name="ShellNavigationView"
             AutomationProperties.Name="CopyGIF navigation"
             IsBackButtonVisible="Collapsed"
@@ -22,55 +20,55 @@
             PaneDisplayMode="LeftCompact"
             SelectionChanged="ShellNavigationView_SelectionChanged">
 
-            <NavigationView.KeyboardAccelerators>
-                <KeyboardAccelerator
+			<NavigationView.KeyboardAccelerators>
+				<KeyboardAccelerator
                     Key="F"
                     Modifiers="Control"
                     Invoked="FocusSearchKeyboardAccelerator_Invoked" />
-            </NavigationView.KeyboardAccelerators>
+			</NavigationView.KeyboardAccelerators>
 
-            <NavigationView.MenuItems>
+			<NavigationView.MenuItems>
 
-                <NavigationViewItem
+				<NavigationViewItem
                     x:Name="SearchNavigationItem"
                     AutomationProperties.Name="Search"
                     Content="Search"
                     Tag="Search">
 
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE721;" />
-                    </NavigationViewItem.Icon>
+					<NavigationViewItem.Icon>
+						<FontIcon Glyph="&#xE721;" />
+					</NavigationViewItem.Icon>
 
-                </NavigationViewItem>
+				</NavigationViewItem>
 
-                <NavigationViewItem
+				<NavigationViewItem
                     x:Name="FavoritesNavigationItem"
                     AutomationProperties.Name="Favorites"
                     Content="Favorites"
                     Tag="Favorites">
 
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE734;" />
-                    </NavigationViewItem.Icon>
+					<NavigationViewItem.Icon>
+						<FontIcon Glyph="&#xE734;" />
+					</NavigationViewItem.Icon>
 
-                </NavigationViewItem>
+				</NavigationViewItem>
 
-                <NavigationViewItem
+				<NavigationViewItem
                     x:Name="RecentsNavigationItem"
                     AutomationProperties.Name="Recents"
                     Content="Recents"
                     Tag="Recents">
 
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE81C;" />
-                    </NavigationViewItem.Icon>
+					<NavigationViewItem.Icon>
+						<FontIcon Glyph="&#xE81C;" />
+					</NavigationViewItem.Icon>
 
-                </NavigationViewItem>
+				</NavigationViewItem>
 
-            </NavigationView.MenuItems>
+			</NavigationView.MenuItems>
 
-        </NavigationView>
+		</NavigationView>
 
-    </Grid>
+	</Grid>
 
 </Window>

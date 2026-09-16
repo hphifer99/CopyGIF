@@ -180,6 +180,8 @@ UserControl
         InitializeComponent();
         Loaded += Root_Loaded;
 
+        Loaded += (_, _) => UpdateFavoriteState();
+
         UpdateFavoriteState();
         UpdateBusyState();
         UpdateAccessibleText();
@@ -731,6 +733,7 @@ UserControl
 
     private void UpdateFavoriteState()
     {
+        VisualStateManager.GoToState(this, IsFavorite ? "Favorite" : "NotFavorite", false);
         FavoriteIcon.Glyph =
         IsFavorite
         ? "\uE735"
@@ -756,6 +759,10 @@ UserControl
 
     private void UpdateAccessibleText()
     {
+        string providerDisplayName = string.Equals(ProviderName?.Trim(), "klipy", StringComparison.OrdinalIgnoreCase)
+            ? "KLIPY"
+            : ProviderName?.Trim() ?? string.Empty;
+        ProviderTextBlock.Text = providerDisplayName;
         string accessibleTitle =
         string.IsNullOrWhiteSpace(
         Title)
@@ -771,7 +778,7 @@ UserControl
         string.IsNullOrWhiteSpace(
         ProviderName)
         ? "Press Enter to copy this GIF."
-        : $"Provided by {ProviderName.Trim()}. Press Enter to copy this GIF.");
+        : $"Provided by {providerDisplayName}. Press Enter to copy this GIF.");
 
         ProviderTextBlock.Visibility =
         string.IsNullOrWhiteSpace(

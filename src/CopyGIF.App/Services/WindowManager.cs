@@ -27,7 +27,7 @@ public sealed class WindowManager :
         640;
 
     private const int OnboardingWindowHeight =
-        600;
+        520;
 
     private readonly Func<MainWindow>
         _mainWindowFactory;
@@ -561,6 +561,18 @@ public sealed class WindowManager :
         SettingsWindow window =
             EnsureSettingsWindow();
 
+        WindowPlacementResult placement = await _placementService
+            .CalculateAsync(
+                new WindowSettings
+                {
+                    PlacementMode = WindowPlacementMode.Center,
+                    Width = SettingsWindowWidth,
+                    Height = SettingsWindowHeight
+                },
+                cancellationToken)
+            .ConfigureAwait(true);
+
+        window.AppWindow.MoveAndResize(CreateRectangle(placement));
         window.Activate();
     }
 
@@ -575,6 +587,18 @@ public sealed class WindowManager :
         OnboardingWindow window =
             EnsureOnboardingWindow();
 
+        WindowPlacementResult placement = await _placementService
+            .CalculateAsync(
+                new WindowSettings
+                {
+                    PlacementMode = WindowPlacementMode.Center,
+                    Width = OnboardingWindowWidth,
+                    Height = OnboardingWindowHeight
+                },
+                cancellationToken)
+            .ConfigureAwait(true);
+
+        window.AppWindow.MoveAndResize(CreateRectangle(placement));
         window.Activate();
     }
 
@@ -742,11 +766,6 @@ public sealed class WindowManager :
         window.Closed +=
             HandleSettingsWindowClosed;
 
-        window.AppWindow.Resize(
-            new SizeInt32(
-                SettingsWindowWidth,
-                SettingsWindowHeight));
-
         return window;
     }
 
@@ -770,11 +789,6 @@ public sealed class WindowManager :
 
         window.Closed +=
             HandleOnboardingWindowClosed;
-
-        window.AppWindow.Resize(
-            new SizeInt32(
-                OnboardingWindowWidth,
-                OnboardingWindowHeight));
 
         return window;
     }

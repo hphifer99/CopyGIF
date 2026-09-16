@@ -38,6 +38,9 @@ public sealed class ThemeManager :
 
     private bool _disposed;
 
+    private DispatcherTimer? _animationSettingsTimer;
+    private bool _lastAnimationsEnabled;
+
     public ThemeManager(
         WinUiDispatcher dispatcher)
     {
@@ -170,6 +173,17 @@ public sealed class ThemeManager :
         _systemEventSubscriptionAttempted =
             true;
 
+        // AnimationsEnabledChanged requires Windows 10 version 2004. Keep
+        // the existing 1809 minimum and read the supported property on the
+        // UI thread, including when an animation preference changes alone.
+        _lastAnimationsEnabled = _uiSettings.AnimationsEnabled;
+        _animationSettingsTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1)
+        };
+        _animationSettingsTimer.Tick += HandleAnimationSettingsTick;
+        _animationSettingsTimer.Start();
+
         try
         {
             _accessibilitySettings.HighContrastChanged +=
@@ -201,6 +215,27 @@ public sealed class ThemeManager :
 
     private void UnsubscribeFromSystemEvents()
     {
+        if (_animationSettingsTimer is not null)
+        {
+            DispatcherTimer timer = _animationSettingsTimer;
+            _animationSettingsTimer = null;
+
+            void StopTimer()
+            {
+                timer.Stop();
+                timer.Tick -= HandleAnimationSettingsTick;
+            }
+
+            if (_dispatcher.HasThreadAccess)
+            {
+                StopTimer();
+            }
+            else
+            {
+                _dispatcher.TryEnqueue(StopTimer);
+            }
+        }
+
         if (_highContrastChangedSubscribed)
         {
             try
@@ -305,12 +340,29 @@ public sealed class ThemeManager :
         object __)
     {
         _dispatcher.TryEnqueue(
-            () =>
-            {
-                AnimationsEnabledChanged?.Invoke(
-                    this,
-                    EventArgs.Empty);
-            });
+            CheckAnimationSettings);
+    }
+
+    private void HandleAnimationSettingsTick(object? sender, object eventArgs)
+    {
+        CheckAnimationSettings();
+    }
+
+    private void CheckAnimationSettings()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        bool enabled = _uiSettings.AnimationsEnabled;
+        if (_lastAnimationsEnabled == enabled)
+        {
+            return;
+        }
+
+        _lastAnimationsEnabled = enabled;
+        AnimationsEnabledChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void EnsureUiThread()

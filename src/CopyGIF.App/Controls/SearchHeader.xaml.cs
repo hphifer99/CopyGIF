@@ -375,6 +375,9 @@ public sealed partial class SearchHeader :
                 ? Visibility.Collapsed
                 : Visibility.Visible;
 
+        SearchButton.Visibility =
+            IsBusy ? Visibility.Collapsed : Visibility.Visible;
+
         SearchProgressRing.Visibility =
             IsBusy
                 ? Visibility.Visible

@@ -6,18 +6,35 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    MinWidth="180"
+    Width="192"
+    Height="224"
     Unloaded="Root_Unloaded"
     mc:Ignorable="d">
 
     <Grid>
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="FavoriteStates">
+                <VisualState x:Name="NotFavorite" />
+                <VisualState x:Name="Favorite">
+                    <VisualState.Setters>
+                        <Setter Target="FavoriteButton.Background" Value="{ThemeResource CopyGifFavoriteBackgroundBrush}" />
+                        <Setter Target="FavoriteButton.Foreground" Value="{ThemeResource CopyGifFavoriteForegroundBrush}" />
+                        <Setter Target="FavoriteButton.BorderBrush" Value="{ThemeResource CopyGifBrandPrimaryBrush}" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
 
         <Button
             x:Name="SelectButton"
             Padding="0"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
             AutomationProperties.Name="GIF result"
-            Background="Transparent"
-            BorderThickness="0"
+            Background="{ThemeResource CopyGifCardBackgroundBrush}"
+            BorderBrush="{ThemeResource CopyGifCardBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="12"
             Command="{Binding SelectCommand, ElementName=Root}"
             CommandParameter="{Binding SelectCommandParameter, ElementName=Root}"
             GotFocus="SelectButton_GotFocus"
@@ -29,13 +46,13 @@
             VerticalContentAlignment="Stretch">
 
             <Border
-                Style="{StaticResource CopyGifCardBorderStyle}">
+                CornerRadius="11">
 
                 <Grid>
 
                     <Grid.RowDefinitions>
                         <RowDefinition Height="160" />
-                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
                     <Grid
@@ -79,20 +96,19 @@
 
                     <StackPanel
                         Grid.Row="1"
-                        Padding="12"
+                        Padding="10,8"
                         Spacing="4">
 
                         <TextBlock
-                            MaxLines="2"
+                            MaxLines="1"
                             Text="{Binding Title, ElementName=Root}"
                             TextTrimming="CharacterEllipsis"
-                            TextWrapping="Wrap" />
+                            TextWrapping="NoWrap" />
 
                         <TextBlock
                             x:Name="ProviderTextBlock"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             FontSize="12"
-                            Text="{Binding ProviderName, ElementName=Root}"
                             TextTrimming="CharacterEllipsis" />
 
                     </StackPanel>
@@ -106,6 +122,10 @@
         <Button
             x:Name="FavoriteButton"
             Margin="8"
+            Background="{ThemeResource CopyGifCardBackgroundBrush}"
+            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+            BorderBrush="{ThemeResource CopyGifCardBorderBrush}"
+            CornerRadius="8"
             HorizontalAlignment="Right"
             VerticalAlignment="Top"
             AutomationProperties.Name="Add GIF to Favorites"

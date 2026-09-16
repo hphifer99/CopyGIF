@@ -9,52 +9,50 @@
     mc:Ignorable="d"
     Title="Welcome to CopyGIF">
 
-    <Grid
+	<Grid
         x:Name="WindowRoot"
-        MinWidth="560"
-        MinHeight="480"
-        Padding="32"
-        RowSpacing="20"
+        Padding="24"
+        RowSpacing="16"
         Style="{StaticResource CopyGifPageRootStyle}">
 
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="*" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
 
-        <StackPanel
+		<StackPanel
             Grid.Row="0"
             Spacing="6">
 
-            <TextBlock
+			<TextBlock
                 Style="{StaticResource CopyGifPageTitleTextStyle}"
                 Text="{Binding StepTitle}" />
 
-            <TextBlock
+			<TextBlock
                 Style="{StaticResource CopyGifPageSubtitleTextStyle}"
                 Text="{Binding StepDescription}" />
 
-        </StackPanel>
+		</StackPanel>
 
-        <ScrollViewer
+		<ScrollViewer
             Grid.Row="1"
             HorizontalScrollBarVisibility="Disabled"
             HorizontalScrollMode="Disabled"
             VerticalScrollBarVisibility="Auto"
             VerticalScrollMode="Auto">
 
-            <ContentPresenter
+			<ContentPresenter
                 x:Name="StepContentPresenter"
                 HorizontalContentAlignment="Stretch"
                 VerticalContentAlignment="Stretch"
                 Content="{x:Bind StepContent, Mode=OneWay}"
                 ContentTemplate="{x:Bind StepContentTemplate, Mode=OneWay}" />
 
-        </ScrollViewer>
+		</ScrollViewer>
 
-        <controls:StatusBanner
+		<controls:StatusBanner
             x:Name="PageStatusBanner"
             Grid.Row="2"
             IsClosable="False"
@@ -62,18 +60,18 @@
             Severity="{Binding StatusSeverity}"
             Title="Setup status" />
 
-        <Grid Grid.Row="3">
+		<Grid Grid.Row="3">
 
-            <Button
+			<Button
                 x:Name="FinishButton"
                 HorizontalAlignment="Right"
                 AutomationProperties.Name="Finish setup"
                 Command="{Binding FinishCommand}"
-                Content="Finish"
+                Content="Finish setup"
                 Style="{StaticResource CopyGifPrimaryButtonStyle}" />
 
-        </Grid>
+		</Grid>
 
-    </Grid>
+	</Grid>
 
 </Window>

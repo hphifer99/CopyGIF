@@ -11,11 +11,10 @@
 
     <Grid
         Padding="{StaticResource CopyGifPagePadding}"
-        RowSpacing="16"
+        RowSpacing="0"
         Style="{StaticResource CopyGifPageRootStyle}">
 
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -23,22 +22,8 @@
 
         <StackPanel
             Grid.Row="0"
-            Margin="{StaticResource CopyGifPageHeaderMargin}"
-            Spacing="4">
-
-            <TextBlock
-                Style="{StaticResource CopyGifPageTitleTextStyle}"
-                Text="Search" />
-
-            <TextBlock
-                Style="{StaticResource CopyGifPageSubtitleTextStyle}"
-                Text="Find a GIF, preview it, and copy it to the clipboard." />
-
-        </StackPanel>
-
-        <StackPanel
-            Grid.Row="1"
-            Spacing="12">
+            Margin="0,0,0,12"
+            Spacing="8">
 
             <controls:SearchHeader
                 x:Name="PageSearchHeader"
@@ -60,20 +45,27 @@
 
         </StackPanel>
 
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="1">
 
             <GridView
+                Padding="0"
                 x:Name="ResultsGridView"
                 AutomationProperties.Name="GIF search results"
                 IsItemClickEnabled="False"
                 IsTabStop="False"
+                ItemContainerStyle="{StaticResource CopyGifGridItemStyle}"
+                ScrollViewer.HorizontalScrollMode="Disabled"
+                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                 ItemTemplate="{Binding ItemTemplate, ElementName=Root}"
                 ItemsSource="{Binding ItemsSource, ElementName=Root}"
                 SelectionMode="None">
 
                 <GridView.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <ItemsWrapGrid Orientation="Horizontal" />
+                        <ItemsWrapGrid
+                            Orientation="Horizontal"
+                            ItemWidth="204"
+                            ItemHeight="236" />
                     </ItemsPanelTemplate>
                 </GridView.ItemsPanel>
 
@@ -108,39 +100,14 @@
 
         </Grid>
 
-        <Grid
-            Grid.Row="3"
-            ColumnSpacing="12">
-
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <TextBlock
-                x:Name="LoadingTextBlock"
-                Grid.Column="0"
-                AutomationProperties.LiveSetting="Polite"
-                Style="{StaticResource CopyGifStatusTextStyle}"
-                Text="Loading GIFs..." />
-
-            <ProgressRing
-                x:Name="LoadingProgressRing"
-                Grid.Column="1"
-                Width="24"
-                Height="24"
-                AutomationProperties.Name="Loading GIFs"
-                IsActive="{Binding IsBusy, ElementName=Root}" />
-
-            <Button
-                x:Name="LoadMoreButton"
-                Grid.Column="2"
-                AutomationProperties.Name="Load more GIFs"
-                Command="{Binding LoadMoreCommand, ElementName=Root}"
-                Content="Load more" />
-
-        </Grid>
+        <Button
+            x:Name="LoadMoreButton"
+            Grid.Row="2"
+            Margin="0,8,0,0"
+            HorizontalAlignment="Center"
+            AutomationProperties.Name="Load more GIFs"
+            Command="{Binding LoadMoreCommand, ElementName=Root}"
+            Content="Load more" />
 
     </Grid>
 

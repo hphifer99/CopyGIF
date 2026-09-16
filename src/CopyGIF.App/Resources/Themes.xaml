@@ -6,6 +6,14 @@
     <ResourceDictionary.ThemeDictionaries>
 
         <ResourceDictionary x:Key="Light">
+            <SolidColorBrush x:Key="AccentButtonBackground" Color="#FF6C4DFF" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#FF5C40DE" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="#FF4D35BD" />
+            <SolidColorBrush x:Key="AccentButtonForeground" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="CopyGifFavoriteBackgroundBrush" Color="#FF6C4DFF" />
+            <SolidColorBrush x:Key="CopyGifFavoriteForegroundBrush" Color="#FFFFFFFF" />
             <SolidColorBrush
                 x:Key="CopyGifBrandPrimaryBrush"
                 Color="{StaticResource CopyGifPurple600Color}" />
@@ -27,6 +35,14 @@
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="Dark">
+            <SolidColorBrush x:Key="AccentButtonBackground" Color="#FFB6A7FF" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#FFC5B9FF" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="#FFA592F5" />
+            <SolidColorBrush x:Key="AccentButtonForeground" Color="#FF171126" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#FF171126" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#FF171126" />
+            <SolidColorBrush x:Key="CopyGifFavoriteBackgroundBrush" Color="#FFB6A7FF" />
+            <SolidColorBrush x:Key="CopyGifFavoriteForegroundBrush" Color="#FF171126" />
             <SolidColorBrush
                 x:Key="CopyGifBrandPrimaryBrush"
                 Color="{StaticResource CopyGifPurple300Color}" />
@@ -48,6 +64,14 @@
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="HighContrast">
+            <SolidColorBrush x:Key="AccentButtonBackground" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="AccentButtonForeground" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <SolidColorBrush x:Key="CopyGifFavoriteBackgroundBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="CopyGifFavoriteForegroundBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
             <SolidColorBrush
                 x:Key="CopyGifBrandPrimaryBrush"
                 Color="{ThemeResource SystemColorHighlightColor}" />

@@ -8,19 +8,18 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid ColumnSpacing="8">
+    <Grid ColumnSpacing="8" MinHeight="40">
 
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="40" />
+            <ColumnDefinition Width="112" />
         </Grid.ColumnDefinitions>
 
         <AutoSuggestBox
             x:Name="SearchBox"
             Grid.Column="0"
+            VerticalAlignment="Stretch"
             AutomationProperties.Name="Search GIFs"
             ItemsSource="{Binding Suggestions, ElementName=Root}"
             PlaceholderText="{Binding PlaceholderText, ElementName=Root}"
@@ -42,26 +41,31 @@
         </Button>
 
         <Button
+            x:Name="SearchButton"
             Grid.Column="2"
+            HorizontalAlignment="Stretch"
             AutomationProperties.Name="Search"
             Command="{Binding SearchCommand, ElementName=Root}"
             Content="Search"
             Style="{StaticResource CopyGifPrimaryButtonStyle}" />
 
-        <ProgressRing
-            x:Name="SearchProgressRing"
-            Grid.Column="3"
-            Width="24"
-            Height="24"
-            AutomationProperties.Name="Search in progress"
-            IsActive="{Binding IsBusy, ElementName=Root}" />
-
         <Button
             x:Name="CancelButton"
-            Grid.Column="4"
+            Grid.Column="2"
+            MinHeight="40"
+            HorizontalAlignment="Stretch"
             AutomationProperties.Name="Cancel search"
-            Command="{Binding CancelCommand, ElementName=Root}"
-            Content="Cancel" />
+            Command="{Binding CancelCommand, ElementName=Root}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <ProgressRing
+                    x:Name="SearchProgressRing"
+                    Width="16"
+                    Height="16"
+                    AutomationProperties.Name="Search in progress"
+                    IsActive="{Binding IsBusy, ElementName=Root}" />
+                <TextBlock Text="Cancel" VerticalAlignment="Center" />
+            </StackPanel>
+        </Button>
 
     </Grid>
 

@@ -9,159 +9,163 @@
     mc:Ignorable="d"
     Title="CopyGIF Settings">
 
-    <Grid
+	<Grid
         x:Name="WindowRoot"
-        MinWidth="720"
-        MinHeight="560"
         Style="{StaticResource CopyGifPageRootStyle}">
 
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-
-        <NavigationView
+		<NavigationView
             x:Name="SettingsNavigationView"
             Grid.Row="0"
             AutomationProperties.Name="Settings categories"
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="False"
-            PaneDisplayMode="Left"
+            PaneDisplayMode="Auto"
+            OpenPaneLength="200"
+            ExpandedModeThresholdWidth="820"
+            CompactModeThresholdWidth="600"
             SelectionChanged="SettingsNavigationView_SelectionChanged">
 
-            <NavigationView.MenuItems>
+			<NavigationView.MenuItems>
 
-                <NavigationViewItem
+				<NavigationViewItem
                     x:Name="GeneralNavigationItem"
                     Content="General">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE713;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
+					<NavigationViewItem.Icon>
+						<FontIcon Glyph="&#xE713;" />
+					</NavigationViewItem.Icon>
+				</NavigationViewItem>
 
-                <NavigationViewItem
+				<NavigationViewItem
                     x:Name="SearchNavigationItem"
                     Content="Search">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE721;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
+					<NavigationViewItem.Icon>
+						<FontIcon Glyph="&#xE721;" />
+					</NavigationViewItem.Icon>
+				</NavigationViewItem>
 
-                <NavigationViewItem
+				<NavigationViewItem
                     x:Name="AppearanceNavigationItem"
                     Content="Appearance">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE790;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
+					<NavigationViewItem.Icon>
+						<FontIcon Glyph="&#xE790;" />
+					</NavigationViewItem.Icon>
+				</NavigationViewItem>
 
-                <NavigationViewItem
+				<NavigationViewItem
                     x:Name="LibraryNavigationItem"
                     Content="Library">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE8F1;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
+					<NavigationViewItem.Icon>
+						<FontIcon Glyph="&#xE8F1;" />
+					</NavigationViewItem.Icon>
+				</NavigationViewItem>
 
-                <NavigationViewItem
+				<NavigationViewItem
                     x:Name="ApiNavigationItem"
                     Content="API">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE72E;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
+					<NavigationViewItem.Icon>
+						<FontIcon Glyph="&#xE72E;" />
+					</NavigationViewItem.Icon>
+				</NavigationViewItem>
 
-                <NavigationViewItem
+				<NavigationViewItem
                     x:Name="UpdatesNavigationItem"
                     Content="Updates">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE895;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
+					<NavigationViewItem.Icon>
+						<FontIcon Glyph="&#xE895;" />
+					</NavigationViewItem.Icon>
+				</NavigationViewItem>
 
-            </NavigationView.MenuItems>
+			</NavigationView.MenuItems>
 
-            <ScrollViewer
-                HorizontalScrollBarVisibility="Disabled"
-                HorizontalScrollMode="Disabled"
-                VerticalScrollBarVisibility="Auto"
-                VerticalScrollMode="Auto">
+			<Grid>
+				<Grid.RowDefinitions>
+					<RowDefinition Height="*" />
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
+				</Grid.RowDefinitions>
 
-                <StackPanel
-                    Padding="32"
-                    Spacing="20">
+				<ScrollViewer
+                    HorizontalScrollBarVisibility="Disabled"
+                    HorizontalScrollMode="Disabled"
+                    VerticalScrollBarVisibility="Auto"
+                    VerticalScrollMode="Auto">
 
-                    <StackPanel Spacing="4">
+					<StackPanel
+                        Padding="20"
+                        MaxWidth="760"
+                        HorizontalAlignment="Stretch"
+                        Spacing="20">
 
-                        <TextBlock
-                            x:Name="SectionTitleTextBlock"
-                            Style="{StaticResource CopyGifPageTitleTextStyle}" />
+						<StackPanel Spacing="4">
 
-                        <TextBlock
-                            Style="{StaticResource CopyGifPageSubtitleTextStyle}"
-                            Text="Changes are reviewed and saved from this window." />
+							<TextBlock
+                                x:Name="SectionTitleTextBlock"
+                                Style="{StaticResource CopyGifPageTitleTextStyle}" />
 
-                    </StackPanel>
+							<TextBlock
+                                Style="{StaticResource CopyGifPageSubtitleTextStyle}"
+                                Text="Select Save to apply your changes." />
 
-                    <ContentPresenter
-                        x:Name="SectionContentPresenter"
-                        HorizontalContentAlignment="Stretch"
-                        VerticalContentAlignment="Stretch" />
+						</StackPanel>
 
-                </StackPanel>
+						<ContentPresenter
+                            x:Name="SectionContentPresenter"
+                            HorizontalContentAlignment="Stretch"
+                            VerticalContentAlignment="Stretch" />
 
-            </ScrollViewer>
+					</StackPanel>
 
-        </NavigationView>
+				</ScrollViewer>
 
-        <controls:StatusBanner
-            x:Name="PageStatusBanner"
-            Grid.Row="1"
-            Margin="24,0,24,12"
-            IsClosable="False"
-            Message="{Binding StatusMessage}"
-            Severity="{Binding StatusSeverity}"
-            Title="Settings status" />
+				<controls:StatusBanner
+                    x:Name="PageStatusBanner"
+                    Grid.Row="1"
+                    Margin="20,0,20,8"
+                    IsClosable="False"
+                    Message="{Binding StatusMessage}"
+                    Severity="{Binding StatusSeverity}"
+                    Title="Settings status" />
 
-        <Grid
-            Grid.Row="2"
-            Padding="24,12,24,24"
-            ColumnSpacing="12">
+				<Grid
+                    Grid.Row="2"
+                    Padding="20,12,20,20"
+                    ColumnSpacing="12">
 
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+					</Grid.ColumnDefinitions>
 
-            <ProgressRing
-                x:Name="SavingProgressRing"
-                Grid.Column="1"
-                Width="24"
-                Height="24"
-                VerticalAlignment="Center"
-                AutomationProperties.Name="Saving settings"
-                IsActive="{Binding IsBusy}" />
+					<ProgressRing
+                        x:Name="SavingProgressRing"
+                        Grid.Column="1"
+                        Width="24"
+                        Height="24"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="Saving settings"
+                        IsActive="{Binding IsBusy}" />
 
-            <Button
-                x:Name="CancelButton"
-                Grid.Column="2"
-                AutomationProperties.Name="Cancel settings changes"
-                Command="{Binding CancelCommand}"
-                Content="Cancel" />
+					<Button
+                        x:Name="CancelButton"
+                        Grid.Column="2"
+                        AutomationProperties.Name="Cancel settings changes"
+                        Command="{Binding CancelCommand}"
+                        Content="Cancel" />
 
-            <Button
-                x:Name="SaveButton"
-                Grid.Column="3"
-                AutomationProperties.Name="Save settings"
-                Command="{Binding SaveCommand}"
-                Content="Save"
-                Style="{StaticResource CopyGifPrimaryButtonStyle}" />
+					<Button
+                        x:Name="SaveButton"
+                        Grid.Column="3"
+                        AutomationProperties.Name="Save settings"
+                        Command="{Binding SaveCommand}"
+                        Content="Save"
+                        Style="{StaticResource CopyGifPrimaryButtonStyle}" />
 
-        </Grid>
+				</Grid>
 
-    </Grid>
+			</Grid>
+		</NavigationView>
+	</Grid>
 
 </Window>

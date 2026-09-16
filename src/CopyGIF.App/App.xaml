@@ -341,8 +341,8 @@
                                 Text="{Binding StorageLocationText}" />
 
                             <StackPanel
-                                Orientation="Horizontal"
-                                Spacing="12">
+                                Orientation="Vertical"
+                                Spacing="8">
 
                                 <Button
                                     AutomationProperties.Name="Choose library storage folder"
@@ -396,8 +396,8 @@
                                 PlaceholderText="Enter a replacement API key" />
 
                             <StackPanel
-                                Orientation="Horizontal"
-                                Spacing="12">
+                                Orientation="Vertical"
+                                Spacing="8">
 
                                 <Button
                                     AutomationProperties.Name="Delete saved API key"
@@ -506,8 +506,8 @@
                                 Value="{Binding Update.DownloadPercentage}" />
 
                             <StackPanel
-                                Orientation="Horizontal"
-                                Spacing="12">
+                                Orientation="Vertical"
+                                Spacing="8">
 
                                 <Button
                                     AutomationProperties.Name="Check for updates now"

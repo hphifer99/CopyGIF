@@ -2,15 +2,6 @@
 
 CopyGIF includes or communicates with the third-party components and services listed below.
 
-## XamlAnimatedGif 2.3.2
-
-- Project: [XamlAnimatedGif](https://github.com/XamlAnimatedGif/XamlAnimatedGif)
-- Package: `XamlAnimatedGif` 2.3.2
-- License: Apache License 2.0
-- Use: WPF GIF preview playback
-
-The complete license text is included at `licenses/XamlAnimatedGif-LICENSE.txt` and is distributed with CopyGIF release packages.
-
 ## KLIPY
 
 - Developer site: [klipy.com/developers](https://klipy.com/developers)

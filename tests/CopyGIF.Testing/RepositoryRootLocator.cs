@@ -8,16 +8,10 @@ public static class RepositoryRootLocator
 
         while (directory is not null)
         {
-            string v1SolutionPath = Path.Combine(
-                directory.FullName,
-                "CopyGIF.slnx");
-
-            string v2SolutionPath = Path.Combine(
-                directory.FullName,
-                "CopyGIF.V2.slnx");
-
-            if (File.Exists(v1SolutionPath) &&
-                File.Exists(v2SolutionPath))
+            if (File.Exists(Path.Combine(directory.FullName, "CopyGIF.slnx")) &&
+                File.Exists(Path.Combine(directory.FullName, "Directory.Build.props")) &&
+                Directory.Exists(Path.Combine(directory.FullName, "src")) &&
+                Directory.Exists(Path.Combine(directory.FullName, "tests")))
             {
                 return directory.FullName;
             }

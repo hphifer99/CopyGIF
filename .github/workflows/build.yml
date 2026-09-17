@@ -1,10 +1,13 @@
-name: Build
+name: Build and test
 
 on:
   push:
     branches:
+      - development
       - main
+
   pull_request:
+
   workflow_dispatch:
 
 permissions:
@@ -15,37 +18,67 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-test:
     name: Windows x64
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      NUGET_XMLDOC_MODE: skip
 
     steps:
       - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Install NuGet
-        uses: NuGet/setup-nuget@b26b823c478ee115be5c9403e62c90b0bf943843 # v3.1.0
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          nuget-version: 7.9.0
+          dotnet-version: "10.0.400"
 
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
-        with:
-          msbuild-architecture: x64
-
-      - name: Build and package
+      - name: Show .NET environment
         shell: pwsh
-        run: .\scripts\Build-Release.ps1
+        run: dotnet --info
 
-      - name: Upload release candidate
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: CopyGIF-win-x64
-          path: |
-            artifacts/CopyGIF-win-x64.zip
-            artifacts/CopyGIF-win-x64.sha256
-          if-no-files-found: error
-          retention-days: 14
+      - name: Restore CopyGIF
+        shell: pwsh
+        run: dotnet restore .\CopyGIF.slnx -p:Platform=x64
+
+      - name: Build CopyGIF Debug x64
+        shell: pwsh
+        run: dotnet build .\CopyGIF.slnx -c Debug -p:Platform=x64 --no-restore
+
+      - name: Build CopyGIF Release x64
+        shell: pwsh
+        run: dotnet build .\CopyGIF.slnx -c Release -p:Platform=x64 --no-restore
+
+      - name: Run tests
+        shell: pwsh
+        run: |
+          $testProjects = Get-ChildItem `
+            -Path .\tests `
+            -Filter *.Tests.csproj `
+            -Recurse |
+            Sort-Object FullName
+
+          if ($testProjects.Count -eq 0) {
+            throw "No test projects were found."
+          }
+
+          foreach ($project in $testProjects) {
+            Write-Host "Testing $($project.FullName)"
+
+            dotnet test `
+              $project.FullName `
+              -c Release `
+              -p:Platform=x64 `
+              --no-build `
+              --logger "console;verbosity=normal"
+
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }

@@ -39,7 +39,6 @@ try {
     foreach ($name in @('LICENSE.txt','PRIVACY.md','THIRD-PARTY-NOTICES.md')) {
         Copy-Item -LiteralPath (Join-Path $repositoryRoot $name) -Destination $publishDirectory
     }
-    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'licenses') -Destination $publishDirectory -Recurse
     $exe = Join-Path $publishDirectory 'CopyGif.exe'
     if (-not (Test-Path -LiteralPath $exe)) { throw 'The WinUI publish did not produce CopyGif.exe.' }
     Invoke-Checked { & $signTool.FullName sign /sha1 $SigningThumbprint /fd SHA256 /tr $TimestampServer /td SHA256 $exe }

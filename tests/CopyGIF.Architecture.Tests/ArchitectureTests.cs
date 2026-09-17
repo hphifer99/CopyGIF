@@ -137,7 +137,7 @@ public sealed class ArchitectureTests
     }
 
     [TestMethod]
-    public void V1Solution_RemainsV1Only()
+    public void Solution_ContainsOnlyExpectedProjects()
     {
         string repositoryRoot =
             RepositoryRootLocator.Find();
@@ -147,43 +147,6 @@ public sealed class ArchitectureTests
                 Path.Combine(
                     repositoryRoot,
                     "CopyGIF.slnx"));
-
-        string[] projectPaths =
-            solution
-                .Descendants()
-                .Where(
-                    element =>
-                        element.Name.LocalName ==
-                        "Project")
-                .Select(
-                    element =>
-                        element.Attribute("Path")?.Value)
-                .Where(
-                    path =>
-                        !string.IsNullOrWhiteSpace(
-                            path))
-                .Cast<string>()
-                .ToArray();
-
-        CollectionAssert.AreEquivalent(
-            new[]
-            {
-                "CopyGIF/CopyGIF.csproj"
-            },
-            projectPaths);
-    }
-
-    [TestMethod]
-    public void V2Solution_ContainsOnlyExpectedV2Projects()
-    {
-        string repositoryRoot =
-            RepositoryRootLocator.Find();
-
-        XDocument solution =
-            XDocument.Load(
-                Path.Combine(
-                    repositoryRoot,
-                    "CopyGIF.V2.slnx"));
 
         string[] productionProjects =
             GetProjectsInSolutionFolder(
@@ -236,7 +199,11 @@ public sealed class ArchitectureTests
                     path.StartsWith(
                         "CopyGIF/",
                         StringComparison.OrdinalIgnoreCase)),
-            "The V2 solution must not reference the V1 project.");
+            "The solution must not reference the retired .NET Framework project.");
+
+        Assert.IsFalse(
+            Directory.Exists(Path.Combine(repositoryRoot, "CopyGIF")),
+            "Remove the retired .NET Framework source folder from the repository.");
     }
 
     [TestMethod]
@@ -307,7 +274,7 @@ public sealed class ArchitectureTests
     }
 
     [TestMethod]
-    public void V2Projects_UseCentralPackageVersions()
+    public void Projects_UseCentralPackageVersions()
     {
         string repositoryRoot =
             RepositoryRootLocator.Find();
@@ -416,7 +383,7 @@ public sealed class ArchitectureTests
     }
 
     [TestMethod]
-    public void V2BuildPolicy_IsX64Only()
+    public void BuildPolicy_IsX64Only()
     {
         string repositoryRoot =
             RepositoryRootLocator.Find();
@@ -493,7 +460,7 @@ public sealed class ArchitectureTests
             XDocument.Load(
                 Path.Combine(
                     repositoryRoot,
-                    "CopyGIF.V2.slnx"));
+                    "CopyGIF.slnx"));
 
         XElement[] solutionPlatforms =
             solution
@@ -509,13 +476,13 @@ public sealed class ArchitectureTests
         Assert.AreEqual(
             1,
             solutionPlatforms.Length,
-            "The V2 solution must define exactly one solution platform.");
+            "The CopyGIF solution must define exactly one solution platform.");
 
         Assert.AreEqual(
             "x64",
             solutionPlatforms[0]
                 .Attribute("Name")?.Value,
-            "The V2 solution platform must be x64.");
+            "The CopyGIF solution platform must be x64.");
 
         XElement[] projectPlatformMappings =
             solution
@@ -532,7 +499,7 @@ public sealed class ArchitectureTests
             ExpectedProductionProjectPaths.Length +
             ExpectedTestProjectPaths.Length,
             projectPlatformMappings.Length,
-            "Every V2 solution project must have an explicit platform mapping.");
+            "Every CopyGIF solution project must have an explicit platform mapping.");
 
         foreach (XElement platformMapping
                  in projectPlatformMappings)
@@ -541,12 +508,12 @@ public sealed class ArchitectureTests
                 "x64",
                 platformMapping
                     .Attribute("Project")?.Value,
-                "Every V2 project must map to x64.");
+                "Every CopyGIF project must map to x64.");
         }
     }
 
     [TestMethod]
-    public void V2Projects_UseFrozenTargetFrameworks()
+    public void Projects_UseFrozenTargetFrameworks()
     {
         string repositoryRoot =
             RepositoryRootLocator.Find();

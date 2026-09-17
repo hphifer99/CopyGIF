@@ -351,42 +351,17 @@ public sealed partial class SearchHeader :
             SearchCommand);
     }
 
-    private void ClearButton_Click(
-        object sender,
-        RoutedEventArgs eventArgs)
-    {
-        _ = sender;
-        _ = eventArgs;
-
-        ExecuteCommand(
-            ClearCommand);
-
-        Query = string.Empty;
-        SearchBox.Text = string.Empty;
-
-        FocusSearchBox();
-    }
-
     private void UpdateVisualState()
     {
-        ClearButton.Visibility =
-            string.IsNullOrEmpty(
-                Query)
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-
         SearchButton.Visibility =
-            IsBusy ? Visibility.Collapsed : Visibility.Visible;
+            Visibility.Visible;
 
         SearchProgressRing.Visibility =
             IsBusy
                 ? Visibility.Visible
                 : Visibility.Collapsed;
 
-        CancelButton.Visibility =
-            IsBusy
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+        CancelButton.Visibility = Visibility.Collapsed;
     }
 
     private static void ExecuteCommand(

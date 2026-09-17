@@ -35,6 +35,8 @@ internal static class WindowTitleBar
         ArgumentNullException.ThrowIfNull(
             root);
 
+        string iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "CopyGif.ico");
+        if (File.Exists(iconPath)) window.AppWindow.SetIcon(iconPath);
         AccessibilitySettings accessibilitySettings = new();
         bool highContrastSubscribed = false;
         bool closed = false;

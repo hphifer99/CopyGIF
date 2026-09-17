@@ -297,7 +297,7 @@ public sealed class SchemaContractTests
     {
         return Path.Combine(
             RepositoryRootLocator.Find(),
-            "schemas");
+            "Schemas");
     }
 
     private static JsonDocument LoadSchema(

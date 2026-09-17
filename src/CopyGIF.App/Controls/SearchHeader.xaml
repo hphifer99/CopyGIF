@@ -12,7 +12,6 @@
 
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="40" />
             <ColumnDefinition Width="112" />
         </Grid.ColumnDefinitions>
 
@@ -29,20 +28,8 @@
             TextChanged="SearchBox_TextChanged" />
 
         <Button
-            x:Name="ClearButton"
-            Grid.Column="1"
-            AutomationProperties.Name="Clear search"
-            Click="ClearButton_Click"
-            Style="{StaticResource CopyGifIconButtonStyle}"
-            ToolTipService.ToolTip="Clear search">
-
-            <FontIcon Glyph="&#xE894;" />
-
-        </Button>
-
-        <Button
             x:Name="SearchButton"
-            Grid.Column="2"
+            Grid.Column="1"
             HorizontalAlignment="Stretch"
             AutomationProperties.Name="Search"
             Command="{Binding SearchCommand, ElementName=Root}"
@@ -51,7 +38,7 @@
 
         <Button
             x:Name="CancelButton"
-            Grid.Column="2"
+            Grid.Column="1"
             MinHeight="40"
             HorizontalAlignment="Stretch"
             AutomationProperties.Name="Cancel search"

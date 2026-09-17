@@ -841,7 +841,7 @@ public sealed class ArchitectureTests
                 Path.GetFullPath(
                     Path.Combine(
                         projectDirectory,
-                        include));
+                        include.Replace('\\', Path.DirectorySeparatorChar)));
 
             references.Add(
                 Path.GetFileNameWithoutExtension(

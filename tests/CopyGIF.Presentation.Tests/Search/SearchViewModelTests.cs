@@ -11,6 +11,42 @@ namespace CopyGIF.Presentation.Tests.Search;
 public sealed class SearchViewModelTests
 {
     [TestMethod]
+    public async Task ClearingRestoresAllTrendingPagesWithoutAnotherRequest()
+    {
+        var search = new FakeSearchCoordinator
+        {
+            TrendingResult = new GifSearchPage { Items = [CreateGif("trending-1")], ContinuationToken = "next" },
+            TrendingLoadMoreResult = new GifSearchPage { Items = [CreateGif("trending-2")], ContinuationToken = "third" },
+            SearchResult = new GifSearchPage { Items = [CreateGif("searched")] }
+        };
+        using var model = CreateViewModel(searchCoordinator: search);
+        await model.TrendingCommand.ExecuteAsync(null);
+        await model.LoadMoreCommand.ExecuteAsync(null);
+        model.TrendingScrollOffset = 360;
+        model.Query = "cats";
+        await model.SearchCommand.ExecuteAsync(null);
+        model.ClearQueryCommand.Execute(null);
+        CollectionAssert.AreEqual(new[] { "trending-1", "trending-2" }, model.Results.Select(c => c.Id).ToArray());
+        Assert.AreEqual(1, search.TrendingCount);
+        Assert.AreEqual(360, model.TrendingScrollOffset);
+        Assert.IsTrue(model.HasMoreResults);
+    }
+
+    [TestMethod]
+    public async Task EmptyQueryWithTrendingDisabledMakesNoTrendingRequest()
+    {
+        var search = new FakeSearchCoordinator();
+        using var model = CreateViewModel(searchCoordinator: search);
+        model.Configure(new CopyGIF.Core.Settings.AppSettings
+        { Search = new() { ShowTrendingWhenEmpty = false } });
+        model.Query = "cats";
+        await model.SearchCommand.ExecuteAsync(null);
+        model.Query = string.Empty;
+        Assert.AreEqual(GifSearchMode.None, model.Mode);
+        Assert.AreEqual(0, search.TrendingCount);
+    }
+
+    [TestMethod]
     public async Task TypingDuringDebounce_CancelsOlderQueryAndKeepsLatestResults()
     {
         TaskCompletionSource<GifSearchPage> firstResponse =
@@ -92,7 +128,7 @@ public sealed class SearchViewModelTests
 
         Assert.AreEqual(string.Empty, viewModel.Query);
         Assert.AreEqual(0, viewModel.Results.Count);
-        Assert.AreEqual(GifSearchMode.None, viewModel.Mode);
+        Assert.AreEqual(GifSearchMode.Trending, viewModel.Mode);
         Assert.IsFalse(viewModel.IsBusy);
     }
 
@@ -606,11 +642,11 @@ public sealed class SearchViewModelTests
             viewModel.Results);
 
         Assert.AreEqual(
-            GifSearchMode.None,
+            GifSearchMode.Trending,
             viewModel.Mode);
 
         Assert.AreEqual(
-            AsyncOperationStatus.Idle,
+            AsyncOperationStatus.Succeeded,
             viewModel.OperationState.Status);
     }
 

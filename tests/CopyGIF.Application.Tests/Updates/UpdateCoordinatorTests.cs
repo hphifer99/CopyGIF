@@ -121,7 +121,7 @@ public sealed class UpdateCoordinatorTests
                 force: true);
 
         Assert.AreEqual(
-            UpdateCheckStatus.NoUpdateAvailable,
+            UpdateCheckStatus.FeedUnavailable,
             result.Status);
 
         CollectionAssert.AreEqual(

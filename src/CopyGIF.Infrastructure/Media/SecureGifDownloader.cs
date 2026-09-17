@@ -100,9 +100,9 @@ public sealed class SecureGifDownloader :
             destination.OwnedRoot,
             destination.Directory);
 
-        string fileName =
-            CreateStableFileName(
-                item.StableIdentity);
+        string fileName = purpose == GifDownloadPurpose.Clipboard
+            ? $"clipboard-{Guid.NewGuid():N}.gif"
+            : CreateStableFileName(item.StableIdentity);
 
         string finalPath =
             _pathGuard.EnsureSafeFilePath(

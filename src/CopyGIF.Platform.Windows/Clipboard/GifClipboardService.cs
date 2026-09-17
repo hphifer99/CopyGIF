@@ -74,7 +74,7 @@ public sealed class GifClipboardService :
                 fullPath);
         }
 
-        if (file.Length != gif.SizeBytes)
+        if (gif.SizeBytes <= 6 || file.Length != gif.SizeBytes)
         {
             throw new InvalidDataException(
                 "The downloaded GIF file size changed before it could be copied.");
@@ -111,6 +111,7 @@ public sealed class GifClipboardService :
                     payload,
                     out lastError))
             {
+                RepairDiagnostics.Record("clipboard-native", gif.Identity.ProviderId, "file-drop-ready", file.Length);
                 return;
             }
 

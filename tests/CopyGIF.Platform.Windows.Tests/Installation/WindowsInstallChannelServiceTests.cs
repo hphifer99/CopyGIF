@@ -8,7 +8,7 @@ namespace CopyGIF.Platform.Windows.Tests.Installation;
 public sealed class WindowsInstallChannelServiceTests
 {
     [TestMethod]
-    public async Task GetCurrentAsync_PackageIdentity_ReturnsMicrosoftStore()
+    public async Task GetCurrentAsync_UnclassifiedPackageIdentity_ReturnsDevelopmentPackage()
     {
         FakeRegistryValueReader registry =
             new();
@@ -26,7 +26,7 @@ public sealed class WindowsInstallChannelServiceTests
             await service.GetCurrentAsync();
 
         Assert.AreEqual(
-            InstallChannel.MicrosoftStore,
+            InstallChannel.DevelopmentPackage,
             result.Channel);
 
         Assert.AreEqual(
@@ -161,6 +161,7 @@ public sealed class WindowsInstallChannelServiceTests
             string subKey,
             string valueName)
         {
+            if (valueName == "InstallDirectory") return Path.GetDirectoryName(Environment.ProcessPath);
             _values.TryGetValue(
                 hive,
                 out object? value);

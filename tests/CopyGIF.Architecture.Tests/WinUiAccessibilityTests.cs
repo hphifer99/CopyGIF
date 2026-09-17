@@ -21,7 +21,6 @@ public sealed class WinUiAccessibilityTests
                 ["Controls/SearchHeader.xaml"] =
                 [
                     "AutomationProperties.Name=\"Search GIFs\"",
-                    "AutomationProperties.Name=\"Clear search\"",
                     "AutomationProperties.Name=\"Search\"",
                     "AutomationProperties.Name=\"Search in progress\"",
                     "AutomationProperties.Name=\"Cancel search\""
@@ -44,8 +43,8 @@ public sealed class WinUiAccessibilityTests
                 [
                     "AutomationProperties.Name=\"Settings categories\"",
                     "AutomationProperties.Name=\"Saving settings\"",
-                    "AutomationProperties.Name=\"Cancel settings changes\"",
-                    "AutomationProperties.Name=\"Save settings\""
+                    "AutomationProperties.Name=\"Close settings\"",
+                    "AutomationProperties.Name=\"Apply all settings\""
                 ],
 
                 ["Views/OnboardingWindow.xaml"] =

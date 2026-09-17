@@ -119,6 +119,11 @@
 
         </Button>
 
+        <Button x:Name="RetryThumbnailButton" Content="Retry preview"
+            HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,70,0,0"
+            Visibility="Collapsed" Click="RetryThumbnail_Click"
+            AutomationProperties.Name="Retry loading GIF thumbnail" />
+
         <Button
             x:Name="FavoriteButton"
             Margin="8"

@@ -1,6 +1,7 @@
 using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 using CopyGIF.Core.Settings;
+using CopyGIF.Core.Policies;
 
 namespace CopyGIF.Application.Library;
 
@@ -102,6 +103,9 @@ public sealed class GifLibraryCoordinator :
 
         ArgumentNullException.ThrowIfNull(
             item);
+
+        if (!ProviderMediaPolicy.AllowsPersistentLibrary(item.ProviderId))
+            throw new InvalidOperationException("GIPHY GIFs cannot be added to the local library.");
 
         await _gate
             .WaitAsync(
@@ -342,8 +346,9 @@ public sealed class GifLibraryCoordinator :
         ArgumentNullException.ThrowIfNull(
             item);
 
-        ArgumentNullException.ThrowIfNull(
-            copiedGif);
+        ArgumentNullException.ThrowIfNull(copiedGif);
+        if (!ProviderMediaPolicy.AllowsPersistentLibrary(item.ProviderId))
+            return await LoadAsync(cancellationToken).ConfigureAwait(false);
 
         if (!copiedGif.Identity.Equals(
                 item.StableIdentity))

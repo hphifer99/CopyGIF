@@ -31,7 +31,9 @@ public enum UpdateCheckStatus
     ManagedByStore,
     NotDue,
     NoUpdateAvailable,
-    UpdateAvailable
+    UpdateAvailable,
+    UnsupportedInstallation,
+    FeedUnavailable
 }
 
 public sealed record UpdateCheckResult

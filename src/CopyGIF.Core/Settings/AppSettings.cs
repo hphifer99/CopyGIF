@@ -73,6 +73,8 @@ public sealed record LibrarySettings
 
 public sealed record WindowSettings
 {
+    public bool CenterOnTrayOpen { get; init; } = true;
+
     public WindowPlacementMode PlacementMode { get; init; } =
         WindowPlacementMode.Mouse;
 
@@ -91,6 +93,8 @@ public sealed record WindowSettings
 
 public sealed record BehaviorSettings
 {
+    public bool CloseToTray { get; init; } = true;
+
     public bool CloseWhenFocusLost { get; init; } = true;
 
     public bool HideAfterCopy { get; init; } = true;

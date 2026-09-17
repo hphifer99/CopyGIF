@@ -330,7 +330,7 @@ public sealed class WinUiShellStructureTests
             ".Play();",
             ".Stop();",
             "_isPointerOver",
-            "_hasKeyboardFocus"
+            "_inViewport"
         ];
 
         foreach (string requiredText
@@ -387,7 +387,7 @@ public sealed class WinUiShellStructureTests
             "SettingsWindow",
             "OnboardingWindow",
             "SettingsRequested",
-            "Activate()"
+            "NativeWindowActivation.RestoreAndActivate"
         ];
 
         foreach (string requiredText

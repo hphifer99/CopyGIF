@@ -123,6 +123,11 @@ public sealed class AppearanceSettingsViewModel :
                 value);
     }
 
+    public void ApplySettings(AppSettings settings)
+    {
+        Theme = settings.Appearance.Theme;
+    }
+
     public void ClearMessage()
     {
         Message =

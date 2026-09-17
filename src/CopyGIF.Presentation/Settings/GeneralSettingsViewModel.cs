@@ -110,6 +110,11 @@ public sealed class GeneralSettingsViewModel :
         !string.IsNullOrWhiteSpace(
             Hotkey);
 
+    private bool _closeToTray = true;
+    private bool _centerOnTrayOpen = true;
+    public bool CloseToTray { get => _closeToTray; set => SetProperty(ref _closeToTray, value); }
+    public bool CenterOnTrayOpen { get => _centerOnTrayOpen; set => SetProperty(ref _centerOnTrayOpen, value); }
+
     public bool StartWithWindows
     {
         get => _startWithWindows;
@@ -352,6 +357,7 @@ public sealed class GeneralSettingsViewModel :
                     Behavior =
                         current.Behavior with
                         {
+                            CloseToTray = CloseToTray,
                             CloseWhenFocusLost =
                                 CloseWhenFocusLost,
 
@@ -362,6 +368,7 @@ public sealed class GeneralSettingsViewModel :
                     Window =
                         current.Window with
                         {
+                            CenterOnTrayOpen = CenterOnTrayOpen,
                             PlacementMode =
                                 PlacementMode,
 
@@ -443,12 +450,14 @@ public sealed class GeneralSettingsViewModel :
         }
     }
 
-    private void ApplySettings(
+    public void ApplySettings(
         AppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(
             settings);
 
+        CloseToTray = settings.Behavior.CloseToTray;
+        CenterOnTrayOpen = settings.Window.CenterOnTrayOpen;
         Hotkey =
             settings.Hotkey;
 

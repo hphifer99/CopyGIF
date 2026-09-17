@@ -502,7 +502,7 @@ public sealed class SearchSettingsViewModel :
         }
     }
 
-    private void ApplySettings(
+    public void ApplySettings(
         SearchSettings settings)
     {
         ArgumentNullException.ThrowIfNull(

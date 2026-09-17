@@ -41,13 +41,12 @@ public sealed class GifCopyCoordinatorTests
                 item,
                 "  funny cats  ");
 
-        Assert.HasCount(
-            1,
-            downloader.Requests);
+        Assert.HasCount(2, downloader.Requests);
+        Assert.AreEqual(GifDownloadPurpose.Clipboard, downloader.Requests[0].Purpose);
 
         Assert.AreEqual(
             GifDownloadPurpose.Recent,
-            downloader.Requests[0].Purpose);
+            downloader.Requests[1].Purpose);
 
         Assert.HasCount(
             1,
@@ -57,10 +56,9 @@ public sealed class GifCopyCoordinatorTests
             1,
             library.RecordedRecents);
 
-        Assert.AreSame(
-            result,
-            library.RecordedRecents[0]
-                .CopiedGif);
+        Assert.AreSame(result, clipboard.CopiedGifs[0]);
+        Assert.AreEqual(GifDownloadPurpose.Recent, library.RecordedRecents[0].CopiedGif.Purpose);
+        Assert.AreNotSame(result, library.RecordedRecents[0].CopiedGif);
 
         Assert.HasCount(
             1,

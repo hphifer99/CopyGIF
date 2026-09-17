@@ -4,7 +4,9 @@ public enum InstallChannel
 {
     None,
     MicrosoftStore,
-    Msi
+    Msi,
+    DevelopmentPackage,
+    SideloadedPackage
 }
 
 public enum InstallScope

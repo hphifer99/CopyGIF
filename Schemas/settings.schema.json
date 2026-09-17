@@ -213,6 +213,10 @@
           "minLength": 1,
           "maxLength": 512,
           "default": null
+        },
+        "centerOnTrayOpen": {
+          "type": "boolean",
+          "default": true
         }
       }
     },
@@ -229,6 +233,10 @@
           "default": true
         },
         "hideAfterCopy": {
+          "type": "boolean",
+          "default": true
+        },
+        "closeToTray": {
           "type": "boolean",
           "default": true
         }

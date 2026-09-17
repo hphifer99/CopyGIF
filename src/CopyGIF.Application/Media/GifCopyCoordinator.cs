@@ -2,6 +2,7 @@ using CopyGIF.Application.Library;
 using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 using CopyGIF.Core.Settings;
+using CopyGIF.Core.Policies;
 
 namespace CopyGIF.Application.Media;
 
@@ -66,10 +67,7 @@ public sealed class GifCopyCoordinator :
                         cancellationToken)
                     .ConfigureAwait(false));
 
-        GifDownloadPurpose purpose =
-            settings.Library.StoreRecentsLocally
-                ? GifDownloadPurpose.Recent
-                : GifDownloadPurpose.Clipboard;
+        const GifDownloadPurpose purpose = GifDownloadPurpose.Clipboard;
 
         DownloadedGif downloadedGif =
             await _gifDownloader
@@ -85,12 +83,22 @@ public sealed class GifCopyCoordinator :
                 cancellationToken)
             .ConfigureAwait(false);
 
-        await _libraryCoordinator
-            .RecordRecentAsync(
-                item,
-                downloadedGif,
-                CancellationToken.None)
-            .ConfigureAwait(false);
+        RepairDiagnostics.Record("clipboard-handoff", item.ProviderId, "copied", downloadedGif.SizeBytes);
+        if (ProviderMediaPolicy.AllowsPersistentLibrary(item.ProviderId))
+        {
+            try
+            {
+                DownloadedGif recent = settings.Library.StoreRecentsLocally
+                    ? await _gifDownloader.DownloadAsync(item, GifDownloadPurpose.Recent, CancellationToken.None).ConfigureAwait(false)
+                    : downloadedGif;
+                await _libraryCoordinator.RecordRecentAsync(item, recent, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                // Clipboard success is not reversed by an unrelated Recents failure.
+                RepairDiagnostics.Record("record-recent", item.ProviderId, exception.GetType().Name);
+            }
+        }
 
         await TryRegisterShareAsync(
                 item,

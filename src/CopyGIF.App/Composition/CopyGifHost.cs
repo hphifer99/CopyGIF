@@ -9,6 +9,7 @@ using CopyGIF.App.Services;
 using CopyGIF.App.Views;
 using CopyGIF.App.Views.Pages;
 using CopyGIF.Core.Models;
+using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Settings;
 using CopyGIF.Infrastructure;
 using CopyGIF.Platform.Windows;
@@ -130,6 +131,7 @@ public sealed class CopyGifHost :
 
         try
         {
+            RepairLog.Configure(serviceProvider.GetRequiredService<CopyGIF.Core.Contracts.IApplicationPaths>().LogsDirectory);
             return new CopyGifHost(
                 serviceProvider);
         }
@@ -171,8 +173,9 @@ public sealed class CopyGifHost :
         services
             .AddCopyGifPresentation();
 
-        ReplaceCopyCoordinator(
-            services);
+        ReplaceCopyCoordinator(services);
+        services.AddSingleton<UpdateViewModel>();
+        services.AddSingleton<AppUpdateScheduler>();
 
         services.AddSingleton<
             WinUiDispatcher>();
@@ -269,6 +272,8 @@ public sealed class CopyGifHost :
                     onboarding,
                     cancellationToken)
                 .ConfigureAwait(true);
+
+            _serviceProvider.GetRequiredService<AppUpdateScheduler>().Start(GetCurrentVersion());
 
             if (result.HotkeyFailure != HotkeyRegistrationFailure.None &&
                 !onboarding.IsRequired)
@@ -388,6 +393,7 @@ public sealed class CopyGifHost :
                 if (runtimeState.Settings
                         .Search
                         .ShowTrendingWhenEmpty &&
+                    string.IsNullOrWhiteSpace(viewModel.Search.Query) &&
                     !viewModel.Search.HasResults &&
                     !viewModel.Search.IsBusy &&
                     viewModel.Search
@@ -527,102 +533,19 @@ public sealed class CopyGifHost :
                 }
             };
 
-        window.HasUnsavedChanges =
-            true;
-
-        ISettingsCoordinator settingsCoordinator =
-            services.GetRequiredService<
-                ISettingsCoordinator>();
-
-        ShellRuntimeState runtimeState =
-            services.GetRequiredService<
-                ShellRuntimeState>();
-
-        window.SaveCommand =
-            new AsyncRelayCommand(
-                async cancellationToken =>
-                {
-                    try
-                    {
-                        IAsyncRelayCommand command =
-                            GetSettingsSaveCommand(
-                                window.CurrentSection,
-                                viewModel);
-
-                        await command
-                            .ExecuteAsync(null)
-                            .ConfigureAwait(true);
-
-                        if (!GetSettingsOperationState(
-                                window.CurrentSection,
-                                viewModel)
-                            .IsSuccessful)
-                        {
-                            return;
-                        }
-
-                        AppSettings settings =
-                            await settingsCoordinator
-                                .LoadAsync(
-                                    cancellationToken)
-                                .ConfigureAwait(true);
-
-                        runtimeState.ApplySettings(
-                            settings);
-
-                        await services
-                            .GetRequiredService<
-                                WindowManager>()
-                            .ApplySettingsAsync(
-                                settings,
-                                cancellationToken)
-                            .ConfigureAwait(true);
-
-                        window.StatusMessage =
-                            "Settings saved.";
-
-                        window.StatusSeverity =
-                            InfoBarSeverity.Success;
-                    }
-                    catch (OperationCanceledException)
-                        when (cancellationToken
-                            .IsCancellationRequested)
-                    {
-                    }
-                    catch (Exception exception)
-                    {
-                        window.StatusMessage =
-                            exception.Message;
-
-                        window.StatusSeverity =
-                            InfoBarSeverity.Error;
-                    }
-                });
-
-        window.CancelCommand =
-            new RelayCommand(
-                window.Close);
-
-        bool loaded =
-            false;
-
-        window.Activated +=
-            (_, _) =>
-            {
-                if (loaded)
-                {
-                    return;
-                }
-
-                loaded =
-                    true;
-
-                viewModel.LoadCommand
-                    .Execute(null);
-
-                updateViewModel.Initialize(
-                    GetCurrentVersion());
-            };
+        var controller = new SettingsWindowController(window, viewModel,
+            services.GetRequiredService<SettingsEditSession>(),
+            services.GetRequiredService<ShellRuntimeState>());
+        window.Closed += (_, _) => controller.Dispose();
+        window.CancelCommand = new RelayCommand(window.Close);
+        bool loaded = false;
+        window.Activated += async (_, _) =>
+        {
+            if (loaded) return;
+            loaded = true;
+            await controller.LoadAsync();
+            if (!updateViewModel.HasCurrentVersion) updateViewModel.Initialize(GetCurrentVersion());
+        };
 
         return window;
     }
@@ -662,6 +585,12 @@ public sealed class CopyGifHost :
             services.GetRequiredService<
                 OnboardingViewModel>();
 
+        var providerOnboarding = new CopyGIF.Application.Onboarding.ProviderOnboardingCoordinator(
+            services.GetRequiredService<ISettingsStore>(), services.GetRequiredService<ISecretStore>(),
+            services.GetServices<IGifProviderCredentialManager>());
+        viewModel.CompleteProvider = providerOnboarding.CompleteAsync;
+        viewModel.OpenProviderHelp = services.GetRequiredService<IUriLauncherService>().TryLaunchAsync;
+
         OnboardingWindow window =
             new()
             {
@@ -669,7 +598,7 @@ public sealed class CopyGifHost :
                     "Connect GIF provider",
 
                 StepDescription =
-                    "Add your KLIPY API key to start searching and copying GIFs.",
+                    "Choose KLIPY or GIPHY and add its API key to start searching and copying GIFs.",
 
                 StepContent =
                     viewModel,
@@ -720,6 +649,8 @@ public sealed class CopyGifHost :
                             return;
                         }
 
+                        var saved = await services.GetRequiredService<ISettingsCoordinator>().LoadAsync(cancellationToken);
+                        services.GetRequiredService<ShellRuntimeState>().ApplySettings(saved);
                         await services
                             .GetRequiredService<
                                 WindowManager>()
@@ -766,7 +697,7 @@ public sealed class CopyGifHost :
     private static WindowManager CreateWindowManager(
         IServiceProvider services)
     {
-        return new WindowManager(
+        var manager = new WindowManager(
             () =>
                 services.GetRequiredService<
                     MainWindow>(),
@@ -786,6 +717,8 @@ public sealed class CopyGifHost :
                 WinUiDispatcher>(),
             services.GetRequiredService<
                 ThemeManager>());
+        manager.AttachEffectiveSettings(services.GetRequiredService<EffectiveSettings>());
+        return manager;
     }
 
     private static void ApplySettingsWindowState(
@@ -1265,6 +1198,7 @@ public sealed class ShellRuntimeState :
             throw new ArgumentNullException(
                 nameof(settings));
 
+        _mainViewModel.Search.Configure(settings);
         ApplyMotionPreference();
     }
 

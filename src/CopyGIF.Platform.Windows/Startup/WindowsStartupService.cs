@@ -56,7 +56,7 @@ public sealed class WindowsStartupService :
 
         return context.Channel switch
         {
-            InstallChannel.MicrosoftStore =>
+            InstallChannel.MicrosoftStore or InstallChannel.DevelopmentPackage or InstallChannel.SideloadedPackage =>
                 await _storeController
                     .IsEnabledAsync(
                         cancellationToken)
@@ -85,6 +85,8 @@ public sealed class WindowsStartupService :
         switch (context.Channel)
         {
             case InstallChannel.MicrosoftStore:
+            case InstallChannel.DevelopmentPackage:
+            case InstallChannel.SideloadedPackage:
                 await _storeController
                     .SetEnabledAsync(
                         enabled,

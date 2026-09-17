@@ -1,6 +1,8 @@
 using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 using CopyGIF.Core.Settings;
+using CopyGIF.Core.Policies;
+using CopyGIF.Application.Settings;
 
 namespace CopyGIF.Application.Media;
 
@@ -10,11 +12,14 @@ public sealed class PreviewCoordinator :
     private readonly ISettingsStore _settingsStore;
 
     private readonly IPreviewCache _previewCache;
+    private readonly EffectiveSettings? _effective;
 
     public PreviewCoordinator(
         ISettingsStore settingsStore,
-        IPreviewCache previewCache)
+        IPreviewCache previewCache,
+        EffectiveSettings? effective = null)
     {
+        _effective = effective;
         _settingsStore =
             settingsStore ??
             throw new ArgumentNullException(
@@ -26,17 +31,26 @@ public sealed class PreviewCoordinator :
                 nameof(previewCache));
     }
 
-    public Task<Uri> GetThumbnailSourceAsync(
-        GifItem item,
-        CancellationToken cancellationToken = default)
+    public async Task<Uri> GetThumbnailSourceAsync(GifItem item, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(
-            item);
-
-        return ResolveSourceAsync(
-            item.ThumbnailUri,
-            PreviewCacheKind.Thumbnail,
-            cancellationToken);
+        ArgumentNullException.ThrowIfNull(item);
+        if (!ProviderMediaPolicy.AllowsPersistentLibrary(item.ProviderId))
+        {
+            if (!ProviderMediaPolicy.IsDirectMediaUri(item.ThumbnailUri)) throw new InvalidDataException("Invalid GIPHY media host.");
+            return item.ThumbnailUri;
+        }
+        try
+        {
+            var source = await ResolveSourceAsync(item.ThumbnailUri, PreviewCacheKind.Thumbnail, cancellationToken);
+            RepairDiagnostics.Record("thumbnail-cache", item.ProviderId, "ready");
+            return source;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            RepairDiagnostics.Record("thumbnail-cache", item.ProviderId, exception.GetType().Name);
+            // A validated GIF can supply its first frame without starting animation.
+            return await ResolveSourceAsync(item.PreviewUri ?? item.GifUri, PreviewCacheKind.Preview, cancellationToken);
+        }
     }
 
     public async Task<Uri> GetAnimatedSourceAsync(
@@ -54,6 +68,8 @@ public sealed class PreviewCoordinator :
                         cancellationToken)
                     .ConfigureAwait(false));
 
+        if (_effective is not null) settings = await _effective.LoadAsync(cancellationToken).ConfigureAwait(false);
+
         if (reducedMotion ||
             !settings.Search.AnimatePreviews)
         {
@@ -67,6 +83,11 @@ public sealed class PreviewCoordinator :
             item.PreviewUri ??
             item.GifUri;
 
+        if (!ProviderMediaPolicy.AllowsPersistentLibrary(item.ProviderId))
+        {
+            if (!ProviderMediaPolicy.IsDirectMediaUri(sourceUri)) throw new InvalidDataException("Invalid GIPHY media host.");
+            return sourceUri;
+        }
         return await ResolveSourceAsync(
                 sourceUri,
                 PreviewCacheKind.Preview,
@@ -80,6 +101,8 @@ public sealed class PreviewCoordinator :
     {
         ArgumentNullException.ThrowIfNull(
             item);
+
+        if (!ProviderMediaPolicy.AllowsPersistentLibrary(item.ProviderId)) return;
 
         await _previewCache
             .RemoveAsync(

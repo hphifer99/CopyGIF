@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -6,6 +6,14 @@
     <TargetPlatformMinVersion>$(CopyGifWindowsMinimumVersion)</TargetPlatformMinVersion>
     <SupportedOSPlatformVersion>$(CopyGifWindowsMinimumVersion)</SupportedOSPlatformVersion>
 
+    <AssemblyName>CopyGif</AssemblyName>
+    <Title>CopyGif</Title>
+    <Product>CopyGif</Product>
+    <Description>CopyGif</Description>
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+    <ApplicationIcon>Assets\CopyGif.ico</ApplicationIcon>
     <RootNamespace>CopyGIF.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
 
@@ -30,6 +38,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="Assets\PoweredByGiphy.png" />
+    <Content Include="Assets\CopyGif.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\SplashScreen.scale-200.png" />
     <Content Include="Assets\LockScreenLogo.scale-200.png" />
     <Content Include="Assets\Square150x150Logo.scale-200.png" />

@@ -49,7 +49,7 @@ public sealed class WindowsInstallChannelService :
                 new InstallationContext
                 {
                     Channel =
-                        InstallChannel.MicrosoftStore,
+                        _packageIdentityDetector.GetPackageChannel(),
                     Scope =
                         InstallScope.CurrentUser
                 });
@@ -98,10 +98,18 @@ public sealed class WindowsInstallChannelService :
                 CopyGifRegistry.ProductSubKey,
                 CopyGifRegistry.InstallChannelValueName);
 
-        return string.Equals(
-            value as string,
-            CopyGifRegistry.MsiInstallChannelValue,
-            StringComparison.OrdinalIgnoreCase);
+        if (!string.Equals(value as string, CopyGifRegistry.MsiInstallChannelValue, StringComparison.OrdinalIgnoreCase)) return false;
+        // A machine marker must not classify an unrelated unpackaged debug/portable build as installed.
+        string? installedDirectory = _registryValueReader.ReadValue(hive,
+            CopyGifRegistry.ProductSubKey, "InstallDirectory") as string;
+        if (string.IsNullOrWhiteSpace(installedDirectory) || string.IsNullOrWhiteSpace(Environment.ProcessPath)) return false;
+        try
+        {
+            return string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(installedDirectory)),
+                Path.GetDirectoryName(Environment.ProcessPath), StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        { return false; }
     }
 }
 
@@ -111,6 +119,15 @@ internal sealed class WindowsPackageIdentityDetector :
     private const int Success = 0;
     private const int InsufficientBuffer = 122;
     private const int NoPackageIdentity = 15700;
+
+    public InstallChannel GetPackageChannel()
+    {
+        if (!HasPackageIdentity()) return InstallChannel.None;
+        var package = global::Windows.ApplicationModel.Package.Current;
+        if (package.IsDevelopmentMode) return InstallChannel.DevelopmentPackage;
+        return package.SignatureKind == global::Windows.ApplicationModel.PackageSignatureKind.Store
+            ? InstallChannel.MicrosoftStore : InstallChannel.SideloadedPackage;
+    }
 
     public bool HasPackageIdentity()
     {

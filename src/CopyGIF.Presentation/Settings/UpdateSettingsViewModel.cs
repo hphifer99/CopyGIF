@@ -407,7 +407,7 @@ public sealed class UpdateSettingsViewModel :
         }
     }
 
-    private void ApplySettings(
+    public void ApplySettings(
         Core.Settings.UpdateSettings settings)
     {
         ArgumentNullException.ThrowIfNull(

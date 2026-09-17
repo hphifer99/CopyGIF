@@ -164,6 +164,7 @@ UserControl
     private bool _previewRequested;
     private XamlRoot? _observedRoot;
     private bool _isLoaded;
+    private bool _inViewport = true;
 
     private int _thumbnailVersion;
 
@@ -171,7 +172,6 @@ UserControl
 
     private bool _isPointerOver;
 
-    private bool _hasKeyboardFocus;
 
     private bool _isPreviewReady;
 
@@ -179,6 +179,19 @@ UserControl
     {
         InitializeComponent();
         Loaded += Root_Loaded;
+        EffectiveViewportChanged += (_, args) =>
+        {
+            var viewport = args.EffectiveViewport;
+            _inViewport = viewport.Width > 0 && viewport.Height > 0 &&
+                viewport.Right > 0 && viewport.Bottom > 0 && viewport.Left < ActualWidth && viewport.Top < ActualHeight;
+            if (!_inViewport)
+            {
+                _isPointerOver = false;
+                _previewRequested = false;
+                ExecuteIfAvailable(StopPreviewCommand);
+                ResetPreview();
+            }
+        };
 
         Loaded += (_, _) => UpdateFavoriteState();
 
@@ -474,7 +487,6 @@ UserControl
         _ = sender;
         _ = eventArgs;
 
-        _hasKeyboardFocus = true;
         RequestPreview();
         UpdatePreviewPlayback();
     }
@@ -486,7 +498,6 @@ UserControl
         _ = sender;
         _ = eventArgs;
 
-        _hasKeyboardFocus = false;
         StopInactivePreview();
         UpdatePreviewPlayback();
     }
@@ -527,7 +538,6 @@ UserControl
         _thumbnailVersion++;
         ThumbnailImage.Source = null;
         _isPointerOver = false;
-        _hasKeyboardFocus = false;
         if (_observedRoot is not null)
         {
             _observedRoot.Changed -= Root_Changed;
@@ -561,17 +571,16 @@ UserControl
         {
             _previewRequested = false;
             _isPointerOver = false;
-            _hasKeyboardFocus = false;
-            ExecuteIfAvailable(StopPreviewCommand);
+                ExecuteIfAvailable(StopPreviewCommand);
             ResetPreview();
         }
     }
 
     private void RequestPreview()
     {
-        if (_isLoaded && !_previewRequested && XamlRoot?.IsHostVisible == true &&
+        if (_isLoaded && _inViewport && !_previewRequested && XamlRoot?.IsHostVisible == true &&
         AnimatePreview && SystemAnimationsEnabled &&
-        (_isPointerOver || _hasKeyboardFocus) &&
+        _isPointerOver &&
         StartPreviewCommand?.CanExecute(null) == true)
         {
             _previewRequested = true;
@@ -581,7 +590,7 @@ UserControl
 
     private void StopInactivePreview()
     {
-        if (!_isPointerOver && !_hasKeyboardFocus)
+        if (!_isPointerOver)
         {
             _previewRequested = false;
             ExecuteIfAvailable(StopPreviewCommand);
@@ -599,9 +608,19 @@ UserControl
 
     private static bool IsSafeLocalSource(Uri? uri)
     {
-        return uri is { IsAbsoluteUri: true, IsFile: true, IsUnc: false } &&
+        return CopyGIF.Core.Policies.ProviderMediaPolicy.IsDirectMediaUri(uri) ||
+            uri is { IsAbsoluteUri: true, IsFile: true, IsUnc: false } &&
         string.IsNullOrEmpty(uri.Host) &&
         string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment);
+    }
+
+    private async void RetryThumbnail_Click(object sender, RoutedEventArgs args)
+    {
+        if (LoadThumbnailCommand is not CommunityToolkit.Mvvm.Input.IAsyncRelayCommand command || !command.CanExecute(true)) return;
+        RetryThumbnailButton.IsEnabled = false;
+        try { await command.ExecuteAsync(true); await RefreshThumbnailAsync(); }
+        catch (Exception) { RetryThumbnailButton.Visibility = Visibility.Visible; }
+        finally { RetryThumbnailButton.IsEnabled = true; }
     }
 
     private void RefreshThumbnail()
@@ -615,9 +634,12 @@ UserControl
         Uri? thumbnailUri = ThumbnailUri;
         ThumbnailImage.Source = null;
         PlaceholderIcon.Visibility = Visibility.Visible;
+        RetryThumbnailButton.Visibility = Visibility.Collapsed;
 
-        if (!_isLoaded || thumbnailUri is null || !IsSafeLocalSource(thumbnailUri))
+        if (!_isLoaded || thumbnailUri is null) return;
+        if (!IsSafeLocalSource(thumbnailUri))
         {
+            RetryThumbnailButton.Visibility = Visibility.Visible;
             return;
         }
 
@@ -628,10 +650,8 @@ UserControl
         };
 
         bool loaded = await LocalBitmapLoader.TryLoadAsync(bitmap, thumbnailUri);
-        if (version != _thumbnailVersion || !_isLoaded || !loaded)
-        {
-            return;
-        }
+        if (version != _thumbnailVersion || !_isLoaded) return;
+        if (!loaded) { RetryThumbnailButton.Visibility = Visibility.Visible; return; }
 
         ThumbnailImage.Source = bitmap;
         PlaceholderIcon.Visibility = Visibility.Collapsed;
@@ -676,9 +696,9 @@ UserControl
     private void UpdatePreviewPlayback()
     {
         bool shouldPlay =
-        _isLoaded && XamlRoot?.IsHostVisible == true &&
+        _isLoaded && _inViewport && XamlRoot?.IsHostVisible == true &&
         CanAnimatePreview &&
-        (_isPointerOver || _hasKeyboardFocus);
+        _isPointerOver;
 
         if (!shouldPlay)
         {

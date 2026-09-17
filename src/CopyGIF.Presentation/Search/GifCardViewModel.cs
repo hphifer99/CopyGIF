@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using CopyGIF.Application.Library;
 using CopyGIF.Application.Media;
 using CopyGIF.Core.Models;
+using CopyGIF.Core.Policies;
 using CopyGIF.Presentation.Common;
 
 namespace CopyGIF.Presentation.Search;
@@ -86,7 +87,11 @@ public sealed class GifCardViewModel :
         _currentSource =
             item.ThumbnailUri;
 
-        LoadThumbnailCommand = new AsyncRelayCommand(LoadThumbnailAsync);
+        LoadThumbnailCommand = new AsyncRelayCommand<bool?>(async (retry, token) =>
+        {
+            if (retry == true) await _previewCoordinator.InvalidateAsync(Item, token);
+            await LoadThumbnailAsync(token);
+        });
 
         CopyCommand =
             new AsyncRelayCommand(
@@ -96,7 +101,7 @@ public sealed class GifCardViewModel :
         ToggleFavoriteCommand =
             new AsyncRelayCommand(
                 ToggleFavoriteAsync,
-                CanExecuteAction);
+                () => CanExecuteAction() && ProviderMediaPolicy.AllowsPersistentLibrary(ProviderId));
 
         StartPreviewCommand =
             new AsyncRelayCommand(
@@ -289,8 +294,9 @@ public sealed class GifCardViewModel :
                         Item,
                         cancellationToken);
 
-            ThumbnailSource =
-                source;
+            ThumbnailSource = source;
+            OnPropertyChanged(nameof(ThumbnailSource));
+            Message = null;
 
             if (!IsPreviewing)
             {
@@ -303,8 +309,10 @@ public sealed class GifCardViewModel :
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            RepairDiagnostics.Record("thumbnail-resolve", ProviderId, exception.GetType().Name);
+            Message = UserMessage.Warning("Preview unavailable. Select Retry preview to try again.");
             ThumbnailSource =
                 Item.ThumbnailUri;
 

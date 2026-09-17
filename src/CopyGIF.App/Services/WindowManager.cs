@@ -84,6 +84,28 @@ public sealed class WindowManager :
     private bool _isExiting;
 
     private int _disposeState;
+    private EffectiveSettings? _effectiveSettings;
+    private long _activationGeneration;
+    private int _focusDeferrals;
+    private bool _closingSettings;
+    public Func<Task>? ShutdownAsync { get; set; }
+
+    public void AttachEffectiveSettings(EffectiveSettings effective)
+    {
+        _effectiveSettings = effective;
+        effective.Changed += HandleEffectiveSettingsChanged;
+    }
+
+    private void HandleEffectiveSettingsChanged(object? sender, EventArgs args)
+    {
+        if (!_initialized || _isExiting) return;
+        QueueOperation(async token =>
+        {
+            _settings = await _effectiveSettings!.LoadAsync(token);
+            await _themeManager.ApplyThemeAsync(_settings.Appearance.Theme);
+        });
+    }
+
 
     public WindowManager(
         Func<MainWindow> mainWindowFactory,
@@ -355,35 +377,8 @@ public sealed class WindowManager :
             cancellationToken);
     }
 
-    public Task ExitAsync(
-        CancellationToken cancellationToken = default)
-    {
-        return ExecuteSerializedAsync(
-            async operationToken =>
-            {
-                EnsureInitialized();
-
-                if (_isPickerVisible)
-                {
-                    try
-                    {
-                        await PersistPickerBoundsAsync(
-                                operationToken)
-                            .ConfigureAwait(true);
-                    }
-                    catch (Exception exception)
-                    {
-                        ReportOperationFailure(
-                            exception);
-                    }
-                }
-
-                CloseAllWindows();
-
-                XamlApplication.Current.Exit();
-            },
-            cancellationToken);
-    }
+    public Task ExitAsync(CancellationToken cancellationToken = default) =>
+        ExecuteSerializedAsync(ExitCoreAsync, cancellationToken);
 
     public async ValueTask DisposeAsync()
     {
@@ -395,6 +390,7 @@ public sealed class WindowManager :
         }
 
         UnsubscribeFromStartupEvents();
+        if (_effectiveSettings is not null) _effectiveSettings.Changed -= HandleEffectiveSettingsChanged;
 
         await _lifetimeCancellation
             .CancelAsync()
@@ -449,8 +445,7 @@ public sealed class WindowManager :
         {
             Func<Task> dispatcherOperation =
                 () =>
-                    operation(
-                        linkedCancellation.Token);
+                    RunTransitionAsync(operation, linkedCancellation.Token);
 
             await _dispatcher
                 .InvokeAsync(
@@ -463,10 +458,18 @@ public sealed class WindowManager :
         }
     }
 
+    private async Task RunTransitionAsync(Func<CancellationToken, Task> operation, CancellationToken token)
+    {
+        _focusDeferrals++;
+        try { await operation(token); }
+        finally { _focusDeferrals--; }
+    }
+
     private async Task ShowPickerCoreAsync(
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        Interlocked.Increment(ref _activationGeneration);
 
         if (_onboardingRequired)
         {
@@ -477,8 +480,10 @@ public sealed class WindowManager :
             return;
         }
 
-        _settings = await _settingsCoordinator.LoadAsync(cancellationToken)
-            .ConfigureAwait(true);
+        _settings = _effectiveSettings is null
+            ? await _settingsCoordinator.LoadAsync(cancellationToken)
+            : await _effectiveSettings.LoadAsync(cancellationToken);
+        _settingsWindow?.AppWindow.Hide();
         await _themeManager.ApplyThemeAsync(_settings.Appearance.Theme)
             .ConfigureAwait(true);
 
@@ -499,7 +504,7 @@ public sealed class WindowManager :
         _lastPlacement =
             placement;
 
-        window.Activate();
+        NativeWindowActivation.RestoreAndActivate(window);
 
         _isPickerVisible =
             true;
@@ -558,6 +563,7 @@ public sealed class WindowManager :
                 cancellationToken)
             .ConfigureAwait(true);
 
+        Interlocked.Increment(ref _activationGeneration);
         SettingsWindow window =
             EnsureSettingsWindow();
 
@@ -573,7 +579,7 @@ public sealed class WindowManager :
             .ConfigureAwait(true);
 
         window.AppWindow.MoveAndResize(CreateRectangle(placement));
-        window.Activate();
+        NativeWindowActivation.RestoreAndActivate(window);
     }
 
     private async Task ShowOnboardingCoreAsync(
@@ -599,7 +605,7 @@ public sealed class WindowManager :
             .ConfigureAwait(true);
 
         window.AppWindow.MoveAndResize(CreateRectangle(placement));
-        window.Activate();
+        NativeWindowActivation.RestoreAndActivate(window);
     }
 
     private async Task PersistPickerBoundsAsync(
@@ -612,7 +618,6 @@ public sealed class WindowManager :
 
         AppSettings latestSettings = await _settingsCoordinator
             .LoadAsync(cancellationToken).ConfigureAwait(true);
-        _settings = latestSettings;
         WindowSettings current = latestSettings.Window;
 
         bool savePosition =
@@ -686,13 +691,18 @@ public sealed class WindowManager :
 
         SettingsSaveResult saveResult =
             await _settingsCoordinator
-                .SaveAsync(
-                    proposedSettings,
-                    cancellationToken)
+                .UpdateAsync(latest => latest with { Window = latest.Window with
+                    {
+                        Width = latest.Window.RememberWindowSize ? updatedWindow.Width : latest.Window.Width,
+                        Height = latest.Window.RememberWindowSize ? updatedWindow.Height : latest.Window.Height,
+                        Left = latest.Window.PlacementMode == WindowPlacementMode.Remember ? updatedWindow.Left : latest.Window.Left,
+                        Top = latest.Window.PlacementMode == WindowPlacementMode.Remember ? updatedWindow.Top : latest.Window.Top,
+                        LastMonitorId = latest.Window.PlacementMode == WindowPlacementMode.Remember ? updatedWindow.LastMonitorId : latest.Window.LastMonitorId
+                    } }, cancellationToken)
                 .ConfigureAwait(true);
 
-        _settings =
-            saveResult.EffectiveSettings;
+        _settings = _effectiveSettings is null ? saveResult.EffectiveSettings
+            : await _effectiveSettings.LoadAsync(cancellationToken);
 
         if (!saveResult.Succeeded)
         {
@@ -726,8 +736,7 @@ public sealed class WindowManager :
         window.Activated +=
             HandleMainWindowActivated;
 
-        window.Closed +=
-            HandleMainWindowClosed;
+        window.AppWindow.Closing += HandleMainWindowClosing;
 
         _escapeAccelerator =
             new KeyboardAccelerator
@@ -763,8 +772,9 @@ public sealed class WindowManager :
         _themeManager.RegisterRoot(
             window.RootElement);
 
-        window.Closed +=
-            HandleSettingsWindowClosed;
+        window.Closed += HandleSettingsWindowClosed;
+        window.AppWindow.Closing += HandleSettingsWindowClosing;
+        window.Activated += HandleMainWindowActivated;
 
         return window;
     }
@@ -840,8 +850,7 @@ public sealed class WindowManager :
         window.Activated -=
             HandleMainWindowActivated;
 
-        window.Closed -=
-            HandleMainWindowClosed;
+        window.AppWindow.Closing -= HandleMainWindowClosing;
 
         if (_escapeAccelerator is not null)
         {
@@ -874,8 +883,9 @@ public sealed class WindowManager :
         SettingsWindow window =
             _settingsWindow;
 
-        window.Closed -=
-            HandleSettingsWindowClosed;
+        window.Closed -= HandleSettingsWindowClosed;
+        window.AppWindow.Closing -= HandleSettingsWindowClosing;
+        window.Activated -= HandleMainWindowActivated;
 
         _themeManager.UnregisterRoot(
             window.RootElement);
@@ -883,7 +893,9 @@ public sealed class WindowManager :
         _settingsWindow =
             null;
 
-        window.Close();
+        _closingSettings = true;
+        try { window.Close(); }
+        finally { _closingSettings = false; }
     }
 
     private void HandleActivationRequested(
@@ -908,15 +920,18 @@ public sealed class WindowManager :
             ShowPickerCoreAsync);
     }
 
-    private void HandleOpenRequested(
-        object? sender,
-        EventArgs eventArgs)
+    private void HandleOpenRequested(object? sender, EventArgs eventArgs)
     {
-        _ = sender;
-        _ = eventArgs;
-
-        QueueOperation(
-            ShowPickerCoreAsync);
+        Task<WindowPlacementResult>? captured = _settings.Window.CenterOnTrayOpen
+            ? _placementService.CalculateAsync(_settings.Window with { PlacementMode = WindowPlacementMode.Center }) : null;
+        QueueOperation(async token =>
+        {
+            await ShowPickerCoreAsync(token);
+            if (_mainWindow is null || captured is null || !_settings.Window.CenterOnTrayOpen) return;
+            var placement = await captured;
+            _mainWindow.AppWindow.MoveAndResize(CreateRectangle(placement));
+            _lastPlacement = placement;
+        });
     }
 
     private void HandleSettingsRequested(
@@ -930,36 +945,7 @@ public sealed class WindowManager :
             ShowSettingsCoreAsync);
     }
 
-    private void HandleExitRequested(
-        object? sender,
-        EventArgs eventArgs)
-    {
-        _ = sender;
-        _ = eventArgs;
-
-        QueueOperation(
-            async cancellationToken =>
-            {
-                if (_isPickerVisible)
-                {
-                    try
-                    {
-                        await PersistPickerBoundsAsync(
-                                cancellationToken)
-                            .ConfigureAwait(true);
-                    }
-                    catch (Exception exception)
-                    {
-                        ReportOperationFailure(
-                            exception);
-                    }
-                }
-
-                CloseAllWindows();
-
-                XamlApplication.Current.Exit();
-            });
-    }
+    private void HandleExitRequested(object? sender, EventArgs eventArgs) => QueueOperation(ExitCoreAsync);
 
     private void HandleMainWindowSettingsRequested(
         object? sender,
@@ -972,46 +958,83 @@ public sealed class WindowManager :
             ShowSettingsCoreAsync);
     }
 
-    private void HandleMainWindowActivated(
-        object sender,
-        WindowActivatedEventArgs eventArgs)
+    private void HandleMainWindowActivated(object sender, WindowActivatedEventArgs eventArgs)
     {
-        _ = sender;
-
-        if (eventArgs.WindowActivationState !=
-                WindowActivationState.Deactivated ||
-            !_isPickerVisible ||
-            !_settings.Behavior.CloseWhenFocusLost)
-        {
+        if (eventArgs.WindowActivationState != WindowActivationState.Deactivated ||
+            _focusDeferrals != 0 || !_settings.Behavior.CloseWhenFocusLost || _isExiting)
             return;
-        }
-
-        QueueOperation(
-            cancellationToken =>
-                HidePickerCoreAsync(
-                    persistBounds: true,
-                    cancellationToken));
+        long generation = Volatile.Read(ref _activationGeneration);
+        _ = HideAfterFocusLeavesAsync(generation);
     }
 
-    private void HandleMainWindowClosed(
-        object sender,
-        WindowEventArgs eventArgs)
+    private async Task HideAfterFocusLeavesAsync(long generation)
     {
-        _ = sender;
-
-        if (_isExiting)
+        try
         {
-            return;
+            await Task.Delay(100, _lifetimeCancellation.Token);
+            await ExecuteSerializedAsync(async token =>
+            {
+                if (generation != Volatile.Read(ref _activationGeneration) ||
+                    NativeWindowActivation.IsProcessForeground() ||
+                    !_settings.Behavior.CloseWhenFocusLost ||
+                    _settingsWindow?.IsInteractionProtected?.Invoke() == true) return;
+                _settingsWindow?.AppWindow.Hide();
+                await HidePickerCoreAsync(true, token);
+            }, _lifetimeCancellation.Token);
         }
+        catch (OperationCanceledException) { }
+        catch (ObjectDisposedException) { }
+        catch (Exception exception) { ReportOperationFailure(exception); }
+    }
 
-        eventArgs.Handled =
-            true;
+    private void HandleMainWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (_isExiting) return;
+        args.Cancel = true;
+        QueueOperation(_settings.Behavior.CloseToTray
+            ? token => HidePickerCoreAsync(true, token)
+            : ExitCoreAsync);
+    }
 
-        QueueOperation(
-            cancellationToken =>
-                HidePickerCoreAsync(
-                    persistBounds: true,
-                    cancellationToken));
+    private void HandleSettingsWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (_isExiting || _closingSettings) return;
+        args.Cancel = true;
+        QueueOperation(async token =>
+        {
+            if (!await ResolveSettingsCloseAsync()) return;
+            CloseSettingsWindow();
+            await ShowPickerCoreAsync(token);
+        });
+    }
+
+    private async Task<bool> ResolveSettingsCloseAsync()
+    {
+        if (_settingsWindow is null) return true;
+        NativeWindowActivation.RestoreAndActivate(_settingsWindow);
+        return _settingsWindow.CanCloseAsync is null || await _settingsWindow.CanCloseAsync();
+    }
+
+    private async Task ExitCoreAsync(CancellationToken token)
+    {
+        if (!await ResolveSettingsCloseAsync()) return;
+        if (_isPickerVisible)
+        {
+            try { await PersistPickerBoundsAsync(token); }
+            catch (Exception exception) { ReportOperationFailure(exception); }
+        }
+        CloseAllWindows();
+        // Dispose the host after releasing this manager's operation gate.
+        if (ShutdownAsync is not null)
+            _ = ShutdownAfterTransitionAsync();
+        else XamlApplication.Current.Exit();
+    }
+
+    private async Task ShutdownAfterTransitionAsync()
+    {
+        await Task.Yield();
+        try { await ShutdownAsync!(); }
+        catch (Exception exception) { ReportOperationFailure(exception); XamlApplication.Current.Exit(); }
     }
 
     private void HandleSettingsWindowClosed(

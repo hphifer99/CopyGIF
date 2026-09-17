@@ -55,8 +55,8 @@ public sealed class OnboardingCoordinator :
             ProviderDisplayName =
                 credentialState.ProviderDisplayName,
 
-            CredentialHelpUri =
-                CredentialHelpUri
+            CredentialHelpUri = credentialState.ProviderId == "giphy"
+                ? new Uri("https://developers.giphy.com/dashboard/") : CredentialHelpUri
         };
     }
 

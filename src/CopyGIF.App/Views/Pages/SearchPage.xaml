@@ -36,6 +36,14 @@
                 SearchCommand="{Binding SearchCommand, ElementName=Root}"
                 Suggestions="{Binding Suggestions, ElementName=Root}" />
 
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock x:Name="ProviderAttributionText" Text="{Binding AttributionText}" Style="{StaticResource CopyGifStatusTextStyle}" />
+                <Border x:Name="GiphyAttribution" Background="Black" Padding="4" Visibility="Collapsed">
+                    <Image Source="ms-appx:///Assets/PoweredByGiphy.png" Width="200" Stretch="Uniform"
+                           AutomationProperties.Name="Powered By GIPHY" />
+                </Border>
+            </StackPanel>
+
             <controls:StatusBanner
                 x:Name="PageStatusBanner"
                 IsClosable="False"
@@ -59,6 +67,16 @@
                 ItemTemplate="{Binding ItemTemplate, ElementName=Root}"
                 ItemsSource="{Binding ItemsSource, ElementName=Root}"
                 SelectionMode="None">
+
+                <GridView.Footer>
+        <Button
+            x:Name="LoadMoreButton"
+            Margin="0,8,0,0"
+            HorizontalAlignment="Center"
+            AutomationProperties.Name="Load more GIFs"
+            Command="{Binding LoadMoreCommand, ElementName=Root}"
+            Content="Load more" />
+                </GridView.Footer>
 
                 <GridView.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -100,14 +118,7 @@
 
         </Grid>
 
-        <Button
-            x:Name="LoadMoreButton"
-            Grid.Row="2"
-            Margin="0,8,0,0"
-            HorizontalAlignment="Center"
-            AutomationProperties.Name="Load more GIFs"
-            Command="{Binding LoadMoreCommand, ElementName=Root}"
-            Content="Load more" />
+
 
     </Grid>
 

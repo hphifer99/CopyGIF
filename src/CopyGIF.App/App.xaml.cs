@@ -32,6 +32,12 @@ public partial class App :
             _host ??=
                 CopyGifHost.Create();
 
+            _host.WindowManager.ShutdownAsync = async () =>
+            {
+                await DisposeHostAsync();
+                Exit();
+            };
+
             string[] commandLine =
                 Environment.GetCommandLineArgs();
 

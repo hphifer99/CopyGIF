@@ -1,4 +1,5 @@
 using CopyGIF.Application.Providers;
+using CopyGIF.Application.Settings;
 using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 using CopyGIF.Core.Settings;
@@ -33,13 +34,16 @@ public sealed class GifSearchCoordinator :
         _pendingDebounceCancellation;
 
     private bool _disposed;
+    private readonly EffectiveSettings? _effective;
 
     public GifSearchCoordinator(
         IActiveGifProviderAccessor providerAccessor,
         ISettingsStore settingsStore,
         ISearchSuggestionCoordinator suggestionCoordinator,
-        IClock clock)
+        IClock clock,
+        EffectiveSettings? effective = null)
     {
+        _effective = effective;
         _providerAccessor =
             providerAccessor ??
             throw new ArgumentNullException(
@@ -308,6 +312,7 @@ public sealed class GifSearchCoordinator :
     private async Task<AppSettings> LoadSettingsAsync(
         CancellationToken cancellationToken)
     {
+        if (_effective is not null) return await _effective.LoadAsync(cancellationToken).ConfigureAwait(false);
         return AppSettingsNormalizer.Normalize(
             await _settingsStore
                 .LoadAsync(

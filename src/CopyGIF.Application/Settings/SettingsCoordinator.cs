@@ -129,6 +129,20 @@ public sealed class SettingsCoordinator :
         }
     }
 
+    public async Task<SettingsSaveResult> UpdateAsync(Func<AppSettings, AppSettings> update,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(update);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            AppSettings latest = await LoadNormalizedAsync(cancellationToken).ConfigureAwait(false);
+            return await SaveCoreAsync(update(latest), cancellationToken).ConfigureAwait(false);
+        }
+        finally { _gate.Release(); }
+    }
+
     public async Task<SettingsSaveResult>
         RestoreDefaultsAsync(
             CancellationToken cancellationToken = default)

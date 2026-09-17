@@ -1,157 +1,72 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("Debug", "Release")]
-    [string]$Configuration = "Release",
-
-    [ValidatePattern("^\d+\.\d+\.\d+$")]
-    [string]$Version,
-
-    [string]$OutputDirectory
+    [Parameter(Mandatory)][ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version,
+    [string]$OutputDirectory,
+    [string]$SigningThumbprint,
+    [string]$TimestampServer = 'http://timestamp.digicert.com'
 )
-
 Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-
-$repositoryRoot = [IO.Path]::GetFullPath(
-    (Join-Path $PSScriptRoot ".."))
-
-if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
-    $OutputDirectory = Join-Path $repositoryRoot "artifacts"
-}
-
+$ErrorActionPreference = 'Stop'
+$repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { $OutputDirectory = Join-Path $repositoryRoot 'artifacts' }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
-$projectPath = Join-Path $repositoryRoot "CopyGIF\CopyGIF.csproj"
-$packagesConfigPath = Join-Path $repositoryRoot "CopyGIF\packages.config"
-$packagesDirectory = Join-Path $repositoryRoot "packages"
-$assemblyInfoPath = Join-Path $repositoryRoot "CopyGIF\Properties\AssemblyInfo.cs"
-$buildOutputDirectory = Join-Path $repositoryRoot "CopyGIF\bin\$Configuration"
-$packageDirectory = Join-Path $OutputDirectory "CopyGIF-win-x64"
-$zipPath = Join-Path $OutputDirectory "CopyGIF-win-x64.zip"
-$checksumPath = Join-Path $OutputDirectory "CopyGIF-win-x64.sha256"
-
-if (-not (Test-Path -LiteralPath $projectPath -PathType Leaf)) {
-    throw "CopyGIF.csproj was not found at $projectPath"
+# A unique work directory avoids removing unrelated artifacts or reusing stale publish output.
+$workDirectory = Join-Path $OutputDirectory ('build-' + [guid]::NewGuid().ToString('N'))
+$publishDirectory = Join-Path $workDirectory 'publish'
+$toolsDirectory = Join-Path $workDirectory 'tools'
+New-Item -ItemType Directory -Path $publishDirectory -Force | Out-Null
+$project = Join-Path $repositoryRoot 'src\CopyGIF.App\CopyGIF.App.csproj'
+$assetName = "CopyGIF-$Version-win-x64.msi"
+$msiPath = Join-Path $OutputDirectory $assetName
+if (Test-Path -LiteralPath $msiPath) { throw "An artifact already exists at $msiPath. Choose a new output directory." }
+if ([string]::IsNullOrWhiteSpace($SigningThumbprint)) {
+    throw 'A code-signing certificate in Cert:\CurrentUser\My is required. Supply -SigningThumbprint. An unsigned build cannot participate in trusted updates.'
 }
-
-if (-not [string]::IsNullOrWhiteSpace($Version)) {
-    $expectedAttribute =
-        '[assembly: AssemblyInformationalVersion("{0}")]' -f $Version
-
-    $versionMatch = Select-String `
-        -LiteralPath $assemblyInfoPath `
-        -SimpleMatch `
-        -Pattern $expectedAttribute
-
-    if ($null -eq $versionMatch) {
-        throw "The requested version $Version does not match AssemblyInformationalVersion."
+$signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+    Sort-Object { [version]$_.Directory.Parent.Name } -Descending | Select-Object -First 1
+if ($null -eq $signTool) { throw 'Install the Windows SDK signing tools in Visual Studio Installer.' }
+function Invoke-Checked([scriptblock]$Command) {
+    & $Command
+    if ($LASTEXITCODE -ne 0) { throw "An external build command failed with exit code $LASTEXITCODE." }
+}
+Push-Location $repositoryRoot
+try {
+    Invoke-Checked { dotnet publish $project -c Release -r win-x64 --self-contained true `
+        -p:Platform=x64 -p:WindowsPackageType=None -p:EnableMsixTooling=false `
+        -p:WindowsAppSDKSelfContained=true -p:PublishSingleFile=false -p:PublishTrimmed=false `
+        "-p:Version=$Version" "-p:AssemblyVersion=$Version.0" "-p:FileVersion=$Version.0" `
+        -o $publishDirectory }
+    foreach ($name in @('LICENSE.txt','PRIVACY.md','THIRD-PARTY-NOTICES.md')) {
+        Copy-Item -LiteralPath (Join-Path $repositoryRoot $name) -Destination $publishDirectory
     }
-}
-
-if ($null -eq (Get-Command nuget.exe -ErrorAction SilentlyContinue)) {
-    throw "nuget.exe is required and was not found on PATH."
-}
-
-if ($null -eq (Get-Command msbuild.exe -ErrorAction SilentlyContinue)) {
-    throw "msbuild.exe is required and was not found on PATH."
-}
-
-New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
-
-Write-Output "Restoring NuGet packages..."
-& nuget.exe restore $packagesConfigPath `
-    -PackagesDirectory $packagesDirectory `
-    -NonInteractive
-
-if ($LASTEXITCODE -ne 0) {
-    throw "NuGet restore failed with exit code $LASTEXITCODE."
-}
-
-Write-Output "Building CopyGIF $Configuration..."
-& msbuild.exe $projectPath `
-    /m `
-    /t:Rebuild `
-    "/p:Configuration=$Configuration" `
-    /p:Platform=AnyCPU `
-    /p:ContinuousIntegrationBuild=true `
-    /p:DeterministicSourcePaths=false `
-    /verbosity:minimal
-
-if ($LASTEXITCODE -ne 0) {
-    throw "MSBuild failed with exit code $LASTEXITCODE."
-}
-
-$requiredBuildFiles = @(
-    "CopyGIF.exe",
-    "CopyGIF.exe.config",
-    "XamlAnimatedGif.dll"
-)
-
-foreach ($fileName in $requiredBuildFiles) {
-    $sourcePath = Join-Path $buildOutputDirectory $fileName
-
-    if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
-        throw "The build did not produce the required file $sourcePath"
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'licenses') -Destination $publishDirectory -Recurse
+    $exe = Join-Path $publishDirectory 'CopyGif.exe'
+    if (-not (Test-Path -LiteralPath $exe)) { throw 'The WinUI publish did not produce CopyGif.exe.' }
+    Invoke-Checked { & $signTool.FullName sign /sha1 $SigningThumbprint /fd SHA256 /tr $TimestampServer /td SHA256 $exe }
+    Invoke-Checked { & $signTool.FullName verify /pa $exe }
+    Invoke-Checked { dotnet tool install wix --version 6.0.0 --allow-roll-forward --tool-path $toolsDirectory }
+    $wix = Join-Path $toolsDirectory 'wix.exe'
+    Invoke-Checked { & $wix build (Join-Path $repositoryRoot 'installer\CopyGIF.wxs') -arch x64 `
+        -d "Version=$Version" -d "PublishDir=$publishDirectory" -o $msiPath }
+    Invoke-Checked { & $signTool.FullName sign /sha1 $SigningThumbprint /fd SHA256 /tr $TimestampServer /td SHA256 $msiPath }
+    Invoke-Checked { & $signTool.FullName verify /pa $msiPath }
+    $exeSignature = Get-AuthenticodeSignature -LiteralPath $exe
+    $msiSignature = Get-AuthenticodeSignature -LiteralPath $msiPath
+    if ($exeSignature.Status -ne 'Valid' -or $msiSignature.Status -ne 'Valid' -or
+        $exeSignature.SignerCertificate.Thumbprint -ne $msiSignature.SignerCertificate.Thumbprint) {
+        throw 'The executable and MSI must have valid signatures from the same certificate.'
     }
-}
-
-if (Test-Path -LiteralPath $packageDirectory) {
-    Remove-Item -LiteralPath $packageDirectory -Recurse -Force
-}
-
-foreach ($filePath in @($zipPath, $checksumPath)) {
-    if (Test-Path -LiteralPath $filePath) {
-        Remove-Item -LiteralPath $filePath -Force
+    $hash = (Get-FileHash -LiteralPath $msiPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $releaseBase = "https://github.com/hphifer99/CopyGIF/releases"
+    $manifest = [ordered]@{
+        schemaVersion = 1; version = $Version; channel = 'stable'; assetName = $assetName
+        assetUri = "$releaseBase/download/v$Version/$assetName"
+        sizeBytes = (Get-Item -LiteralPath $msiPath).Length; sha256 = $hash
+        minimumSupportedVersion = '2.0.0'; releaseNotesUri = "$releaseBase/tag/v$Version"
+        publishedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
     }
+    $manifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutputDirectory 'CopyGIF-update.json') -Encoding utf8
+    "$hash  $assetName" | Set-Content -LiteralPath (Join-Path $OutputDirectory 'CopyGIF-win-x64.sha256') -Encoding ascii
+    Write-Output "Created $msiPath and CopyGIF-update.json. Install and test the MSI before publishing."
 }
-
-New-Item -ItemType Directory -Path $packageDirectory -Force | Out-Null
-
-foreach ($fileName in $requiredBuildFiles) {
-    Copy-Item `
-        -LiteralPath (Join-Path $buildOutputDirectory $fileName) `
-        -Destination $packageDirectory
-}
-
-$requiredDistributionFiles = @(
-    "LICENSE.txt",
-    "README.md",
-    "PRIVACY.md",
-    "THIRD-PARTY-NOTICES.md",
-    "uninstall.ps1"
-)
-
-foreach ($relativePath in $requiredDistributionFiles) {
-    $sourcePath = Join-Path $repositoryRoot $relativePath
-
-    if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
-        throw "The required distribution file $relativePath was not found."
-    }
-
-    Copy-Item -LiteralPath $sourcePath -Destination $packageDirectory
-}
-
-$licensesSource = Join-Path $repositoryRoot "licenses"
-$licensesDestination = Join-Path $packageDirectory "licenses"
-
-if (-not (Test-Path -LiteralPath $licensesSource -PathType Container)) {
-    throw "The licenses directory was not found."
-}
-
-Copy-Item `
-    -LiteralPath $licensesSource `
-    -Destination $licensesDestination `
-    -Recurse
-
-Write-Output "Creating release archive..."
-Compress-Archive `
-    -Path (Join-Path $packageDirectory "*") `
-    -DestinationPath $zipPath `
-    -CompressionLevel Optimal
-
-$releaseHash = Get-FileHash -LiteralPath $zipPath -Algorithm SHA256
-$checksumLine = "{0}  {1}`r`n" -f $releaseHash.Hash, (Split-Path $zipPath -Leaf)
-Set-Content -LiteralPath $checksumPath -Value $checksumLine -Encoding ASCII -NoNewline
-
-Write-Output "Release package created:"
-Write-Output "  $zipPath"
-Write-Output "  $checksumPath"
+finally { Pop-Location }

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="CopyGif" Manufacturer="CopyGIF" Version="$(var.Version)"
+           UpgradeCode="4594B572-93C3-4B03-A9C8-356C3012C87E" Scope="perMachine" InstallerVersion="500">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of CopyGif is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Property Id="ARPPRODUCTICON" Value="CopyGifIcon" />
+    <Icon Id="CopyGifIcon" SourceFile="$(var.PublishDir)\Assets\CopyGif.ico" />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="CopyGIF">
+        <Component Id="InstallMarker" Guid="A3A56A89-406F-439B-BFA9-D196C82BBC75" Bitness="always64">
+          <RegistryKey Root="HKLM" Key="Software\CopyGIF">
+            <RegistryValue Name="InstallChannel" Type="string" Value="Msi" KeyPath="yes" />
+            <RegistryValue Name="InstallDirectory" Type="string" Value="[INSTALLFOLDER]" />
+          </RegistryKey>
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut" Guid="D797D75A-81D6-4A73-A4D2-1C311BD354A6" Bitness="always64">
+        <Shortcut Id="CopyGifShortcut" Name="CopyGif" Target="[INSTALLFOLDER]CopyGif.exe"
+                  WorkingDirectory="INSTALLFOLDER" Icon="CopyGifIcon" />
+        <RegistryValue Root="HKLM" Key="Software\CopyGIF" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+    <Feature Id="MainFeature" Title="CopyGif" Level="1">
+      <ComponentRef Id="InstallMarker" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentGroupRef Id="AppFiles" />
+    </Feature>
+  </Package>
+  <Fragment>
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.PublishDir)\**" />
+    </ComponentGroup>
+  </Fragment>
+</Wix>

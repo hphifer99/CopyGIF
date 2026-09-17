@@ -223,7 +223,7 @@ public sealed class UpdateViewModel :
         Candidate?.AvailableVersion;
 
     public Uri? ReleaseNotesUri =>
-        Candidate?.ReleaseNotesUri;
+        Candidate?.ReleaseNotesUri ?? new Uri("https://github.com/hphifer99/CopyGIF/releases");
 
     public DownloadedUpdatePackage?
         PreparedPackage
@@ -772,6 +772,18 @@ public sealed class UpdateViewModel :
         }
     }
 
+    public void AcceptAutomaticResult(AutomaticUpdateResult result)
+    {
+        if (IsBusy) return;
+        ApplyCheckResult(result.Check);
+        if (result.Preparation is { IsReady: true, Package: not null })
+        {
+            PreparedPackage = result.Preparation.Package;
+            SetCompletedDownloadProgress(result.Preparation.Package);
+        }
+        ApplyAutomaticPresentation(result);
+    }
+
     private void ApplyCheckResult(
         UpdateCheckResult result)
     {
@@ -819,6 +831,21 @@ public sealed class UpdateViewModel :
                     UserMessage.Information(
                         "Microsoft Store manages updates for this installation.");
 
+                break;
+
+            case UpdateCheckStatus.UnsupportedInstallation:
+                OperationState = AsyncOperationState.Succeeded("Updates are not available for this installation type.");
+                Message = UserMessage.Information(result.Installation.Channel switch
+                {
+                    CoreInstallChannel.DevelopmentPackage => "This is a development package. Install a newer build from Visual Studio.",
+                    CoreInstallChannel.SideloadedPackage => "This package was installed outside Microsoft Store. Install a newer package from its original source.",
+                    _ => "This unpackaged copy has no MSI installation. Use release history to get a newer version."
+                });
+                break;
+
+            case UpdateCheckStatus.FeedUnavailable:
+                OperationState = AsyncOperationState.Failed("The update feed is not published.");
+                Message = UserMessage.Warning("No MSI update feed is currently published. This does not confirm that CopyGIF is up to date.");
                 break;
 
             case UpdateCheckStatus.NotDue:

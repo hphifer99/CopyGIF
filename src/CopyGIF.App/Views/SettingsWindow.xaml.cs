@@ -81,6 +81,9 @@ public sealed partial class SettingsWindow :
     public event PropertyChangedEventHandler?
         PropertyChanged;
 
+    public Func<Task<bool>>? CanCloseAsync { get; set; }
+    public Func<bool>? IsInteractionProtected { get; set; }
+
     public FrameworkElement RootElement =>
         WindowRoot;
 

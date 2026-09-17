@@ -19,6 +19,8 @@
             AutomationProperties.Name="Settings categories"
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="False"
+            HorizontalContentAlignment="Stretch"
+            VerticalContentAlignment="Stretch"
             PaneDisplayMode="Auto"
             OpenPaneLength="200"
             ExpandedModeThresholdWidth="820"
@@ -85,6 +87,8 @@
 				</Grid.RowDefinitions>
 
 				<ScrollViewer
+                    HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Top"
                     HorizontalScrollBarVisibility="Disabled"
                     HorizontalScrollMode="Disabled"
                     VerticalScrollBarVisibility="Auto"
@@ -104,7 +108,7 @@
 
 							<TextBlock
                                 Style="{StaticResource CopyGifPageSubtitleTextStyle}"
-                                Text="Select Save to apply your changes." />
+                                Text="Apply saves changes from every category. Close returns to GIF search." />
 
 						</StackPanel>
 
@@ -150,16 +154,16 @@
 					<Button
                         x:Name="CancelButton"
                         Grid.Column="2"
-                        AutomationProperties.Name="Cancel settings changes"
+                        AutomationProperties.Name="Close settings"
                         Command="{Binding CancelCommand}"
-                        Content="Cancel" />
+                        Content="Close" />
 
 					<Button
                         x:Name="SaveButton"
                         Grid.Column="3"
-                        AutomationProperties.Name="Save settings"
+                        AutomationProperties.Name="Apply all settings"
                         Command="{Binding SaveCommand}"
-                        Content="Save"
+                        Content="Apply"
                         Style="{StaticResource CopyGifPrimaryButtonStyle}" />
 
 				</Grid>

@@ -304,7 +304,7 @@ public sealed class UpdateCoordinator :
                 settings.Updates.Mode,
                 installation);
 
-        if (!settings.Updates.CheckForUpdates)
+        if (!force && !settings.Updates.CheckForUpdates)
         {
             return CreateCheckResult(
                 UpdateCheckStatus.Disabled,
@@ -317,7 +317,8 @@ public sealed class UpdateCoordinator :
                 installation))
         {
             return CreateCheckResult(
-                UpdateCheckStatus.ManagedByStore,
+                installation.Channel == InstallChannel.MicrosoftStore
+                    ? UpdateCheckStatus.ManagedByStore : UpdateCheckStatus.UnsupportedInstallation,
                 installation,
                 state,
                 resolvedMode);
@@ -344,6 +345,9 @@ public sealed class UpdateCoordinator :
                     StableChannel,
                     cancellationToken)
                 .ConfigureAwait(false);
+
+        if (manifest is null)
+            return CreateCheckResult(UpdateCheckStatus.FeedUnavailable, installation, state, resolvedMode);
 
         UpdateCandidate? candidate = null;
 

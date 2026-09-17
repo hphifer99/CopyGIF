@@ -12,6 +12,12 @@ public interface ISettingsCoordinator
         AppSettings settings,
         CancellationToken cancellationToken = default);
 
+    async Task<SettingsSaveResult> UpdateAsync(Func<AppSettings, AppSettings> update,
+        CancellationToken cancellationToken = default)
+    {
+        return await SaveAsync(update(await LoadAsync(cancellationToken)), cancellationToken);
+    }
+
     Task<SettingsSaveResult> RestoreDefaultsAsync(
         CancellationToken cancellationToken = default);
 

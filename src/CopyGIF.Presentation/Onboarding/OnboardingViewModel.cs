@@ -74,6 +74,25 @@ public sealed class OnboardingViewModel :
     public IAsyncRelayCommand LoadCommand
     { get; }
 
+    public Func<string, string, CancellationToken, Task<CredentialValidationResult>>? CompleteProvider { get; set; }
+    public Func<Uri, CancellationToken, Task<bool>>? OpenProviderHelp { get; set; }
+    public IReadOnlyList<CopyGIF.Presentation.Settings.ProviderChoice> Providers { get; } =
+        [new("klipy", "KLIPY"), new("giphy", "GIPHY")];
+    private string _selectedProviderId = "klipy";
+    public string SelectedProviderId
+    {
+        get => _selectedProviderId;
+        set
+        {
+            if (SetProperty(ref _selectedProviderId, value))
+            {
+                ProviderId = value;
+                ProviderDisplayName = value == "giphy" ? "GIPHY" : "KLIPY";
+                CredentialHelpUri = new Uri(value == "giphy" ? "https://developers.giphy.com/dashboard/" : "https://partner.klipy.com/api-keys");
+            }
+        }
+    }
+
     public IAsyncRelayCommand CompleteCommand
     { get; }
 
@@ -353,11 +372,9 @@ public sealed class OnboardingViewModel :
 
         try
         {
-            CredentialValidationResult result =
-                await _onboardingCoordinator
-                    .CompleteAsync(
-                        credential,
-                        linkedCancellation.Token);
+            CredentialValidationResult result = CompleteProvider is null
+                ? await _onboardingCoordinator.CompleteAsync(credential, linkedCancellation.Token)
+                : await CompleteProvider(SelectedProviderId, credential, linkedCancellation.Token);
 
             if (!result.IsValid)
             {
@@ -432,9 +449,9 @@ public sealed class OnboardingViewModel :
         try
         {
             bool opened =
-                await _onboardingCoordinator
-                    .OpenCredentialHelpAsync(
-                        linkedCancellation.Token);
+                (OpenProviderHelp is not null && CredentialHelpUri is not null
+                    ? await OpenProviderHelp(CredentialHelpUri, linkedCancellation.Token)
+                    : await _onboardingCoordinator.OpenCredentialHelpAsync(linkedCancellation.Token));
 
             if (opened)
             {
@@ -490,6 +507,7 @@ public sealed class OnboardingViewModel :
         ArgumentNullException.ThrowIfNull(
             state);
 
+        SelectedProviderId = state.ProviderId;
         ProviderId =
             state.ProviderId;
 

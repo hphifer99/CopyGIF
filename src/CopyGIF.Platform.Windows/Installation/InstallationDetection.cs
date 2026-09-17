@@ -24,6 +24,8 @@ internal static class CopyGifRegistry
 internal interface IPackageIdentityDetector
 {
     bool HasPackageIdentity();
+    CopyGIF.Core.Models.InstallChannel GetPackageChannel() =>
+        HasPackageIdentity() ? CopyGIF.Core.Models.InstallChannel.DevelopmentPackage : CopyGIF.Core.Models.InstallChannel.None;
 }
 
 internal interface IRegistryValueReader

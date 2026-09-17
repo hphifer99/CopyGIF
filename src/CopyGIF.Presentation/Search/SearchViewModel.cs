@@ -5,6 +5,7 @@ using CopyGIF.Application.Library;
 using CopyGIF.Application.Media;
 using CopyGIF.Application.Search;
 using CopyGIF.Core.Models;
+using CopyGIF.Core.Settings;
 using CopyGIF.Presentation.Common;
 
 namespace CopyGIF.Presentation.Search;
@@ -68,6 +69,40 @@ public sealed class SearchViewModel :
     private bool _reducedMotion;
 
     private bool _disposed;
+    private AppSettings _settings = new();
+    private GifSearchPage? _trendingSnapshot;
+    private Task? _emptyQueryOperation;
+    public bool AutoLoadMoreResults => _settings.Search.AutoLoadMoreResults;
+    public string ActiveProviderId => _settings.Providers.ActiveProviderId;
+    public bool IsGiphy => ActiveProviderId == "giphy";
+    public string AttributionText => ActiveProviderId == "giphy" ? "Powered By GIPHY" : "Powered by KLIPY";
+    public double TrendingScrollOffset { get; set; }
+
+    public void Configure(AppSettings settings)
+    {
+        bool providerChanged = !string.Equals(ActiveProviderId, settings.Providers.ActiveProviderId, StringComparison.OrdinalIgnoreCase);
+        bool emptyModeChanged = _settings.Search.ShowTrendingWhenEmpty != settings.Search.ShowTrendingWhenEmpty;
+        bool pageSizeChanged = _settings.Search.ResultsPerSearch != settings.Search.ResultsPerSearch;
+        _settings = settings;
+        OnPropertyChanged(nameof(AutoLoadMoreResults));
+        OnPropertyChanged(nameof(ActiveProviderId));
+        OnPropertyChanged(nameof(AttributionText));
+        OnPropertyChanged(nameof(IsGiphy));
+        if (providerChanged || pageSizeChanged) { _trendingSnapshot = null; TrendingScrollOffset = 0; }
+        if (providerChanged)
+        {
+            _operationCancellation?.Cancel();
+            _operationCancellation = null;
+            ClearResults();
+            _continuationToken = null;
+            OperationState = AsyncOperationState.Idle;
+            Mode = GifSearchMode.None;
+            if (string.IsNullOrWhiteSpace(Query)) ClearQuery();
+            else SearchCommand.Execute(null);
+        }
+        else if (emptyModeChanged && string.IsNullOrWhiteSpace(Query)) ClearQuery();
+    }
+
 
     public SearchViewModel(
         IGifSearchCoordinator searchCoordinator,
@@ -222,7 +257,7 @@ public sealed class SearchViewModel :
                 _operationCancellation?.Cancel();
                 CancelSuggestionOperation();
 
-                if (normalized.Length == 0)
+                if (string.IsNullOrWhiteSpace(normalized))
                 {
                     ClearQuery();
                 }
@@ -460,7 +495,6 @@ public sealed class SearchViewModel :
         _continuationToken =
             null;
 
-        ClearResults();
 
         NotifyPaginationState();
 
@@ -487,6 +521,7 @@ public sealed class SearchViewModel :
                 return;
             }
 
+            ClearResults();
             ApplyPage(
                 page,
                 favorites,
@@ -549,7 +584,8 @@ public sealed class SearchViewModel :
         CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
-
+        if (!string.IsNullOrWhiteSpace(Query)) return;
+        if (!_settings.Search.ShowTrendingWhenEmpty) { ClearResults(); return; }
         CancellationTokenSource operation =
             BeginOperation(
                 "Loading Trending GIFs...",
@@ -570,10 +606,9 @@ public sealed class SearchViewModel :
 
         try
         {
-            GifSearchPage page =
-                await _searchCoordinator
-                    .TrendingAsync(
-                        operation.Token);
+            GifSearchPage page = ActiveProviderId == "klipy" && _trendingSnapshot is not null
+                ? _trendingSnapshot
+                : await _searchCoordinator.TrendingAsync(operation.Token);
 
             HashSet<string> favorites =
                 await LoadFavoriteIdentitiesAsync(
@@ -928,33 +963,30 @@ public sealed class SearchViewModel :
 
     private void ClearQuery()
     {
+        if (string.IsNullOrWhiteSpace(_query) && _settings.Search.ShowTrendingWhenEmpty &&
+            Mode == GifSearchMode.Trending && (IsBusy || HasResults)) return;
         CancellationTokenSource? previous = _operationCancellation;
         _operationCancellation = null;
         previous?.Cancel();
         CancelSuggestionOperation();
-
-        Query = string.Empty;
-
-        _activeQuery =
-            null;
-
-        _continuationToken =
-            null;
-
-        Mode =
-            GifSearchMode.None;
-
+        SetProperty(ref _query, string.Empty, nameof(Query));
+        OnPropertyChanged(nameof(CanSubmitQuery));
+        _activeQuery = null;
+        _continuationToken = null;
         Suggestions.Clear();
-
         ClearResults();
-
-        OperationState =
-            AsyncOperationState.Idle;
-
-        Message =
-            null;
-
+        Mode = GifSearchMode.None;
+        OperationState = AsyncOperationState.Idle;
+        Message = null;
         NotifyPaginationState();
+        NotifyCommandStates();
+        if (_settings.Search.ShowTrendingWhenEmpty) _emptyQueryOperation = RestoreEmptyQueryAsync();
+    }
+
+    private async Task RestoreEmptyQueryAsync()
+    {
+        // TrendingAsync owns request cancellation and reports failures in the view model.
+        await TrendingAsync(CancellationToken.None);
     }
 
     private CancellationTokenSource BeginOperation(
@@ -1058,7 +1090,7 @@ public sealed class SearchViewModel :
         foreach (GifItem item
                  in page.Items)
         {
-            if (!_resultIdentities.Add(
+            if (ActiveProviderId != "giphy" && !_resultIdentities.Add(
                     item.Identity))
             {
                 continue;
@@ -1076,8 +1108,14 @@ public sealed class SearchViewModel :
                     ReducedMotion));
         }
 
-        _continuationToken =
-            page.ContinuationToken;
+        _continuationToken = page.ContinuationToken;
+        if (Mode == GifSearchMode.Trending && ActiveProviderId == "klipy")
+            _trendingSnapshot = new GifSearchPage
+            {
+                Items = Results.Select(card => card.Item).ToArray(),
+                ContinuationToken = _continuationToken,
+                TotalCount = page.TotalCount
+            };
 
         NotifyPaginationState();
     }

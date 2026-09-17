@@ -74,6 +74,9 @@ public static class ServiceCollectionExtensions
             IApplicationStartupCoordinator,
             ApplicationStartupCoordinator>();
 
+        services.AddSingleton<EffectiveSettings>();
+        services.AddTransient<SettingsEditSession>();
+
         return services;
     }
 }

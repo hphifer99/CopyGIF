@@ -3,6 +3,7 @@ using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 using CopyGIF.Core.Policies;
 using CopyGIF.Infrastructure.Klipy;
+using CopyGIF.Infrastructure.Giphy;
 using CopyGIF.Infrastructure.Media;
 using CopyGIF.Infrastructure.Migration;
 using CopyGIF.Infrastructure.Storage;
@@ -137,7 +138,8 @@ public static class ServiceCollectionExtensions
                         .GetRequiredService<
                             IHostAddressResolver>(),
                     [
-                        "static.klipy.com"
+                        "static.klipy.com", "media.giphy.com", "media0.giphy.com",
+                        "media1.giphy.com", "media2.giphy.com", "media3.giphy.com", "media4.giphy.com"
                     ]));
 
         services
@@ -288,6 +290,23 @@ public static class ServiceCollectionExtensions
                     .GetRequiredService<
                         HttpUpdatePackageService>());
 
+        services.AddSingleton(new ProviderDescriptor
+        {
+            Id = GiphyGifProvider.ProviderId, DisplayName = "GIPHY", RequiresCredential = true,
+            Capabilities = ProviderCapabilities.Search | ProviderCapabilities.Trending |
+                ProviderCapabilities.Pagination | ProviderCapabilities.CredentialValidation,
+            AttributionText = "Powered By GIPHY", AttributionUri = new Uri("https://giphy.com/")
+        });
+        services.AddHttpClient<GiphyGifProvider>(client => client.Timeout = TimeSpan.FromSeconds(25))
+            .RemoveAllLoggers()
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false, ConnectTimeout = TimeSpan.FromSeconds(10),
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+                MaxResponseHeadersLength = 32
+            });
+        services.AddTransient<IGifProvider>(provider => provider.GetRequiredService<GiphyGifProvider>());
+        services.AddTransient<IGifProviderCredentialManager, GiphyCredentialManager>();
         return services;
     }
 }

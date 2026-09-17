@@ -74,6 +74,8 @@ public sealed class LibrarySettingsViewModel :
                 CanCancel);
     }
 
+    public Func<string?, CancellationToken, Task<string?>>? PickFolder { get; set; }
+
     public IAsyncRelayCommand LoadCommand
     { get; }
 
@@ -480,6 +482,19 @@ public sealed class LibrarySettingsViewModel :
         CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
+        if (PickFolder is not null)
+        {
+            try
+            {
+                string? path = await PickFolder(CustomStorageRoot, cancellationToken);
+                if (path is not null) CustomStorageRoot = path;
+            }
+            catch (Exception)
+            {
+                Message = UserMessage.Error("The folder dialog could not be opened. Your storage location has not changed.", "folder_picker_failed");
+            }
+            return;
+        }
 
         CancellationTokenSource operation =
             BeginOperation(
@@ -579,6 +594,7 @@ public sealed class LibrarySettingsViewModel :
         CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
+        if (PickFolder is not null) { CustomStorageRoot = null; return; }
 
         if (!HasCustomStorageRoot)
         {
@@ -684,7 +700,7 @@ public sealed class LibrarySettingsViewModel :
         }
     }
 
-    private void ApplySettings(
+    public void ApplySettings(
         LibrarySettings settings)
     {
         ArgumentNullException.ThrowIfNull(

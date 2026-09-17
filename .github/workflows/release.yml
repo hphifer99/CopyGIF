@@ -1,92 +1,84 @@
 name: Release
-
 on:
   push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing semantic version tag, such as v1.0.0
+        description: Existing version tag, such as v2.0.0
         required: true
         type: string
-
 permissions:
   contents: write
-
 concurrency:
   group: release-${{ github.ref }}-${{ inputs.tag }}
   cancel-in-progress: false
-
 jobs:
   release:
-    name: Build and publish
+    name: Build signed WinUI MSI and draft release
     runs-on: windows-latest
-    timeout-minutes: 20
-
+    timeout-minutes: 45
     steps:
       - name: Resolve release tag
         id: release_tag
         shell: pwsh
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+          REF_TAG: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-              "${{ inputs.tag }}"
-          }
-          else {
-              "${{ github.ref_name }}"
-          }
-
-          if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
-              throw "Release tag must use the form v1.2.3."
-          }
-
+          $tag = if ($env:EVENT_NAME -eq 'workflow_dispatch') { $env:REQUESTED_TAG } else { $env:REF_TAG }
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw 'Use a tag such as v2.0.0.' }
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "version=$($tag.Substring(1))" >> $env:GITHUB_OUTPUT
-
       - name: Check out tagged source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ steps.release_tag.outputs.tag }}
           persist-credentials: false
-
-      - name: Install NuGet
-        uses: NuGet/setup-nuget@b26b823c478ee115be5c9403e62c90b0bf943843 # v3.1.0
-        with:
-          nuget-version: 7.9.0
-
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
-        with:
-          msbuild-architecture: x64
-
-      - name: Build and package tagged version
+      - name: Install the repository SDK
         shell: pwsh
-        run: >-
-          .\scripts\Build-Release.ps1
-          -Version "${{ steps.release_tag.outputs.version }}"
-
-      - name: Publish GitHub Release
+        run: |
+          $sdkVersion = (Get-Content global.json -Raw | ConvertFrom-Json).sdk.version
+          Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -OutFile "$env:RUNNER_TEMP\dotnet-install.ps1"
+          & "$env:RUNNER_TEMP\dotnet-install.ps1" -Version $sdkVersion -InstallDir "$env:RUNNER_TEMP\copygif-dotnet"
+          if ($LASTEXITCODE -ne 0) { throw 'SDK installation failed.' }
+          "$env:RUNNER_TEMP\copygif-dotnet" >> $env:GITHUB_PATH
+          "DOTNET_ROOT=$env:RUNNER_TEMP\copygif-dotnet" >> $env:GITHUB_ENV
+      - name: Build and sign
+        shell: pwsh
+        env:
+          PFX_BASE64: ${{ secrets.COPYGIF_SIGNING_PFX_BASE64 }}
+          PFX_PASSWORD: ${{ secrets.COPYGIF_SIGNING_PASSWORD }}
+          RELEASE_VERSION: ${{ steps.release_tag.outputs.version }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:PFX_BASE64)) { throw 'Configure COPYGIF_SIGNING_PFX_BASE64 and COPYGIF_SIGNING_PASSWORD before releasing.' }
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'copygif-signing.pfx'
+          $certificate = $null
+          try {
+              [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:PFX_BASE64))
+              $password = ConvertTo-SecureString $env:PFX_PASSWORD -AsPlainText -Force
+              $certificate = Import-PfxCertificate -FilePath $pfxPath -Password $password -CertStoreLocation Cert:\CurrentUser\My
+              .\scripts\Build-Release.ps1 -Version $env:RELEASE_VERSION -SigningThumbprint $certificate.Thumbprint
+          }
+          finally {
+              Remove-Item -LiteralPath $pfxPath -Force -ErrorAction SilentlyContinue
+              if ($null -ne $certificate) { Remove-Item -LiteralPath $certificate.PSPath -Force }
+          }
+      - name: Create reviewable draft release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release_tag.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release_tag.outputs.version }}
         run: |
-          $tag = "${{ steps.release_tag.outputs.tag }}"
-          $version = "${{ steps.release_tag.outputs.version }}"
-          $zip = ".\artifacts\CopyGIF-win-x64.zip"
-          $checksum = ".\artifacts\CopyGIF-win-x64.sha256"
-
-          gh release view $tag 2>$null
-
+          $msi = ".\artifacts\CopyGIF-$env:RELEASE_VERSION-win-x64.msi"
+          $existing = gh release view $env:RELEASE_TAG --json isDraft 2>$null
           if ($LASTEXITCODE -eq 0) {
-              gh release upload $tag $zip $checksum --clobber
+              if (-not ($existing | ConvertFrom-Json).isDraft) { throw 'This release is already public. Create a new version instead of replacing shipped assets.' }
+              gh release upload $env:RELEASE_TAG $msi .\artifacts\CopyGIF-update.json .\artifacts\CopyGIF-win-x64.sha256 --clobber
+          } else {
+              gh release create $env:RELEASE_TAG $msi .\artifacts\CopyGIF-update.json .\artifacts\CopyGIF-win-x64.sha256 `
+                  --verify-tag --draft --generate-notes --title "CopyGif $env:RELEASE_VERSION"
           }
-          else {
-              gh release create $tag $zip $checksum `
-                  --verify-tag `
-                  --generate-notes `
-                  --title "CopyGIF $version"
-          }
-
-          if ($LASTEXITCODE -ne 0) {
-              throw "GitHub Release publication failed with exit code $LASTEXITCODE."
-          }
+          if ($LASTEXITCODE -ne 0) { throw 'Creating the draft release failed.' }

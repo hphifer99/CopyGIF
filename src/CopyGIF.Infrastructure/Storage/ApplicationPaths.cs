@@ -6,6 +6,11 @@ namespace CopyGIF.Infrastructure.Storage;
 public sealed class ApplicationPaths :
     IApplicationPaths
 {
+    // A platform may stage clipboard files outside the library root so that other
+    // applications can open the path CopyGIF publishes on the clipboard.
+    private readonly string?
+        _clipboardCacheDirectory;
+
     public ApplicationPaths()
         : this(
             Path.Combine(
@@ -18,6 +23,15 @@ public sealed class ApplicationPaths :
 
     public ApplicationPaths(
         string rootDirectory)
+        : this(
+            rootDirectory,
+            clipboardCacheDirectory: null)
+    {
+    }
+
+    public ApplicationPaths(
+        string rootDirectory,
+        string? clipboardCacheDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(
             rootDirectory);
@@ -26,6 +40,14 @@ public sealed class ApplicationPaths :
             Path.TrimEndingDirectorySeparator(
                 Path.GetFullPath(
                     rootDirectory));
+
+        _clipboardCacheDirectory =
+            string.IsNullOrWhiteSpace(
+                clipboardCacheDirectory)
+                ? null
+                : Path.TrimEndingDirectorySeparator(
+                    Path.GetFullPath(
+                        clipboardCacheDirectory));
     }
 
     public string RootDirectory { get; }
@@ -91,6 +113,7 @@ public sealed class ApplicationPaths :
             StoragePolicy.PreviewCacheDirectoryName);
 
     public string ClipboardCacheDirectory =>
+        _clipboardCacheDirectory ??
         Path.Combine(
             CacheDirectory,
             StoragePolicy.ClipboardCacheDirectoryName);

@@ -332,15 +332,21 @@
                     <Border Style="{StaticResource CopyGifSettingsSectionBorderStyle}">
                         <StackPanel Spacing="16">
                             <TextBlock Style="{StaticResource CopyGifSectionTitleTextStyle}" Text="Quality" />
-                            <ComboBox Header="Copy quality" AutomationProperties.Name="Copy quality"
+                            <ComboBox AutomationProperties.Name="Copy quality"
                                 ItemsSource="{Binding GifQualities}" ItemTemplate="{StaticResource SettingChoiceTemplate}"
-                                SelectedItem="{Binding CopyQuality, Mode=TwoWay}" ToolTipService.ToolTip="Size and detail of GIFs copied to other apps." />
-                            <ComboBox Header="Save quality" AutomationProperties.Name="Save quality"
+                                SelectedItem="{Binding CopyQuality, Mode=TwoWay}">
+                                <ComboBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Copy quality" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Copy quality information" AutomationProperties.HelpText="Chooses which GIF the provider supplies for copying to other apps. Minimum is the smallest file and Maximum is the original. The nearest available size is used when a provider omits one." ToolTipService.ToolTip="Chooses which GIF the provider supplies for copying to other apps. Minimum is the smallest file and Maximum is the original. The nearest available size is used when a provider omits one." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ComboBox.Header>
+                            </ComboBox>
+                            <ComboBox AutomationProperties.Name="Save quality"
                                 ItemsSource="{Binding GifQualities}" ItemTemplate="{StaticResource SettingChoiceTemplate}"
-                                SelectedItem="{Binding SaveQuality, Mode=TwoWay}" ToolTipService.ToolTip="Size and detail of new local Favorites and Recents. Existing files are kept." />
-                            <ComboBox Header="Display quality" AutomationProperties.Name="Display quality"
+                                SelectedItem="{Binding SaveQuality, Mode=TwoWay}">
+                                <ComboBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Save quality" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Save quality information" AutomationProperties.HelpText="Chooses which GIF is stored in Favorites and Recents. It applies only to files saved from now on, so files already saved keep the quality they were saved at." ToolTipService.ToolTip="Chooses which GIF is stored in Favorites and Recents. It applies only to files saved from now on, so files already saved keep the quality they were saved at." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ComboBox.Header>
+                            </ComboBox>
+                            <ComboBox AutomationProperties.Name="Display quality"
                                 ItemsSource="{Binding GifQualities}" ItemTemplate="{StaticResource SettingChoiceTemplate}"
-                                SelectedItem="{Binding DisplayQuality, Mode=TwoWay}" ToolTipService.ToolTip="Detail shown inside CopyGIF. Lower settings use less image memory." />
+                                SelectedItem="{Binding DisplayQuality, Mode=TwoWay}">
+                                <ComboBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Display quality" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Display quality information" AutomationProperties.HelpText="Sets how large each thumbnail is decoded inside CopyGIF, from 128 pixels at Minimum to 512 at Maximum. It changes image memory only. What is copied and what is saved are unaffected." ToolTipService.ToolTip="Sets how large each thumbnail is decoded inside CopyGIF, from 128 pixels at Minimum to 512 at Maximum. It changes image memory only. What is copied and what is saved are unaffected." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ComboBox.Header>
+                            </ComboBox>
                         </StackPanel>
                     </Border>
 
@@ -415,8 +421,8 @@
                                 Text="Storage location" />
                             <Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" HorizontalAlignment="Left"
                                 AutomationProperties.Name="Storage location information"
-                                AutomationProperties.HelpText="Apply moves saved library files to the selected folder. Discard keeps the current location."
-                                ToolTipService.ToolTip="Apply moves saved library files to the selected folder. Discard keeps the current location." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button>
+                                AutomationProperties.HelpText="Moves saved library files to the selected folder."
+                                ToolTipService.ToolTip="Moves saved library files to the selected folder." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button>
 
                             <TextBlock
                                 AutomationProperties.Name="Current library storage location"
@@ -436,6 +442,53 @@
                                     AutomationProperties.Name="Use default library storage folder"
                                     Command="{Binding ResetStorageRootCommand}"
                                     Content="Use default" />
+
+                            </StackPanel>
+
+                        </StackPanel>
+
+                    </Border>
+
+                    <Border
+                        Style="{StaticResource CopyGifSettingsSectionBorderStyle}">
+
+                        <StackPanel Spacing="12">
+
+                            <TextBlock
+                                Style="{StaticResource CopyGifSectionTitleTextStyle}"
+                                Text="Logs and staged files" />
+                            <Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" HorizontalAlignment="Left"
+                                AutomationProperties.Name="Logs and staged files information"
+                                AutomationProperties.HelpText="These are the folders this build is really using. A packaged build stores them inside its own package folder, not where the plain AppData path would suggest."
+                                ToolTipService.ToolTip="These are the folders this build is really using. A packaged build stores them inside its own package folder, not where the plain AppData path would suggest." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button>
+
+                            <TextBlock
+                                AutomationProperties.Name="Current log folder"
+                                IsTextSelectionEnabled="True"
+                                TextWrapping="Wrap"
+                                Style="{StaticResource CopyGifStatusTextStyle}"
+                                Text="{Binding LogsLocationText}" />
+
+                            <TextBlock
+                                AutomationProperties.Name="Current clipboard staging folder"
+                                IsTextSelectionEnabled="True"
+                                TextWrapping="Wrap"
+                                Style="{StaticResource CopyGifStatusTextStyle}"
+                                Text="{Binding ClipboardLocationText}" />
+
+                            <StackPanel
+                                Orientation="Vertical"
+                                Spacing="8">
+
+                                <Button
+                                    AutomationProperties.Name="Open log folder"
+                                    Command="{Binding OpenLogsFolderCommand}"
+                                    Content="Open logs folder" />
+
+                                <Button
+                                    AutomationProperties.Name="Open clipboard staging folder"
+                                    Command="{Binding OpenClipboardFolderCommand}"
+                                    Content="Open clipboard folder" />
 
                             </StackPanel>
 

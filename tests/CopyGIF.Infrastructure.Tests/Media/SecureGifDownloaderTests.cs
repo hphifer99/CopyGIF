@@ -102,6 +102,53 @@ public sealed class SecureGifDownloaderTests
     }
 
     [TestMethod]
+    public async Task DownloadAsync_ClipboardStagingOutsideLibraryRoot_IsAccepted()
+    {
+        byte[] gif =
+            CreateValidGif();
+
+        string stagingDirectory =
+            Path.Combine(
+                _testDirectory,
+                "Staging",
+                "Clipboard");
+
+        TestHttpMessageHandler handler =
+            new(
+                _ => GifResponse(
+                    gif));
+
+        using TestContext context =
+            CreateContext(
+                handler,
+                customLibraryRoot: null,
+                clipboardStagingDirectory: stagingDirectory);
+
+        DownloadedGif result =
+            await context.Downloader
+                .DownloadAsync(
+                    CreateItem(),
+                    GifDownloadPurpose.Clipboard);
+
+        Assert.IsTrue(
+            File.Exists(
+                result.FilePath));
+
+        StringAssert.StartsWith(
+            result.FilePath,
+            stagingDirectory);
+
+        // The cleanup pass validates the same owned root, so it must accept it too.
+        await context.Downloader
+            .CleanupClipboardAsync(
+                result.FilePath);
+
+        Assert.IsTrue(
+            File.Exists(
+                result.FilePath));
+    }
+
+    [TestMethod]
     public async Task CleanupClipboardAsync_ExpiresOldFileAndPreservesActiveClipboardFile()
     {
         using TestContext context = CreateContext(new TestHttpMessageHandler(
@@ -394,13 +441,15 @@ public sealed class SecureGifDownloaderTests
 
     private TestContext CreateContext(
         HttpMessageHandler handler,
-        string? customLibraryRoot = null)
+        string? customLibraryRoot = null,
+        string? clipboardStagingDirectory = null)
     {
         ApplicationPaths paths =
             new(
                 Path.Combine(
                     _testDirectory,
-                    "Profile"));
+                    "Profile"),
+                clipboardStagingDirectory);
 
         FakeSettingsStore settingsStore =
             new(

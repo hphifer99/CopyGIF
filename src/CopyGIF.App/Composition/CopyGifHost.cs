@@ -10,9 +10,12 @@ using CopyGIF.App.Views;
 using CopyGIF.App.Views.Pages;
 using CopyGIF.Core.Models;
 using CopyGIF.Core.Contracts;
+using CopyGIF.Core.Policies;
 using CopyGIF.Core.Settings;
 using CopyGIF.Infrastructure;
+using CopyGIF.Infrastructure.Storage;
 using CopyGIF.Platform.Windows;
+using CopyGIF.Platform.Windows.Storage;
 using CopyGIF.Presentation;
 using CopyGIF.Presentation.Common;
 using CopyGIF.Presentation.Main;
@@ -131,7 +134,19 @@ public sealed class CopyGifHost :
 
         try
         {
-            RepairLog.Configure(serviceProvider.GetRequiredService<CopyGIF.Core.Contracts.IApplicationPaths>().LogsDirectory);
+            IApplicationPaths paths =
+                serviceProvider
+                    .GetRequiredService<
+                        IApplicationPaths>();
+
+            RepairLog.Configure(paths.LogsDirectory);
+
+            // The first line of every run records where this build actually reads and
+            // writes, so the folders can be found without guessing at the install shape.
+            RepairDiagnostics.RecordContext(
+                "runtime-context",
+                $"{WindowsStagingPaths.Describe()} root={paths.RootDirectory} logs={paths.LogsDirectory}");
+
             return new CopyGifHost(
                 serviceProvider);
         }
@@ -172,6 +187,19 @@ public sealed class CopyGifHost :
 
         services
             .AddCopyGifPresentation();
+
+        // Clipboard files have to live where another application can open them, which
+        // the default library root under AppData does not guarantee on a packaged build.
+        services.RemoveAll<IApplicationPaths>();
+        services.AddSingleton<IApplicationPaths>(
+            _ =>
+                new ApplicationPaths(
+                    Path.Combine(
+                        Environment.GetFolderPath(
+                            Environment.SpecialFolder
+                                .LocalApplicationData),
+                        StoragePolicy.LibraryRootDirectoryName),
+                    WindowsStagingPaths.ClipboardStagingDirectory));
 
         services.RemoveAll<IClipboardService>();
         services.AddSingleton<IClipboardService, WinUiClipboardService>();
@@ -539,7 +567,8 @@ public sealed class CopyGifHost :
             services.GetRequiredService<SettingsEditSession>(),
             services.GetRequiredService<ShellRuntimeState>());
         window.Closed += (_, _) => controller.Dispose();
-        window.CancelCommand = new RelayCommand(window.Close);
+        // WindowManager owns CancelCommand so that Close runs the same resolve and
+        // reopen path as the title bar close button.
         bool loaded = false;
         window.Activated += async (_, _) =>
         {

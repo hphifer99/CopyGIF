@@ -12,4 +12,12 @@ public static class RepairDiagnostics
         Trace.WriteLine(message);
         try { Sink?.Invoke(message); } catch { /* Diagnostics must never fail the user action. */ }
     }
+
+    public static void RecordContext(string stage, string detail)
+    {
+        // Callers pass fixed stage names and local folder paths, never credential values.
+        string message = $"{DateTimeOffset.UtcNow:O} CopyGIF stage={stage} {detail}";
+        Trace.WriteLine(message);
+        try { Sink?.Invoke(message); } catch { /* Diagnostics must never fail the user action. */ }
+    }
 }

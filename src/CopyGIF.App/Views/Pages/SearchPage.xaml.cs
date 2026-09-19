@@ -326,6 +326,14 @@ public sealed partial class SearchPage :
             ClearHistoryCommand.Execute(null);
     }
 
+    private void ReturnToTop_Click(object sender, RoutedEventArgs args)
+    {
+        // Scrolling only. The loaded results and the provider request count are untouched.
+        _ = sender;
+        _ = args;
+        _behavior.ScrollToTop();
+    }
+
     public void FocusSearchBox()
     {
         PageSearchHeader.FocusSearchBox();

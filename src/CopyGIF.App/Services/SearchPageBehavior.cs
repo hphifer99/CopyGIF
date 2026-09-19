@@ -79,6 +79,13 @@ internal sealed class SearchPageBehavior
             _paginationOffset is null)
             RestoreTrendingScroll();
     }
+    public void ScrollToTop()
+    {
+        // A view change only. Nothing here touches the search commands or the provider.
+        _scrollViewer ??= FindScrollViewer(_grid);
+        _scrollViewer?.ChangeView(null, 0, null, false);
+    }
+
     private void RefreshAttribution()
     {
         bool giphy = _observedModel?.IsGiphy == true;

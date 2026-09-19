@@ -43,6 +43,7 @@ internal sealed class SettingsWindowController : IDisposable
             }
             finally { _dialogOpen = false; }
         };
+        model.Library.OpenFolder = path => Task.FromResult(ShellFolderLauncher.TryOpen(path));
         foreach (INotifyPropertyChanged section in Sections()) section.PropertyChanged += Changed;
         session.Changed += SessionChanged;
     }
@@ -181,6 +182,7 @@ internal sealed class SettingsWindowController : IDisposable
         _session.Changed -= SessionChanged;
         _session.Close();
         _model.Library.PickFolder = null;
+        _model.Library.OpenFolder = null;
     }
 
     private void CancelSuccessStatus()

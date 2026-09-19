@@ -261,7 +261,7 @@ public sealed class SecureGifDownloader :
         await _clipboardCleanupGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            _pathGuard.EnsureSafeDirectory(_paths.CacheDirectory, root);
+            _pathGuard.EnsureSafeDirectory(ClipboardOwnedRoot, root);
             var candidates = new List<FileInfo>();
             foreach (string path in Directory.EnumerateFiles(root, "clipboard-*.gif"))
             {
@@ -296,6 +296,17 @@ public sealed class SecureGifDownloader :
         finally { _clipboardCleanupGate.Release(); }
     }
 
+    // The clipboard staging folder can sit outside the library root so that another
+    // application can open the file CopyGIF publishes on the clipboard. Its own parent
+    // is the owned root in that case, and the default layout is unchanged because the
+    // parent of Cache\Clipboard is Cache.
+    private string ClipboardOwnedRoot =>
+        Path.GetDirectoryName(
+            Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(
+                    _paths.ClipboardCacheDirectory))) ??
+        _paths.ClipboardCacheDirectory;
+
     private async Task<DownloadDestination>
         GetDestinationAsync(
             GifDownloadPurpose purpose,
@@ -305,7 +316,7 @@ public sealed class SecureGifDownloader :
             GifDownloadPurpose.Clipboard)
         {
             return new DownloadDestination(
-                _paths.CacheDirectory,
+                ClipboardOwnedRoot,
                 _paths.ClipboardCacheDirectory);
         }
 

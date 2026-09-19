@@ -287,4 +287,73 @@ public sealed class ApplicationPathsTests
                 paths.GetRecentsDirectory(
                     customRoot)));
     }
+
+    [TestMethod]
+    public void ClipboardStagingOverride_ReplacesOnlyTheClipboardFolder()
+    {
+        string stagingRoot =
+            Path.Combine(
+                _testDirectory,
+                "Staging");
+
+        ApplicationPaths paths =
+            new(
+                _testDirectory,
+                stagingRoot);
+
+        Assert.AreEqual(
+            Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(
+                    stagingRoot)),
+            paths.ClipboardCacheDirectory);
+
+        Assert.AreEqual(
+            Path.Combine(
+                paths.CacheDirectory,
+                StoragePolicy.ThumbnailCacheDirectoryName),
+            paths.ThumbnailCacheDirectory);
+
+        Assert.AreEqual(
+            Path.Combine(
+                paths.CacheDirectory,
+                StoragePolicy.PreviewCacheDirectoryName),
+            paths.PreviewCacheDirectory);
+    }
+
+    [TestMethod]
+    public void ClipboardStagingOverride_IsIgnoredWhenBlank()
+    {
+        ApplicationPaths paths =
+            new(
+                _testDirectory,
+                "   ");
+
+        Assert.AreEqual(
+            Path.Combine(
+                paths.CacheDirectory,
+                StoragePolicy.ClipboardCacheDirectoryName),
+            paths.ClipboardCacheDirectory);
+    }
+
+    [TestMethod]
+    public void EnsureDirectoriesExist_CreatesTheClipboardStagingOverride()
+    {
+        string stagingRoot =
+            Path.Combine(
+                _testDirectory,
+                "Staging",
+                "Clipboard");
+
+        ApplicationPaths paths =
+            new(
+                _testDirectory,
+                stagingRoot);
+
+        paths.EnsureDirectoriesExist();
+
+        Assert.IsTrue(
+            Directory.Exists(
+                paths.ClipboardCacheDirectory),
+            $"Expected directory was not created: {paths.ClipboardCacheDirectory}");
+    }
 }

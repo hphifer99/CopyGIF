@@ -95,7 +95,6 @@
 
 					<StackPanel
                         Padding="20"
-                        MaxWidth="760"
                         HorizontalAlignment="Stretch"
                         Spacing="20">
 

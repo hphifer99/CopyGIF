@@ -72,6 +72,18 @@ public sealed class LibrarySettingsViewModel :
                 ResetStorageRootAsync,
                 CanResetStorageRoot);
 
+        OpenLogsFolderCommand =
+            new AsyncRelayCommand(
+                () =>
+                    OpenFolderAsync(
+                        LogsLocationPath));
+
+        OpenClipboardFolderCommand =
+            new AsyncRelayCommand(
+                () =>
+                    OpenFolderAsync(
+                        ClipboardLocationPath));
+
         CancelCommand =
             new RelayCommand(
                 CancelOperation,
@@ -79,6 +91,8 @@ public sealed class LibrarySettingsViewModel :
     }
 
     public Func<string?, CancellationToken, Task<string?>>? PickFolder { get; set; }
+
+    public Func<string, Task<bool>>? OpenFolder { get; set; }
 
     public IReadOnlyList<GifQuality> GifQualities { get; } = Enum.GetValues<GifQuality>();
 
@@ -98,6 +112,12 @@ public sealed class LibrarySettingsViewModel :
     { get; }
 
     public IAsyncRelayCommand ResetStorageRootCommand
+    { get; }
+
+    public IAsyncRelayCommand OpenLogsFolderCommand
+    { get; }
+
+    public IAsyncRelayCommand OpenClipboardFolderCommand
     { get; }
 
     public IRelayCommand CancelCommand
@@ -202,6 +222,20 @@ public sealed class LibrarySettingsViewModel :
     public string StorageLocationText =>
         _paths?.GetLibraryRoot(CustomStorageRoot) ??
             (HasCustomStorageRoot ? CustomStorageRoot! : "Default CopyGIF storage");
+
+    // The resolved folders for this run. A packaged build does not place these where the
+    // nominal AppData path suggests, so the real value is shown rather than a guess.
+    public string? LogsLocationPath =>
+        _paths?.LogsDirectory;
+
+    public string? ClipboardLocationPath =>
+        _paths?.ClipboardCacheDirectory;
+
+    public string LogsLocationText =>
+        LogsLocationPath ?? "Default CopyGIF storage";
+
+    public string ClipboardLocationText =>
+        ClipboardLocationPath ?? "Default CopyGIF storage";
 
     public bool IsValid =>
         RecentLimit >=
@@ -602,6 +636,40 @@ public sealed class LibrarySettingsViewModel :
             EndOperation(
                 operation);
         }
+    }
+
+    private async Task OpenFolderAsync(
+        string? folderPath)
+    {
+        ThrowIfDisposed();
+
+        if (OpenFolder is not Func<string, Task<bool>> openFolder ||
+            string.IsNullOrWhiteSpace(
+                folderPath))
+        {
+            return;
+        }
+
+        bool opened;
+
+        try
+        {
+            opened =
+                await openFolder(
+                    folderPath);
+        }
+        catch (Exception)
+        {
+            opened =
+                false;
+        }
+
+        Message =
+            opened
+                ? null
+                : UserMessage.Error(
+                    "That folder could not be opened. The path is shown above so it can be pasted into File Explorer.",
+                    "folder_open_failed");
     }
 
     private async Task ResetStorageRootAsync(

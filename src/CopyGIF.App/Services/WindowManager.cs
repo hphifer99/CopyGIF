@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.Input;
 using CopyGIF.Application.Onboarding;
 using CopyGIF.Application.Settings;
 using CopyGIF.Application.Startup;
@@ -778,6 +779,13 @@ public sealed class WindowManager :
         window.AppWindow.Closing += HandleSettingsWindowClosing;
         window.Activated += HandleMainWindowActivated;
 
+        // The Close button cannot call Window.Close directly. A programmatic close does
+        // not raise AppWindow.Closing, so it would skip the unsaved changes prompt and
+        // leave the picker hidden.
+        window.CancelCommand =
+            new RelayCommand(
+                RequestSettingsClose);
+
         return window;
     }
 
@@ -1003,6 +1011,12 @@ public sealed class WindowManager :
     {
         if (_isExiting || _closingSettings) return;
         args.Cancel = true;
+        RequestSettingsClose();
+    }
+
+    private void RequestSettingsClose()
+    {
+        if (_isExiting || _closingSettings) return;
         QueueOperation(async token =>
         {
             if (!await ResolveSettingsCloseAsync()) return;

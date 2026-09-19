@@ -20,10 +20,15 @@ internal sealed class SearchPageBehavior
         page.Unloaded += PageUnloaded;
         grid.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(ResultsPointerWheelChanged), true);
         grid.KeyDown += ResultsKeyDown;
+        grid.BringIntoViewRequested += (_, args) =>
+        {
+            if (_paginationOffset is not null || _restoringScroll) args.Handled = true;
+        };
     }
     private ScrollViewer? _scrollViewer;
     private SearchViewModel? _observedModel;
     private bool _restoringScroll;
+    private double? _paginationOffset;
     private void PageLoaded(object sender, RoutedEventArgs args)
     {
         _scrollViewer = FindScrollViewer(_grid);
@@ -41,13 +46,37 @@ internal sealed class SearchPageBehavior
     }
     private void ScrollChanged(object? sender, ScrollViewerViewChangedEventArgs args)
     {
-        if (!_restoringScroll && _observedModel is { Mode: GifSearchMode.Trending, IsBusy: false, ActiveProviderId: "klipy" })
+        if (!_restoringScroll && _paginationOffset is null && _observedModel is { Mode: GifSearchMode.Trending, IsBusy: false, ActiveProviderId: "klipy" })
             _observedModel.TrendingScrollOffset = _scrollViewer?.VerticalOffset ?? 0;
     }
     private void ModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
         if (args.PropertyName == nameof(SearchViewModel.ActiveProviderId)) RefreshAttribution();
-        if (args.PropertyName == nameof(SearchViewModel.OperationState) && _observedModel?.IsBusy == false)
+        if (args.PropertyName == nameof(SearchViewModel.IsLoadingMore))
+        {
+            if (_observedModel?.IsLoadingMore == true)
+            {
+                _scrollViewer ??= FindScrollViewer(_grid);
+                _paginationOffset = _scrollViewer?.VerticalOffset ?? 0;
+            }
+            else if (_paginationOffset is double offset)
+            {
+                _restoringScroll = true;
+                _page.DispatcherQueue.TryEnqueue(() =>
+                {
+                    _grid.UpdateLayout();
+                    _scrollViewer?.ChangeView(null, offset, null, true);
+                    _page.DispatcherQueue.TryEnqueue(() =>
+                    {
+                        _scrollViewer?.ChangeView(null, offset, null, true);
+                        _paginationOffset = null;
+                        _restoringScroll = false;
+                    });
+                });
+            }
+        }
+        if (args.PropertyName == nameof(SearchViewModel.OperationState) && _observedModel?.IsBusy == false &&
+            _paginationOffset is null)
             RestoreTrendingScroll();
     }
     private void RefreshAttribution()

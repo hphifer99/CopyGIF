@@ -9,6 +9,28 @@ namespace CopyGIF.Presentation.Tests.Settings;
 public sealed class AppearanceSettingsViewModelTests
 {
     [TestMethod]
+    public async Task SaveCommand_PersistsThreeIndependentQualities()
+    {
+        var coordinator = new FakeSettingsCoordinator(new AppSettings
+        {
+            Library = new LibrarySettings { GifQuality = GifQuality.Low },
+            Appearance = new AppearanceSettings { DisplayQuality = GifQuality.High }
+        });
+        using var model = new AppearanceSettingsViewModel(coordinator);
+        await model.LoadCommand.ExecuteAsync(null);
+        Assert.AreEqual(GifQuality.Low, model.CopyQuality);
+        Assert.AreEqual(GifQuality.High, model.DisplayQuality);
+        model.CopyQuality = GifQuality.Maximum;
+        model.SaveQuality = GifQuality.Minimum;
+        model.DisplayQuality = GifQuality.Low;
+        await model.SaveCommand.ExecuteAsync(null);
+        Assert.IsNotNull(coordinator.LastSaveRequest);
+        Assert.AreEqual(GifQuality.Maximum, coordinator.LastSaveRequest.Library.GifQuality);
+        Assert.AreEqual(GifQuality.Minimum, coordinator.LastSaveRequest.Library.SaveQuality);
+        Assert.AreEqual(GifQuality.Low, coordinator.LastSaveRequest.Appearance.DisplayQuality);
+    }
+
+    [TestMethod]
     public async Task LoadCommand_LoadsTheme()
     {
         AppSettings settings =

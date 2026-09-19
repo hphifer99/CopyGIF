@@ -129,6 +129,17 @@ public sealed class FavoritesViewModel :
     public bool IsBusy =>
         OperationState.IsBusy;
 
+    private CopyGIF.Core.Settings.GifQuality _displayQuality = CopyGIF.Core.Settings.GifQuality.Medium;
+    public CopyGIF.Core.Settings.GifQuality DisplayQuality
+    {
+        get => _displayQuality;
+        set
+        {
+            if (!SetProperty(ref _displayQuality, value)) return;
+            foreach (GifCardViewModel card in Items) card.DisplayQuality = value;
+        }
+    }
+
     public bool ReducedMotion
     {
         get => _reducedMotion;
@@ -350,6 +361,7 @@ public sealed class FavoritesViewModel :
                     reducedMotion:
                         ReducedMotion);
 
+            card.DisplayQuality = DisplayQuality;
             card.PropertyChanged +=
                 OnCardPropertyChanged;
 
@@ -362,6 +374,12 @@ public sealed class FavoritesViewModel :
         object? sender,
         PropertyChangedEventArgs eventArgs)
     {
+        if (eventArgs.PropertyName == nameof(GifCardViewModel.Message) &&
+            sender is GifCardViewModel { Message: { } cardMessage })
+        {
+            Message = cardMessage;
+            return;
+        }
         if (eventArgs.PropertyName !=
                 nameof(GifCardViewModel.IsFavorite) ||
             sender is not GifCardViewModel card ||
@@ -469,6 +487,7 @@ public sealed class FavoritesViewModel :
 
             GifUri =
                 entry.GifUri,
+            Renditions = entry.Renditions,
 
             PreviewUri =
                 entry.PreviewUri,

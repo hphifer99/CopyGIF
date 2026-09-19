@@ -27,8 +27,6 @@ public sealed class ApplicationStartupCoordinator :
 
     private readonly IHotkeyService _hotkeyService;
 
-    private readonly IStartupService _startupService;
-
     private readonly ITrayService _trayService;
 
     private readonly SemaphoreSlim _gate =
@@ -80,10 +78,7 @@ public sealed class ApplicationStartupCoordinator :
             throw new ArgumentNullException(
                 nameof(hotkeyService));
 
-        _startupService =
-            startupService ??
-            throw new ArgumentNullException(
-                nameof(startupService));
+        ArgumentNullException.ThrowIfNull(startupService);
 
         _trayService =
             trayService ??
@@ -250,15 +245,8 @@ public sealed class ApplicationStartupCoordinator :
         string? previousGesture =
             _hotkeyService.RegisteredGesture;
 
-        bool previousStartupState =
-            await _startupService
-                .IsEnabledAsync(
-                    cancellationToken)
-                .ConfigureAwait(false);
-
         HotkeyRegistrationResult? hotkeyWarning = null;
         bool hotkeyChanged = false;
-        bool startupChanged = false;
 
         try
         {
@@ -284,18 +272,6 @@ public sealed class ApplicationStartupCoordinator :
                 }
             }
 
-            if (previousStartupState !=
-                settings.Startup.StartWithWindows)
-            {
-                startupChanged = true;
-
-                await _startupService
-                    .SetEnabledAsync(
-                        settings.Startup.StartWithWindows,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-            }
-
             await _trayService
                 .InitializeAsync(
                     cancellationToken)
@@ -317,8 +293,6 @@ public sealed class ApplicationStartupCoordinator :
         {
             IReadOnlyList<Exception> rollbackFailures =
                 await RollbackRuntimeStateAsync(
-                        startupChanged,
-                        previousStartupState,
                         hotkeyChanged,
                         previousGesture)
                     .ConfigureAwait(false);
@@ -341,29 +315,10 @@ public sealed class ApplicationStartupCoordinator :
 
     private async Task<IReadOnlyList<Exception>>
         RollbackRuntimeStateAsync(
-            bool startupChanged,
-            bool previousStartupState,
             bool hotkeyChanged,
             string? previousGesture)
     {
         List<Exception> failures = [];
-
-        if (startupChanged)
-        {
-            try
-            {
-                await _startupService
-                    .SetEnabledAsync(
-                        previousStartupState,
-                        CancellationToken.None)
-                    .ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                failures.Add(
-                    exception);
-            }
-        }
 
         if (hotkeyChanged)
         {

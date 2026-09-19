@@ -1,5 +1,10 @@
+using System.Security;
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
+using CopyGIF.Core.Policies;
 using CopyGIF.Core.Settings;
 
 namespace CopyGIF.Infrastructure.Migration;
@@ -90,6 +95,8 @@ public sealed class V1MigrationCoordinator :
 
         if (originalState.IsCompleted)
         {
+            // An interrupted post-commit cleanup must not leave an archived key indefinitely.
+            TryRemoveArchivedCredential(Path.Combine(_paths.MigrationDirectory, V1SettingsBackupFileName));
             return CreateNotRequiredResult(
                 "Legacy data migration was already completed.");
         }
@@ -112,26 +119,46 @@ public sealed class V1MigrationCoordinator :
 
         try
         {
-            RestoreInterruptedSource(
+            if (!await IsVersionedDocumentAsync(_paths.SettingsPath, StoragePolicy.MaximumSettingsFileBytes, cancellationToken)) RestoreInterruptedSource(
                 settingsBackupPath,
                 _paths.SettingsPath);
 
-            RestoreInterruptedSource(
+            if (!await IsVersionedDocumentAsync(_paths.LibraryPath, StoragePolicy.MaximumLibraryFileBytes, cancellationToken)) RestoreInterruptedSource(
                 libraryBackupPath,
                 _paths.LibraryPath);
 
-            V1SettingsSnapshot? settingsSnapshot =
-                await _settingsReader.ReadAsync(
-                    _paths.SettingsPath,
-                    cancellationToken);
+            List<string> warnings = [];
+            bool unreadableSettings = false;
+            bool unreadableLibrary = false;
+            V1SettingsSnapshot? settingsSnapshot = null;
+            V1LibrarySnapshot? librarySnapshot = null;
+            try
+            {
+                settingsSnapshot = await _settingsReader.ReadAsync(_paths.SettingsPath, cancellationToken);
+            }
+            catch (InvalidDataException)
+            {
+                if (!await IsVersionedDocumentAsync(_paths.SettingsPath, StoragePolicy.MaximumSettingsFileBytes, cancellationToken))
+                {
+                    unreadableSettings = true;
+                    warnings.Add("V1 settings were unreadable. The original file was preserved in Migration; defaults will be used.");
+                }
+            }
+            try
+            {
+                librarySnapshot = await _libraryReader.ReadAsync(_paths.LibraryPath, cancellationToken);
+            }
+            catch (InvalidDataException)
+            {
+                if (!await IsVersionedDocumentAsync(_paths.LibraryPath, StoragePolicy.MaximumLibraryFileBytes, cancellationToken))
+                {
+                    unreadableLibrary = true;
+                    warnings.Add("V1 library was unreadable. The original file was preserved in Migration; the library will start empty.");
+                }
+            }
 
-            V1LibrarySnapshot? librarySnapshot =
-                await _libraryReader.ReadAsync(
-                    _paths.LibraryPath,
-                    cancellationToken);
-
-            if (settingsSnapshot is null &&
-                librarySnapshot is null)
+            if (settingsSnapshot is null && librarySnapshot is null &&
+                !unreadableSettings && !unreadableLibrary)
             {
                 stateMutationAttempted = true;
 
@@ -143,8 +170,6 @@ public sealed class V1MigrationCoordinator :
                 return CreateNotRequiredResult(
                     "No legacy CopyGIF data was found.");
             }
-
-            List<string> warnings = [];
 
             if (settingsSnapshot is not null)
             {
@@ -183,6 +208,12 @@ public sealed class V1MigrationCoordinator :
                     settingsSnapshot.Settings,
                     cancellationToken);
             }
+            else if (unreadableSettings)
+            {
+                settingsMutationAttempted = true;
+                ArchiveLegacySource(_paths.SettingsPath, settingsBackupPath);
+                await _settingsStore.SaveAsync(new AppSettings(), cancellationToken);
+            }
 
             if (librarySnapshot is not null)
             {
@@ -195,6 +226,12 @@ public sealed class V1MigrationCoordinator :
                 await _libraryStore.SaveAsync(
                     librarySnapshot.Library,
                     cancellationToken);
+            }
+            else if (unreadableLibrary)
+            {
+                libraryMutationAttempted = true;
+                ArchiveLegacySource(_paths.LibraryPath, libraryBackupPath);
+                await _libraryStore.SaveAsync(new LibrarySnapshot(), cancellationToken);
             }
 
             if (migratedCredential is not null)
@@ -213,6 +250,10 @@ public sealed class V1MigrationCoordinator :
                 CreateCompletedState(
                     sourceVersion: "1"),
                 cancellationToken);
+
+            if ((settingsSnapshot is not null || unreadableSettings) &&
+                !TryRemoveArchivedCredential(settingsBackupPath))
+                warnings.Add("An archived V1 settings file may still contain an API key. Remove that archived file after backing it up securely.");
 
             return new MigrationResult
             {
@@ -298,8 +339,10 @@ public sealed class V1MigrationCoordinator :
             return null;
         }
 
-        string value =
-            payload.Kind switch
+        string value;
+        try
+        {
+            value = payload.Kind switch
             {
                 V1CredentialKind.Plaintext =>
                     payload.Value,
@@ -313,6 +356,13 @@ public sealed class V1MigrationCoordinator :
                     throw new InvalidDataException(
                         "The legacy credential format is not supported.")
             };
+        }
+        catch (Exception exception) when (exception is CryptographicException or FormatException or
+            SecurityException or InvalidDataException)
+        {
+            warnings.Add("The legacy API key could not be read. Enter a new key in CopyGIF.");
+            return null;
+        }
 
         string normalized =
             value.Trim();
@@ -328,8 +378,8 @@ public sealed class V1MigrationCoordinator :
         if (normalized.Length >
             MaximumCredentialLength)
         {
-            throw new InvalidDataException(
-                "The legacy API credential exceeds its maximum allowed size.");
+            warnings.Add("The legacy API key was too long. Enter a new key in CopyGIF.");
+            return null;
         }
 
         return normalized;
@@ -352,6 +402,58 @@ public sealed class V1MigrationCoordinator :
         }
 
         File.Delete(sourcePath);
+    }
+
+    private static async Task<bool> IsVersionedDocumentAsync(string path, long maximumBytes,
+        CancellationToken token)
+    {
+        if (!File.Exists(path) || new FileInfo(path).Length > maximumBytes) return false;
+        try
+        {
+            await using FileStream stream = File.OpenRead(path);
+            using JsonDocument document = await JsonDocument.ParseAsync(stream,
+                new JsonDocumentOptions { MaxDepth = 64 }, token);
+            return document.RootElement.ValueKind == JsonValueKind.Object &&
+                document.RootElement.TryGetProperty("schemaVersion", out _);
+        }
+        catch (System.Text.Json.JsonException) { return false; }
+    }
+
+    private static bool TryRemoveArchivedCredential(string path)
+    {
+        if (!File.Exists(path)) return true;
+        string temporary = path + ".sanitize-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            EnsureRegularFile(path, "legacy migration backup");
+            JsonNode? root;
+            using (FileStream stream = new(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read))
+            {
+                root = JsonNode.Parse(stream);
+            }
+
+            if (root is not JsonObject settings) return false;
+            settings.Remove("ApiKey");
+            settings.Remove("ApiKeyProtected");
+            File.WriteAllText(temporary, settings.ToJsonString());
+            File.Move(temporary, path, overwrite: true);
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
+            System.Text.Json.JsonException or InvalidDataException)
+        {
+            return false;
+        }
+        finally
+        {
+            try { if (File.Exists(temporary)) File.Delete(temporary); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
     }
 
     private static void RestoreInterruptedSource(

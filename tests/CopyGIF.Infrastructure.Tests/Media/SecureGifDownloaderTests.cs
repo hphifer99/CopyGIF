@@ -102,6 +102,24 @@ public sealed class SecureGifDownloaderTests
     }
 
     [TestMethod]
+    public async Task CleanupClipboardAsync_ExpiresOldFileAndPreservesActiveClipboardFile()
+    {
+        using TestContext context = CreateContext(new TestHttpMessageHandler(
+            _ => GifResponse(CreateValidGif())));
+        DownloadedGif previous = await context.Downloader.DownloadAsync(CreateItem(),
+            GifDownloadPurpose.Clipboard);
+        context.Clock.UtcNow = context.Clock.UtcNow.AddDays(2);
+        DownloadedGif active = await context.Downloader.DownloadAsync(CreateItem(),
+            GifDownloadPurpose.Clipboard);
+        File.SetLastWriteTimeUtc(previous.FilePath, context.Clock.UtcNow.AddDays(-2).UtcDateTime);
+
+        await context.Downloader.CleanupClipboardAsync(active.FilePath);
+
+        Assert.IsFalse(File.Exists(previous.FilePath));
+        Assert.IsTrue(File.Exists(active.FilePath));
+    }
+
+    [TestMethod]
     public async Task DownloadAsync_Favorite_UsesCustomLibraryRoot()
     {
         string customRoot =
@@ -515,6 +533,7 @@ public sealed class SecureGifDownloaderTests
     {
         public void Dispose()
         {
+            Downloader.Dispose();
             Client.Dispose();
         }
     }
@@ -567,7 +586,7 @@ public sealed class SecureGifDownloaderTests
         public DateTimeOffset UtcNow
         {
             get;
-            init;
+            set;
         } = new(
             2026,
             9,

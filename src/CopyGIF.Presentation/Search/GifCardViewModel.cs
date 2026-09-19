@@ -23,9 +23,9 @@ public sealed class GifCardViewModel :
     private readonly string?
         _searchQuery;
 
-    private Uri _thumbnailSource;
+    private Uri? _thumbnailSource;
 
-    private Uri _currentSource;
+    private Uri? _currentSource;
 
     private bool _isFavorite;
 
@@ -81,15 +81,17 @@ public sealed class GifCardViewModel :
         _reducedMotion =
             reducedMotion;
 
-        _thumbnailSource =
-            item.ThumbnailUri;
+        // KLIPY cards must wait for a validated local thumbnail before XAML
+        // receives a source URI. GIPHY previews use approved direct media hosts.
+        _thumbnailSource = ProviderMediaPolicy.UsesDirectPreview(item.ProviderId) &&
+            ProviderMediaPolicy.IsDirectMediaUri(item.ThumbnailUri)
+            ? item.ThumbnailUri : null;
 
-        _currentSource =
-            item.ThumbnailUri;
+        _currentSource = _thumbnailSource;
 
         LoadThumbnailCommand = new AsyncRelayCommand<bool?>(async (retry, token) =>
         {
-            if (retry == true) await _previewCoordinator.InvalidateAsync(Item, token);
+            if (retry == true) { _hasThumbnail = false; await _previewCoordinator.InvalidateAsync(Item, token); }
             await LoadThumbnailAsync(token);
         });
 
@@ -113,6 +115,23 @@ public sealed class GifCardViewModel :
                 StopPreview,
                 CanStopPreview);
     }
+
+    private CopyGIF.Core.Settings.GifQuality _displayQuality = CopyGIF.Core.Settings.GifQuality.Medium;
+    public CopyGIF.Core.Settings.GifQuality DisplayQuality
+    {
+        get => _displayQuality;
+        set { if (SetProperty(ref _displayQuality, value)) OnPropertyChanged(nameof(DecodePixelSize)); }
+    }
+    public bool DecodeByHeight => Item.Height > Item.Width;
+    public int DecodePixelSize => DisplayQuality switch
+    {
+        CopyGIF.Core.Settings.GifQuality.Minimum => 128,
+        CopyGIF.Core.Settings.GifQuality.Low => 192,
+        CopyGIF.Core.Settings.GifQuality.Medium => 256,
+        CopyGIF.Core.Settings.GifQuality.High => 384,
+        CopyGIF.Core.Settings.GifQuality.Maximum => 512,
+        _ => 256
+    };
 
     public GifItem Item { get; }
 
@@ -165,7 +184,7 @@ public sealed class GifCardViewModel :
     public string? SearchQuery =>
         _searchQuery;
 
-    public Uri ThumbnailSource
+    public Uri? ThumbnailSource
     {
         get => _thumbnailSource;
 
@@ -175,7 +194,7 @@ public sealed class GifCardViewModel :
                 value);
     }
 
-    public Uri CurrentSource
+    public Uri? CurrentSource
     {
         get => _currentSource;
 
@@ -283,9 +302,12 @@ public sealed class GifCardViewModel :
                 value);
     }
 
+    private bool _hasThumbnail;
+
     public async Task LoadThumbnailAsync(
         CancellationToken cancellationToken = default)
     {
+        if (_hasThumbnail) return;
         try
         {
             Uri source =
@@ -294,6 +316,8 @@ public sealed class GifCardViewModel :
                         Item,
                         cancellationToken);
 
+            cancellationToken.ThrowIfCancellationRequested();
+            _hasThumbnail = true;
             ThumbnailSource = source;
             OnPropertyChanged(nameof(ThumbnailSource));
             Message = null;
@@ -313,13 +337,12 @@ public sealed class GifCardViewModel :
         {
             RepairDiagnostics.Record("thumbnail-resolve", ProviderId, exception.GetType().Name);
             Message = UserMessage.Warning("Preview unavailable. Select Retry preview to try again.");
-            ThumbnailSource =
-                Item.ThumbnailUri;
+            // A remote KLIPY URL cannot be decoded by the local-only card.
+            ThumbnailSource = null;
 
             if (!IsPreviewing)
             {
-                CurrentSource =
-                    Item.ThumbnailUri;
+                CurrentSource = null;
             }
         }
     }
@@ -359,6 +382,7 @@ public sealed class GifCardViewModel :
     private async Task CopyAsync(
         CancellationToken cancellationToken)
     {
+        RepairDiagnostics.Record("copy-click", ProviderId, "started");
         BeginOperation(
             "Copying GIF...");
 
@@ -389,15 +413,17 @@ public sealed class GifCardViewModel :
                 UserMessage.Information(
                     "GIF copy cancelled.");
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            OperationState =
-                AsyncOperationState.Failed(
-                    "Unable to copy GIF.");
-
-            Message =
-                UserMessage.Error(
-                    "Unable to copy the GIF.");
+            string detail = exception is MediaDownloadException download
+                ? $"The GIF download failed ({download.Failure}). Try another GIF or lower copy quality."
+                : exception is System.ComponentModel.Win32Exception native
+                    ? $"Windows rejected the clipboard operation (error {native.NativeErrorCode}). Try again."
+                    : $"Copy failed ({exception.GetType().Name}, 0x{exception.HResult:X8}).";
+            RepairDiagnostics.Record("copy-failed", ProviderId,
+                $"{exception.GetType().Name}-0x{exception.HResult:X8}");
+            OperationState = AsyncOperationState.Failed("Unable to copy GIF.");
+            Message = UserMessage.Error(detail, "gif_copy_failed");
         }
     }
 

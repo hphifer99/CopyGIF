@@ -83,7 +83,7 @@ public sealed class GifClipboardService :
         await VerifyGifSignatureAsync(
                 fullPath,
                 cancellationToken)
-            .ConfigureAwait(false);
+            .ConfigureAwait(true);
 
         byte[] payload =
             GifClipboardPayload.Create(fullPath);
@@ -111,7 +111,12 @@ public sealed class GifClipboardService :
                     payload,
                     out lastError))
             {
-                RepairDiagnostics.Record("clipboard-native", gif.Identity.ProviderId, "file-drop-ready", file.Length);
+                file.Refresh();
+                RepairDiagnostics.Record("clipboard-native", gif.Identity.ProviderId,
+                    file.Exists && file.Length == gif.SizeBytes ? "file-drop-ready" : "backing-file-changed",
+                    file.Exists ? file.Length : 0);
+                if (!file.Exists || file.Length != gif.SizeBytes)
+                    throw new InvalidDataException("The clipboard GIF file changed immediately after copying.");
                 return;
             }
 
@@ -121,7 +126,7 @@ public sealed class GifClipboardService :
                         TimeSpan.FromMilliseconds(
                             25 * (attempt + 1)),
                         cancellationToken)
-                    .ConfigureAwait(false);
+                    .ConfigureAwait(true);
             }
         }
 
@@ -151,7 +156,7 @@ public sealed class GifClipboardService :
             await stream.ReadAsync(
                     signature,
                     cancellationToken)
-                .ConfigureAwait(false);
+                .ConfigureAwait(true);
 
         bool isGif =
             bytesRead == signature.Length &&

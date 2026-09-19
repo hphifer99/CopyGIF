@@ -604,7 +604,7 @@ public sealed class UpdateCoordinatorTests
     }
 
     [TestMethod]
-    public async Task RunAutomaticAsync_DownloadAndInstall_InstallsVerifiedPackage()
+    public async Task RunAutomaticAsync_DownloadAndInstall_AllUsersPromptsAfterDownload()
     {
         Harness harness =
             new(
@@ -620,17 +620,14 @@ public sealed class UpdateCoordinatorTests
                 "2.0.0");
 
         Assert.AreEqual(
-            AutomaticUpdateAction.Installed,
+            AutomaticUpdateAction.Prompt,
             result.Action);
 
-        Assert.IsNotNull(
-            result.Installation);
-
-        Assert.IsTrue(
-            result.Installation.WasInstalled);
+        Assert.IsNotNull(result.Preparation);
+        Assert.IsTrue(result.Preparation.IsReady);
 
         Assert.HasCount(
-            1,
+            0,
             harness.Installer.InstallationRequests);
     }
 

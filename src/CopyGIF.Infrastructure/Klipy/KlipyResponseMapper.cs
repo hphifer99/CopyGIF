@@ -45,12 +45,14 @@ internal static class KlipyResponseMapper
         {
             if (item is null)
             {
-                throw InvalidResponse(
-                    "KLIPY returned a null result item.");
+                RepairDiagnostics.Record("provider-item", KlipyGifProvider.ProviderId, "null");
+                continue;
             }
-
-            items.Add(
-                MapItem(item));
+            try { items.Add(MapItem(item)); }
+            catch (GifProviderException)
+            {
+                RepairDiagnostics.Record("provider-item", KlipyGifProvider.ProviderId, "invalid");
+            }
         }
 
         string? continuationToken = null;
@@ -149,6 +151,15 @@ internal static class KlipyResponseMapper
 
             GifUri = gifUri,
 
+            Renditions = new GifRenditions
+            {
+                Minimum = TryGif(files.Xs?.Gif),
+                Low = TryGif(files.Sm?.Gif),
+                Medium = TryGif(files.Md?.Gif),
+                High = TryGif(files.Hd?.Gif),
+                Maximum = gifUri
+            },
+
             PreviewUri = previewUri,
 
             Width = fullGif.Width,
@@ -177,6 +188,15 @@ internal static class KlipyResponseMapper
                 $"KLIPY returned an invalid {mediaName} URL.");
         }
 
+        return uri;
+    }
+
+    private static Uri? TryGif(KlipyMediaDto? media)
+    {
+        if (media is null || media.Width < 1 || media.Height < 1 ||
+            !Uri.TryCreate(media.Url, UriKind.Absolute, out Uri? uri) ||
+            uri.Scheme != Uri.UriSchemeHttps || !uri.AbsolutePath.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
+            return null;
         return uri;
     }
 

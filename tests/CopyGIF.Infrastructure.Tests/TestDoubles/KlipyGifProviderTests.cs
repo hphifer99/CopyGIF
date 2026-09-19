@@ -501,7 +501,7 @@ public sealed class KlipyGifProviderTests
     }
 
     [TestMethod]
-    public async Task SearchAsync_InsecureMediaUrl_ThrowsInvalidResponse()
+    public async Task SearchAsync_InsecureMediaUrl_SkipsUnsafeItem()
     {
         const string json =
             """
@@ -544,18 +544,8 @@ public sealed class KlipyGifProviderTests
         KlipyGifProvider provider =
             CreateProvider(client);
 
-        GifProviderException exception =
-            await Assert.ThrowsAsync<
-                GifProviderException>(
-                () => provider.SearchAsync(
-                    new GifSearchRequest
-                    {
-                        Query = "test"
-                    }));
-
-        Assert.AreEqual(
-            GifProviderFailure.InvalidResponse,
-            exception.Failure);
+        GifSearchPage page = await provider.SearchAsync(new GifSearchRequest { Query = "test" });
+        Assert.IsEmpty(page.Items);
     }
 
     [TestMethod]

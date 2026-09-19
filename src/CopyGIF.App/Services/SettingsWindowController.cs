@@ -21,6 +21,7 @@ internal sealed class SettingsWindowController : IDisposable
     private bool _loading = true;
     private bool _disposed;
     private bool _dialogOpen;
+    private CancellationTokenSource? _successStatusTimer;
     public bool IsDialogOpen => _dialogOpen;
 
     public SettingsWindowController(SettingsWindow window, SettingsViewModel model,
@@ -73,7 +74,11 @@ internal sealed class SettingsWindowController : IDisposable
 
     private void Changed(object? sender, PropertyChangedEventArgs args)
     {
-        if (!_loading && !_window.IsBusy && !_disposed) CaptureDraft();
+        if (!_loading && !_window.IsBusy && !_disposed)
+        {
+            CancelSuccessStatus();
+            CaptureDraft();
+        }
     }
 
     private void SessionChanged(object? sender, EventArgs args) =>
@@ -91,13 +96,15 @@ internal sealed class SettingsWindowController : IDisposable
                 HideAfterCopy = g.HideAfterCopy, CloseToTray = g.CloseToTray },
             Window = b.Window with { PlacementMode = g.PlacementMode,
                 RememberWindowSize = g.RememberWindowSize, CenterOnTrayOpen = g.CenterOnTrayOpen },
-            Appearance = b.Appearance with { Theme = _model.Appearance.Theme },
+            Appearance = b.Appearance with { Theme = _model.Appearance.Theme, DisplayQuality = _model.Appearance.DisplayQuality },
             Search = b.Search with { ResultsPerSearch = s.ResultsPerSearch,
+                ContentRating = s.ContentRating,
                 DebounceMilliseconds = s.DebounceMilliseconds, AnimatePreviews = s.AnimatePreviews,
                 AutoLoadMoreResults = s.AutoLoadMoreResults, ShowTrendingWhenEmpty = s.ShowTrendingWhenEmpty,
                 SaveSearchHistory = s.SaveSearchHistory, UseHistorySuggestions = s.UseHistorySuggestions,
                 SearchHistoryLimit = s.SearchHistoryLimit },
             Library = b.Library with { RecentLimit = l.RecentLimit, FavoriteLimit = l.FavoriteLimit,
+                GifQuality = _model.Appearance.CopyQuality, SaveQuality = _model.Appearance.SaveQuality,
                 StoreFavoritesLocally = l.StoreFavoritesLocally, StoreRecentsLocally = l.StoreRecentsLocally,
                 CustomStorageRoot = l.CustomStorageRoot },
             Updates = b.Updates with { CheckForUpdates = u.CheckForUpdates,
@@ -121,8 +128,10 @@ internal sealed class SettingsWindowController : IDisposable
             _runtime.ApplySettings(result.EffectiveSettings);
             await _keys.RefreshAsync();
             _window.HasUnsavedChanges = false;
-            _window.StatusMessage = "All settings applied.";
+            _window.StatusMessage = "Settings saved.";
             _window.StatusSeverity = InfoBarSeverity.Success;
+            _successStatusTimer = new CancellationTokenSource();
+            _ = ClearSuccessAfterDelayAsync(_successStatusTimer.Token);
             return true;
         }
         catch (Exception exception)
@@ -167,10 +176,35 @@ internal sealed class SettingsWindowController : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        CancelSuccessStatus();
         foreach (INotifyPropertyChanged section in Sections()) section.PropertyChanged -= Changed;
         _session.Changed -= SessionChanged;
         _session.Close();
         _model.Library.PickFolder = null;
+    }
+
+    private void CancelSuccessStatus()
+    {
+        _successStatusTimer?.Cancel();
+        _successStatusTimer?.Dispose();
+        _successStatusTimer = null;
+        if (_window.StatusSeverity == InfoBarSeverity.Success)
+            _window.StatusMessage = string.Empty;
+    }
+
+    private async Task ClearSuccessAfterDelayAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), token);
+            _window.DispatcherQueue.TryEnqueue(() =>
+            {
+                if (!_disposed && !token.IsCancellationRequested &&
+                    _window.StatusSeverity == InfoBarSeverity.Success)
+                    _window.StatusMessage = string.Empty;
+            });
+        }
+        catch (OperationCanceledException) { }
     }
 
     private sealed class Owner(SettingsWindow window) : IWindowHandleProvider

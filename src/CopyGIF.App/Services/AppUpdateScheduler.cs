@@ -15,6 +15,7 @@ public sealed class AppUpdateScheduler : IAsyncDisposable
     private readonly UpdateViewModel _viewModel;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly object _sync = new();
+    private readonly SemaphoreSlim _wake = new(0, 1);
     private CancellationTokenSource? _current;
     private Task? _loop;
     private DateTimeOffset _retryAfter;
@@ -36,7 +37,11 @@ public sealed class AppUpdateScheduler : IAsyncDisposable
 
     private void SettingsChanged(object? sender, EventArgs args)
     {
-        lock (_sync) _current?.Cancel();
+        lock (_sync)
+        {
+            _current?.Cancel();
+            if (_wake.CurrentCount == 0) _wake.Release();
+        }
     }
 
     private async Task RunAsync(string version)
@@ -45,6 +50,7 @@ public sealed class AppUpdateScheduler : IAsyncDisposable
         {
             while (!_lifetime.IsCancellationRequested)
             {
+                TimeSpan nextCheck = TimeSpan.FromMinutes(15);
                 using var operation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
                 lock (_sync) _current = operation;
                 try
@@ -54,6 +60,11 @@ public sealed class AppUpdateScheduler : IAsyncDisposable
                         AutomaticUpdateResult result = await _updates.RunAutomaticAsync(version, cancellationToken: operation.Token);
                         if (result.Check.Status is UpdateCheckStatus.FeedUnavailable or UpdateCheckStatus.UnsupportedInstallation)
                             _retryAfter = DateTimeOffset.UtcNow.AddHours(1);
+                        if (result.Check.Status is UpdateCheckStatus.ManagedByStore or
+                            UpdateCheckStatus.UnsupportedInstallation or UpdateCheckStatus.Disabled)
+                            nextCheck = TimeSpan.FromDays(1);
+                        else if (result.Check.Status == UpdateCheckStatus.FeedUnavailable)
+                            nextCheck = TimeSpan.FromHours(1);
                         if (result.Check.Status != UpdateCheckStatus.NotDue)
                             await _dispatcher.InvokeAsync(() => _viewModel.AcceptAutomaticResult(result));
                         if (result.Action != AutomaticUpdateAction.None)
@@ -65,9 +76,13 @@ public sealed class AppUpdateScheduler : IAsyncDisposable
                 }
                 catch (OperationCanceledException) when (operation.IsCancellationRequested) { }
                 catch (Exception exception)
-                { _retryAfter = DateTimeOffset.UtcNow.AddHours(1); RepairDiagnostics.Record("automatic-update", "github", exception.GetType().Name); }
+                {
+                    _retryAfter = DateTimeOffset.UtcNow.AddHours(1);
+                    nextCheck = TimeSpan.FromHours(1);
+                    RepairDiagnostics.Record("automatic-update", "github", exception.GetType().Name);
+                }
                 finally { lock (_sync) if (ReferenceEquals(_current, operation)) _current = null; }
-                await Task.Delay(TimeSpan.FromMinutes(1), _lifetime.Token);
+                await _wake.WaitAsync(nextCheck, _lifetime.Token);
             }
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
@@ -78,6 +93,7 @@ public sealed class AppUpdateScheduler : IAsyncDisposable
         _effective.Changed -= SettingsChanged;
         await _lifetime.CancelAsync();
         if (_loop is not null) await _loop;
+        _wake.Dispose();
         _lifetime.Dispose();
     }
 }

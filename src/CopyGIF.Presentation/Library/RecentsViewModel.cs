@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CopyGIF.Application.Library;
@@ -127,6 +128,17 @@ public sealed class RecentsViewModel :
 
     public bool IsBusy =>
         OperationState.IsBusy;
+
+    private CopyGIF.Core.Settings.GifQuality _displayQuality = CopyGIF.Core.Settings.GifQuality.Medium;
+    public CopyGIF.Core.Settings.GifQuality DisplayQuality
+    {
+        get => _displayQuality;
+        set
+        {
+            if (!SetProperty(ref _displayQuality, value)) return;
+            foreach (GifCardViewModel card in Items) card.DisplayQuality = value;
+        }
+    }
 
     public bool ReducedMotion
     {
@@ -361,8 +373,9 @@ public sealed class RecentsViewModel :
                     reducedMotion:
                         ReducedMotion);
 
-            Items.Add(
-                card);
+            card.DisplayQuality = DisplayQuality;
+            card.PropertyChanged += OnCardPropertyChanged;
+            Items.Add(card);
         }
     }
 
@@ -371,11 +384,19 @@ public sealed class RecentsViewModel :
         foreach (GifCardViewModel card
                  in Items)
         {
+            card.PropertyChanged -= OnCardPropertyChanged;
             card.StopPreviewCommand
                 .Execute(null);
         }
 
         Items.Clear();
+    }
+
+    private void OnCardPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(GifCardViewModel.Message) &&
+            sender is GifCardViewModel { Message: { } cardMessage })
+            Message = cardMessage;
     }
 
     private CancellationTokenSource BeginOperation(
@@ -455,6 +476,7 @@ public sealed class RecentsViewModel :
 
             GifUri =
                 entry.GifUri,
+            Renditions = entry.Renditions,
 
             PreviewUri =
                 entry.PreviewUri,

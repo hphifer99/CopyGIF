@@ -250,11 +250,11 @@ public sealed class SettingsCoordinator :
         string? previousGesture =
             _hotkeyService.RegisteredGesture;
 
-        bool previousStartupState =
-            await _startupService
-                .IsEnabledAsync(
-                    cancellationToken)
-                .ConfigureAwait(false);
+        // Only an intentional preference change may override Windows Startup.
+        bool configureStartup = previousSettings.Startup.StartWithWindows !=
+            normalizedSettings.Startup.StartWithWindows;
+        bool previousStartupState = configureStartup &&
+            await _startupService.IsEnabledAsync(cancellationToken).ConfigureAwait(false);
 
         bool hotkeyChanged = false;
         bool startupChanged = false;
@@ -282,9 +282,22 @@ public sealed class SettingsCoordinator :
             hotkeyChanged = true;
         }
 
+        string? registeredGesture =
+            _hotkeyService.RegisteredGesture;
+
+        if (!string.IsNullOrWhiteSpace(
+                registeredGesture))
+        {
+            normalizedSettings =
+                normalizedSettings with
+                {
+                    Hotkey = registeredGesture
+                };
+        }
+
         try
         {
-            if (previousStartupState !=
+            if (configureStartup && previousStartupState !=
                 normalizedSettings.Startup.StartWithWindows)
             {
                 startupChanged = true;

@@ -48,6 +48,15 @@ public sealed class SearchSettingsViewModel :
     private UserMessage? _message;
 
     private bool _disposed;
+    private GifContentRating _contentRating = GifContentRating.AllAvailable;
+
+    public IReadOnlyList<GifContentRating> ContentRatings { get; } = Enum.GetValues<GifContentRating>();
+
+    public GifContentRating ContentRating
+    {
+        get => _contentRating;
+        set => SetProperty(ref _contentRating, value);
+    }
 
     public SearchSettingsViewModel(
         ISettingsCoordinator settingsCoordinator)
@@ -408,6 +417,8 @@ public sealed class SearchSettingsViewModel :
                             ResultsPerSearch =
                                 ResultsPerSearch,
 
+                            ContentRating = ContentRating,
+
                             DebounceMilliseconds =
                                 DebounceMilliseconds,
 
@@ -531,6 +542,8 @@ public sealed class SearchSettingsViewModel :
 
         SearchHistoryLimit =
             settings.SearchHistoryLimit;
+
+        ContentRating = settings.ContentRating;
     }
 
     private void NotifyValidationChanged()

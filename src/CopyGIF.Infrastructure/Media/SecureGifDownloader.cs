@@ -10,7 +10,8 @@ using CopyGIF.Infrastructure.Storage;
 namespace CopyGIF.Infrastructure.Media;
 
 public sealed class SecureGifDownloader :
-    IGifDownloader
+    IReusableGifDownloader,
+    IDisposable
 {
     private readonly HttpClient _httpClient;
 
@@ -27,6 +28,8 @@ public sealed class SecureGifDownloader :
 
     private readonly OwnedPathGuard
         _pathGuard;
+
+    private readonly SemaphoreSlim _clipboardCleanupGate = new(1, 1);
 
     public SecureGifDownloader(
         HttpClient httpClient,
@@ -65,6 +68,11 @@ public sealed class SecureGifDownloader :
             pathGuard ??
             throw new ArgumentNullException(
                 nameof(pathGuard));
+    }
+
+    public void Dispose()
+    {
+        _clipboardCleanupGate.Dispose();
     }
 
     public async Task<DownloadedGif> DownloadAsync(
@@ -194,6 +202,98 @@ public sealed class SecureGifDownloader :
                 "The GIF could not be stored safely.",
                 exception);
         }
+    }
+
+    public async Task<DownloadedGif> RetainAsync(
+        GifItem item, DownloadedGif clipboardGif, GifDownloadPurpose purpose,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(clipboardGif);
+        if (purpose is not (GifDownloadPurpose.Recent or GifDownloadPurpose.Favorite) ||
+            clipboardGif.Purpose != GifDownloadPurpose.Clipboard ||
+            clipboardGif.Identity != item.StableIdentity ||
+            clipboardGif.SizeBytes is < 13 or > MediaPolicy.MaximumGifBytes)
+            throw new InvalidDataException("The clipboard GIF cannot be retained as a library file.");
+
+        string sourcePath = _pathGuard.EnsureSafeFilePath(
+            _paths.ClipboardCacheDirectory, clipboardGif.FilePath);
+        DownloadDestination destination = await GetDestinationAsync(purpose, cancellationToken)
+            .ConfigureAwait(false);
+        _pathGuard.EnsureSafeDirectory(destination.OwnedRoot, destination.Directory);
+        string finalPath = _pathGuard.EnsureSafeFilePath(destination.OwnedRoot,
+            Path.Combine(destination.Directory, Guid.NewGuid().ToString("N") + ".gif"));
+        string temporaryPath = _pathGuard.EnsureSafeFilePath(destination.OwnedRoot,
+            finalPath + ".tmp");
+
+        try
+        {
+            await using FileStream source = new(sourcePath, FileMode.Open, FileAccess.Read,
+                FileShare.Read, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+            if (source.Length != clipboardGif.SizeBytes)
+                throw new InvalidDataException("The clipboard GIF changed before it could be saved.");
+            byte[] hash = await SHA256.HashDataAsync(source, cancellationToken).ConfigureAwait(false);
+            if (!Convert.ToHexString(hash).Equals(clipboardGif.Sha256,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("The clipboard GIF content changed before it could be saved.");
+            source.Position = 0;
+            await using (FileStream target = new(temporaryPath, FileMode.CreateNew,
+                FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
+            {
+                await source.CopyToAsync(target, cancellationToken).ConfigureAwait(false);
+                await target.FlushAsync(cancellationToken).ConfigureAwait(false);
+            }
+            File.Move(temporaryPath, finalPath);
+            return clipboardGif with { FilePath = finalPath, Purpose = purpose };
+        }
+        catch
+        {
+            DeleteTemporaryFile(destination.OwnedRoot, temporaryPath);
+            throw;
+        }
+    }
+
+    public async Task CleanupClipboardAsync(string activeClipboardFilePath,
+        CancellationToken cancellationToken = default)
+    {
+        string root = _paths.ClipboardCacheDirectory;
+        string active = _pathGuard.EnsureSafeFilePath(root, activeClipboardFilePath);
+        await _clipboardCleanupGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            _pathGuard.EnsureSafeDirectory(_paths.CacheDirectory, root);
+            var candidates = new List<FileInfo>();
+            foreach (string path in Directory.EnumerateFiles(root, "clipboard-*.gif"))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    string safe = _pathGuard.EnsureSafeFilePath(root, path);
+                    candidates.Add(new FileInfo(safe));
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException or
+                    MediaDownloadException) { RepairDiagnostics.Record("clipboard-cleanup", "local", "unsafe-file"); }
+            }
+
+            var ordered = candidates.OrderBy(file => file.LastWriteTimeUtc).ToArray();
+            long total = ordered.Sum(file => file.Length);
+            foreach (FileInfo file in ordered)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (string.Equals(file.FullName, active,
+                    OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)) continue;
+                if (_clock.UtcNow - file.LastWriteTimeUtc <= MediaPolicy.ClipboardRetention &&
+                    total <= MediaPolicy.MaximumClipboardCacheBytes) continue;
+                try
+                {
+                    _pathGuard.DeleteOwnedFileIfPresent(root, file.FullName);
+                    total -= file.Length;
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException or
+                    MediaDownloadException) { RepairDiagnostics.Record("clipboard-cleanup", "local", "delete-failed"); }
+            }
+        }
+        finally { _clipboardCleanupGate.Release(); }
     }
 
     private async Task<DownloadDestination>

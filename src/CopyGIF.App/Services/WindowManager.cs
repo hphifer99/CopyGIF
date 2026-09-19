@@ -508,6 +508,7 @@ public sealed class WindowManager :
 
         _isPickerVisible =
             true;
+        _themeManager.SetPickerVisible(true);
 
         if (!window.DispatcherQueue.TryEnqueue(
                 window.FocusSearch))
@@ -546,6 +547,7 @@ public sealed class WindowManager :
 
         _isPickerVisible =
             false;
+        _themeManager.SetPickerVisible(false);
 
         _mainWindow.AppWindow.Hide();
 
@@ -832,6 +834,7 @@ public sealed class WindowManager :
 
         _isPickerVisible =
             false;
+        _themeManager.SetPickerVisible(false);
 
         CloseSettingsWindow();
         CloseOnboardingWindow();

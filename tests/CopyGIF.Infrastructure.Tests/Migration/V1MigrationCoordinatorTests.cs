@@ -82,6 +82,43 @@ public sealed class V1MigrationCoordinatorTests
     }
 
     [TestMethod]
+    public async Task MigrateIfNeededAsync_VersionedFilesWithMissingState_PreservesBoth()
+    {
+        MigrationHarness harness = CreateHarness(new TestSecretStore(),
+            new TestLegacyCredentialDecoder("unused"));
+        AppSettings savedSettings = new() { Hotkey = "Ctrl+Shift+G" };
+        LibrarySnapshot savedLibrary = new();
+        await harness.SettingsStore.SaveAsync(savedSettings);
+        await harness.LibraryStore.SaveAsync(savedLibrary);
+        string settingsBefore = await File.ReadAllTextAsync(harness.Paths.SettingsPath);
+        string libraryBefore = await File.ReadAllTextAsync(harness.Paths.LibraryPath);
+
+        MigrationResult result = await harness.Coordinator.MigrateIfNeededAsync();
+
+        Assert.AreEqual(MigrationStatus.NotRequired, result.Status);
+        Assert.AreEqual(settingsBefore, await File.ReadAllTextAsync(harness.Paths.SettingsPath));
+        Assert.AreEqual(libraryBefore, await File.ReadAllTextAsync(harness.Paths.LibraryPath));
+        Assert.AreEqual("Ctrl+Shift+G", (await harness.SettingsStore.LoadAsync()).Hotkey);
+    }
+
+    [TestMethod]
+    public async Task MigrateIfNeededAsync_MalformedLegacySettings_PreservesArchiveAndStartsWithDefaults()
+    {
+        MigrationHarness harness = CreateHarness(new TestSecretStore(),
+            new TestLegacyCredentialDecoder("unused"));
+        harness.Paths.EnsureDirectoriesExist();
+        await File.WriteAllTextAsync(harness.Paths.SettingsPath, "{ broken legacy");
+
+        MigrationResult result = await harness.Coordinator.MigrateIfNeededAsync();
+
+        Assert.AreEqual(MigrationStatus.Completed, result.Status);
+        Assert.IsTrue(result.Warnings.Any(w => w.Contains("unreadable", StringComparison.Ordinal)));
+        Assert.AreEqual(AppSettings.DefaultHotkey, (await harness.SettingsStore.LoadAsync()).Hotkey);
+        Assert.AreEqual("{ broken legacy", await File.ReadAllTextAsync(Path.Combine(
+            harness.Paths.MigrationDirectory, "settings.v1.json")));
+    }
+
+    [TestMethod]
     public async Task MigrateIfNeededAsync_FullV1Data_MigratesAndArchivesSources()
     {
         TestSecretStore secretStore =
@@ -154,12 +191,11 @@ public sealed class V1MigrationCoordinatorTests
             "1",
             state.SourceVersion);
 
-        Assert.AreEqual(
-            settingsJson,
-            await File.ReadAllTextAsync(
-                Path.Combine(
-                    harness.Paths.MigrationDirectory,
-                    "settings.v1.json")));
+        string archivedSettings = await File.ReadAllTextAsync(Path.Combine(
+            harness.Paths.MigrationDirectory, "settings.v1.json"));
+        Assert.IsTrue(settingsJson.Contains("ApiKeyProtected", StringComparison.Ordinal));
+        Assert.IsFalse(archivedSettings.Contains("ApiKeyProtected", StringComparison.Ordinal));
+        Assert.IsFalse(archivedSettings.Contains("ApiKey", StringComparison.Ordinal));
 
         Assert.AreEqual(
             libraryJson,
@@ -288,7 +324,7 @@ public sealed class V1MigrationCoordinatorTests
     }
 
     [TestMethod]
-    public async Task MigrateIfNeededAsync_CredentialDecodeFails_LeavesSourcesUntouched()
+    public async Task MigrateIfNeededAsync_CredentialDecodeFails_MigratesDataAndWarns()
     {
         TestSecretStore secretStore =
             new();
@@ -310,27 +346,15 @@ public sealed class V1MigrationCoordinatorTests
             await harness.Coordinator
                 .MigrateIfNeededAsync();
 
-        Assert.AreEqual(
-            MigrationStatus.Failed,
-            result.Status);
-        Assert.AreEqual(
-            settingsJson,
-            await File.ReadAllTextAsync(
-                harness.Paths.SettingsPath));
-        Assert.AreEqual(
-            libraryJson,
-            await File.ReadAllTextAsync(
-                harness.Paths.LibraryPath));
-        Assert.IsFalse(
-            File.Exists(
-                Path.Combine(
-                    harness.Paths.MigrationDirectory,
-                    "settings.v1.json")));
-        Assert.IsFalse(
-            File.Exists(
-                Path.Combine(
-                    harness.Paths.MigrationDirectory,
-                    "library.v1.json")));
+        Assert.AreEqual(MigrationStatus.Completed, result.Status);
+        Assert.IsTrue(result.Warnings.Any(warning => warning.Contains("API key", StringComparison.Ordinal)));
+        Assert.IsTrue(settingsJson.Contains("ApiKeyProtected", StringComparison.Ordinal));
+        Assert.IsTrue(libraryJson.Contains("Favorites", StringComparison.Ordinal));
+        Assert.IsFalse(File.Exists(harness.Paths.SettingsPath) &&
+            (await File.ReadAllTextAsync(harness.Paths.SettingsPath)).Contains("ApiKeyProtected", StringComparison.Ordinal));
+        Assert.IsTrue((await harness.LibraryStore.LoadAsync()).Favorites.Count > 0);
+        Assert.IsFalse((await File.ReadAllTextAsync(Path.Combine(harness.Paths.MigrationDirectory,
+            "settings.v1.json"))).Contains("ApiKeyProtected", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -389,10 +413,9 @@ public sealed class V1MigrationCoordinatorTests
             "recovered-api-key",
             await secretStore.GetAsync(
                 SecretNames.KlipyApiKey));
-        Assert.AreEqual(
-            settingsJson,
-            await File.ReadAllTextAsync(
-                settingsBackupPath));
+        Assert.IsTrue(settingsJson.Contains("ApiKeyProtected", StringComparison.Ordinal));
+        Assert.IsFalse((await File.ReadAllTextAsync(settingsBackupPath))
+            .Contains("ApiKeyProtected", StringComparison.Ordinal));
         Assert.AreEqual(
             libraryJson,
             await File.ReadAllTextAsync(

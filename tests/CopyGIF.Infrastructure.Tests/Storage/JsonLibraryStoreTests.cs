@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using CopyGIF.Core.Models;
 using CopyGIF.Infrastructure.Storage;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -100,6 +101,29 @@ public sealed class JsonLibraryStoreTests
             "recent-1",
             loaded.Recents.Single()
                 .Identity.Id);
+    }
+
+    [TestMethod]
+    public async Task LoadAsync_OneInvalidEntry_PreservesOtherEntriesAndOriginal()
+    {
+        (JsonLibraryStore store, ApplicationPaths paths) = CreateStore();
+        await store.SaveAsync(new LibrarySnapshot
+        {
+            Favorites =
+            [
+                CreateEntry("good", DateTimeOffset.UtcNow),
+                CreateEntry("damaged", DateTimeOffset.UtcNow)
+            ]
+        });
+        JsonNode root = JsonNode.Parse(await File.ReadAllTextAsync(paths.LibraryPath))!;
+        root["favorites"]![1]!["gifUri"] = "http://untrusted.test/damaged.gif";
+        await File.WriteAllTextAsync(paths.LibraryPath, root.ToJsonString());
+
+        LibrarySnapshot result = await store.LoadAsync();
+
+        Assert.AreEqual("good", result.Favorites.Single().Identity.Id);
+        Assert.AreEqual("good", (await store.LoadAsync()).Favorites.Single().Identity.Id);
+        Assert.HasCount(1, Directory.GetFiles(_testDirectory, "library.json.corrupt.*"));
     }
 
     [TestMethod]

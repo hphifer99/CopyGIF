@@ -51,14 +51,28 @@ public sealed class GiphyGifProviderTests
     }
 
     [TestMethod]
-    public async Task MediaHostSubstitutionIsRejected()
+    public async Task MediaHostSubstitutionIsSkippedWithoutExposingTheHost()
     {
         using var handler = new Handler(_ => new(HttpStatusCode.OK)
         { Content = new StringContent(Response.Replace("media.giphy.com", "media.giphy.com.attacker.example", StringComparison.Ordinal)) });
         using var client = new HttpClient(handler);
         var provider = new GiphyGifProvider(client, new TestSecretStore(SecretNames.GiphyApiKey, "key"));
-        var failure = await Assert.ThrowsExactlyAsync<GifProviderException>(() => provider.SearchAsync(new() { Query = "cats" }));
-        Assert.AreEqual(GifProviderFailure.InvalidResponse, failure.Failure);
+        var page = await provider.SearchAsync(new() { Query = "cats" });
+        Assert.IsEmpty(page.Items);
+    }
+
+    [TestMethod]
+    public async Task SearchAndTrendingUseSelectedRating()
+    {
+        using var handler = new Handler(_ => new(HttpStatusCode.OK) { Content = new StringContent(Response) });
+        using var client = new HttpClient(handler);
+        var provider = new GiphyGifProvider(client, new TestSecretStore(SecretNames.GiphyApiKey, "key"));
+        await provider.SearchAsync(new() { Query = "cats", ContentRating = GifContentRating.Pg13 });
+        StringAssert.Contains(handler.Uri!.Query, "rating=pg-13");
+        await provider.SearchAsync(new() { Kind = GifSearchKind.Trending, Query = "", ContentRating = GifContentRating.G });
+        StringAssert.Contains(handler.Uri!.Query, "rating=g");
+        await provider.SearchAsync(new() { Query = "cats" });
+        Assert.IsFalse(handler.Uri!.Query.Contains("rating=", StringComparison.Ordinal));
     }
 
     [TestMethod]

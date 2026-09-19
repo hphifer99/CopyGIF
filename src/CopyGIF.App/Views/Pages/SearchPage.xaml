@@ -36,6 +36,10 @@
                 SearchCommand="{Binding SearchCommand, ElementName=Root}"
                 Suggestions="{Binding Suggestions, ElementName=Root}" />
 
+            <Button Content="Clear search history" HorizontalAlignment="Right"
+                AutomationProperties.Name="Clear saved search terms"
+                Click="ClearHistory_Click" />
+
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <TextBlock x:Name="ProviderAttributionText" Text="{Binding AttributionText}" Style="{StaticResource CopyGifStatusTextStyle}" />
                 <Border x:Name="GiphyAttribution" Background="Black" Padding="4" Visibility="Collapsed">
@@ -83,7 +87,7 @@
                         <ItemsWrapGrid
                             Orientation="Horizontal"
                             ItemWidth="204"
-                            ItemHeight="236" />
+                            ItemHeight="252" />
                     </ItemsPanelTemplate>
                 </GridView.ItemsPanel>
 

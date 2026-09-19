@@ -107,6 +107,9 @@ public sealed partial class SearchPage :
         RegisterCommand(
             nameof(LoadMoreCommand));
 
+    public static readonly DependencyProperty ClearHistoryCommandProperty =
+        RegisterCommand(nameof(ClearHistoryCommand));
+
     private readonly SearchPageBehavior _behavior;
 
     public SearchPage()
@@ -299,6 +302,28 @@ public sealed partial class SearchPage :
             SetValue(
                 LoadMoreCommandProperty,
                 value);
+    }
+
+    public ICommand? ClearHistoryCommand
+    {
+        get => GetCommand(ClearHistoryCommandProperty);
+        set => SetValue(ClearHistoryCommandProperty, value);
+    }
+
+    private async void ClearHistory_Click(object sender, RoutedEventArgs args)
+    {
+        if (ClearHistoryCommand?.CanExecute(null) != true) return;
+        ContentDialog dialog = new()
+        {
+            XamlRoot = XamlRoot,
+            Title = "Clear search history?",
+            Content = "This removes saved search terms. Your GIF Recents and Favorites are kept.",
+            PrimaryButtonText = "Clear history",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            ClearHistoryCommand.Execute(null);
     }
 
     public void FocusSearchBox()

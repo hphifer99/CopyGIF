@@ -113,7 +113,7 @@ public sealed class UpdatePolicyTests
     }
 
     [TestMethod]
-    public void ResolveMode_ExplicitMode_PreservesUserSelection()
+    public void ResolveMode_ExplicitMode_PromptsForPerMachineElevation()
     {
         InstallationContext context = new()
         {
@@ -134,7 +134,7 @@ public sealed class UpdatePolicyTests
                 context));
 
         Assert.AreEqual(
-            UpdateMode.DownloadAndInstall,
+            UpdateMode.DownloadAndPrompt,
             UpdatePolicy.ResolveMode(
                 UpdateMode.DownloadAndInstall,
                 context));

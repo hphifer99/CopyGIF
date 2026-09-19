@@ -67,6 +67,18 @@ public sealed class ThemeManager :
     public bool IsHighContrast =>
         _accessibilitySettings.HighContrast;
 
+    public void SetPickerVisible(bool visible)
+    {
+        ThrowIfDisposed();
+        EnsureUiThread();
+        if (visible)
+        {
+            CheckAnimationSettings();
+            _animationSettingsTimer?.Start();
+        }
+        else _animationSettingsTimer?.Stop();
+    }
+
     public void RegisterRoot(
         FrameworkElement root)
     {
@@ -182,7 +194,6 @@ public sealed class ThemeManager :
             Interval = TimeSpan.FromSeconds(1)
         };
         _animationSettingsTimer.Tick += HandleAnimationSettingsTick;
-        _animationSettingsTimer.Start();
 
         try
         {

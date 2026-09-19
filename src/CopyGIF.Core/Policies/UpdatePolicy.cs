@@ -22,6 +22,12 @@ public static class UpdatePolicy
         ArgumentNullException.ThrowIfNull(
             installationContext);
 
+        // A per-machine MSI can raise UAC. Never trigger that from the
+        // background update timer, even if auto install was saved earlier.
+        if (configuredMode == UpdateMode.DownloadAndInstall &&
+            installationContext.Scope != InstallScope.CurrentUser)
+            return UpdateMode.DownloadAndPrompt;
+
         if (configuredMode != UpdateMode.Recommended)
         {
             return configuredMode;

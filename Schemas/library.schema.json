@@ -145,6 +145,27 @@
         "copyCount": {
           "type": "integer",
           "minimum": 0
+        },
+        "renditions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "minimum": {
+              "$ref": "#/$defs/nullableHttpsUri"
+            },
+            "low": {
+              "$ref": "#/$defs/nullableHttpsUri"
+            },
+            "medium": {
+              "$ref": "#/$defs/nullableHttpsUri"
+            },
+            "high": {
+              "$ref": "#/$defs/nullableHttpsUri"
+            },
+            "maximum": {
+              "$ref": "#/$defs/nullableHttpsUri"
+            }
+          }
         }
       }
     }

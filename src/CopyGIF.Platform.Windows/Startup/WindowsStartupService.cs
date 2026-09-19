@@ -107,8 +107,9 @@ public sealed class WindowsStartupService :
             default:
                 if (enabled)
                 {
-                    throw new InvalidOperationException(
-                        "Start with Windows is available after CopyGIF is installed.");
+                    // Development runs have no registration target. Saving other
+                    // settings must remain possible until the app is installed.
+                    break;
                 }
 
                 await _msiController

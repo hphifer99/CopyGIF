@@ -173,6 +173,8 @@ public sealed class CopyGifHost :
         services
             .AddCopyGifPresentation();
 
+        services.RemoveAll<IClipboardService>();
+        services.AddSingleton<IClipboardService, WinUiClipboardService>();
         ReplaceCopyCoordinator(services);
         services.AddSingleton<UpdateViewModel>();
         services.AddSingleton<AppUpdateScheduler>();
@@ -586,8 +588,9 @@ public sealed class CopyGifHost :
                 OnboardingViewModel>();
 
         var providerOnboarding = new CopyGIF.Application.Onboarding.ProviderOnboardingCoordinator(
-            services.GetRequiredService<ISettingsStore>(), services.GetRequiredService<ISecretStore>(),
-            services.GetServices<IGifProviderCredentialManager>());
+            services.GetRequiredService<ISettingsCoordinator>(), services.GetRequiredService<ISecretStore>(),
+            services.GetServices<IGifProviderCredentialManager>(), services.GetRequiredService<IStartupService>(),
+            services.GetRequiredService<IApplicationPaths>());
         viewModel.CompleteProvider = providerOnboarding.CompleteAsync;
         viewModel.OpenProviderHelp = services.GetRequiredService<IUriLauncherService>().TryLaunchAsync;
 
@@ -915,6 +918,7 @@ public sealed class CopyGifHost :
 
         page.LoadMoreCommand =
             viewModel.LoadMoreCommand;
+        page.ClearHistoryCommand = viewModel.ClearSuggestionHistoryCommand;
     }
 
     private static void BindFavoritesPage(
@@ -1127,24 +1131,21 @@ public sealed class CopyGifHost :
                     .CopyAsync(
                         item,
                         searchQuery,
+                        async () =>
+                        {
+                            try
+                            {
+                                await _services.GetRequiredService<WindowManager>()
+                                    .HandleCopyCompletedAsync(CancellationToken.None).ConfigureAwait(false);
+                            }
+                            catch (Exception exception)
+                            {
+                                CopyGIF.Core.Models.RepairDiagnostics.Record(
+                                    "hide-after-copy", item.ProviderId, exception.GetType().Name);
+                            }
+                        },
                         cancellationToken)
                     .ConfigureAwait(false);
-
-            try
-            {
-                await _services
-                    .GetRequiredService<
-                        WindowManager>()
-                    .HandleCopyCompletedAsync(
-                        CancellationToken.None)
-                    .ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                Debug.WriteLine(
-                    $"The GIF was copied, but the picker could not apply hide-after-copy behavior: {exception}");
-            }
-
             return result;
         }
     }
@@ -1228,6 +1229,9 @@ public sealed class ShellRuntimeState :
 
     private void ApplyMotionPreference()
     {
+        _mainViewModel.Search.DisplayQuality = Settings.Appearance.DisplayQuality;
+        _mainViewModel.Favorites.DisplayQuality = Settings.Appearance.DisplayQuality;
+        _mainViewModel.Recents.DisplayQuality = Settings.Appearance.DisplayQuality;
         _mainViewModel.ReducedMotion =
             !Settings.Search.AnimatePreviews ||
             !_themeManager.AnimationsEnabled;

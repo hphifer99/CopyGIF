@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using CopyGIF.Core.Models;
@@ -8,6 +9,9 @@ public sealed class VersionedJsonSerializer
 {
     private readonly AtomicFileWriter _fileWriter;
     private readonly CorruptFileRecovery _corruptFileRecovery;
+    // Store instances created by tests or other callers still serialize access to the same file.
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> PathGates =
+        new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
     private static readonly JsonSerializerOptions
         SerializerOptions =
@@ -32,6 +36,18 @@ public sealed class VersionedJsonSerializer
         VersionedJsonStoreDefinition<T> definition,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(definition);
+        SemaphoreSlim gate = PathGates.GetOrAdd(Path.GetFullPath(definition.PrimaryPath),
+            static _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try { return await LoadCoreAsync(definition, cancellationToken).ConfigureAwait(false); }
+        finally { gate.Release(); }
+    }
+
+    private async Task<T> LoadCoreAsync<T>(
+        VersionedJsonStoreDefinition<T> definition,
+        CancellationToken cancellationToken = default)
+    {
         ArgumentNullException.ThrowIfNull(
             definition);
 
@@ -45,6 +61,11 @@ public sealed class VersionedJsonSerializer
                 primary,
                 definition))
         {
+            if (primary.Status == JsonReadStatus.PartiallyRecovered)
+            {
+                _corruptFileRecovery.Preserve(definition.PrimaryPath);
+                await WriteCoreAsync(definition, primary.Value!, cancellationToken);
+            }
             return primary.Value!;
         }
 
@@ -74,6 +95,8 @@ public sealed class VersionedJsonSerializer
                 backup,
                 definition))
         {
+            if (backup.Status == JsonReadStatus.PartiallyRecovered)
+                _corruptFileRecovery.Preserve(definition.BackupPath);
             await WriteCoreAsync(
                 definition,
                 backup.Value!,
@@ -122,6 +145,19 @@ public sealed class VersionedJsonSerializer
         T value,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(definition);
+        SemaphoreSlim gate = PathGates.GetOrAdd(Path.GetFullPath(definition.PrimaryPath),
+            static _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try { await SaveCoreAsync(definition, value, cancellationToken).ConfigureAwait(false); }
+        finally { gate.Release(); }
+    }
+
+    private async Task SaveCoreAsync<T>(
+        VersionedJsonStoreDefinition<T> definition,
+        T value,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(
             definition);
 
@@ -162,6 +198,20 @@ public sealed class VersionedJsonSerializer
             string path,
             VersionedJsonStoreDefinition<T> definition,
             CancellationToken cancellationToken)
+    {
+        for (int attempt = 0; ; attempt++)
+        {
+            try { return await ReadCoreAsync(path, definition, cancellationToken).ConfigureAwait(false); }
+            catch (IOException) when (attempt < 3)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(50 * (attempt + 1)), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+    }
+
+    private static async Task<JsonReadResult<T>> ReadCoreAsync<T>(
+        string path, VersionedJsonStoreDefinition<T> definition, CancellationToken cancellationToken)
     {
         string fullPath =
             Path.GetFullPath(path);
@@ -233,20 +283,23 @@ public sealed class VersionedJsonSerializer
                         schemaVersion);
             }
 
-            T? value =
-                document.RootElement
-                    .Deserialize<T>(
-                        SerializerOptions);
+            T? value = default;
+            try { value = document.RootElement.Deserialize<T>(SerializerOptions); }
+            catch (JsonException) when (definition.RecoverEntries is not null) { }
 
-            return value is null
-                ? JsonReadResult<T>.Invalid()
-                : JsonReadResult<T>.Success(value);
-        }
-        catch (JsonException)
-        {
+            if (value is not null && definition.IsValid(value))
+                return JsonReadResult<T>.Success(value);
+
+            if (definition.RecoverEntries is not null)
+            {
+                T? recovered = definition.RecoverEntries(document.RootElement, SerializerOptions);
+                if (recovered is not null && definition.IsValid(recovered))
+                    return JsonReadResult<T>.PartiallyRecovered(recovered);
+            }
+
             return JsonReadResult<T>.Invalid();
         }
-        catch (IOException)
+        catch (JsonException)
         {
             return JsonReadResult<T>.Invalid();
         }
@@ -283,8 +336,7 @@ public sealed class VersionedJsonSerializer
         JsonReadResult<T> result,
         VersionedJsonStoreDefinition<T> definition)
     {
-        return result.Status ==
-                   JsonReadStatus.Success &&
+        return (result.Status is JsonReadStatus.Success or JsonReadStatus.PartiallyRecovered) &&
                result.Value is not null &&
                definition.IsValid(
                    result.Value);
@@ -297,6 +349,7 @@ public sealed class VersionedJsonSerializer
         return result.Status is
                    JsonReadStatus.Invalid or
                    JsonReadStatus.MissingSchemaVersion ||
+               result.Status == JsonReadStatus.PartiallyRecovered ||
                result.Status ==
                    JsonReadStatus.Success &&
                (result.Value is null ||
@@ -489,6 +542,8 @@ internal sealed record VersionedJsonStoreDefinition<T>
 
     public required Func<T, bool> IsValid { get; init; }
 
+    public Func<JsonElement, JsonSerializerOptions, T?>? RecoverEntries { get; init; }
+
     public Func<string, Exception>?
         MissingSchemaExceptionFactory
     { get; init; }
@@ -497,6 +552,7 @@ internal sealed record VersionedJsonStoreDefinition<T>
 internal enum JsonReadStatus
 {
     Success,
+    PartiallyRecovered,
     Missing,
     MissingSchemaVersion,
     UnsupportedSchemaVersion,
@@ -524,6 +580,12 @@ internal sealed record JsonReadResult<T>
             Value = value
         };
     }
+
+    public static JsonReadResult<T> PartiallyRecovered(T value) => new()
+    {
+        Status = JsonReadStatus.PartiallyRecovered,
+        Value = value
+    };
 
     public static JsonReadResult<T> Missing()
     {

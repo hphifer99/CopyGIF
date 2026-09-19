@@ -34,7 +34,7 @@ public sealed class PreviewCoordinator :
     public async Task<Uri> GetThumbnailSourceAsync(GifItem item, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(item);
-        if (!ProviderMediaPolicy.AllowsPersistentLibrary(item.ProviderId))
+        if (ProviderMediaPolicy.UsesDirectPreview(item.ProviderId))
         {
             if (!ProviderMediaPolicy.IsDirectMediaUri(item.ThumbnailUri)) throw new InvalidDataException("Invalid GIPHY media host.");
             return item.ThumbnailUri;
@@ -83,7 +83,7 @@ public sealed class PreviewCoordinator :
             item.PreviewUri ??
             item.GifUri;
 
-        if (!ProviderMediaPolicy.AllowsPersistentLibrary(item.ProviderId))
+        if (ProviderMediaPolicy.UsesDirectPreview(item.ProviderId))
         {
             if (!ProviderMediaPolicy.IsDirectMediaUri(sourceUri)) throw new InvalidDataException("Invalid GIPHY media host.");
             return sourceUri;
@@ -102,7 +102,7 @@ public sealed class PreviewCoordinator :
         ArgumentNullException.ThrowIfNull(
             item);
 
-        if (!ProviderMediaPolicy.AllowsPersistentLibrary(item.ProviderId)) return;
+        if (ProviderMediaPolicy.UsesDirectPreview(item.ProviderId)) return;
 
         await _previewCache
             .RemoveAsync(

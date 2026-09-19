@@ -105,7 +105,7 @@ public sealed class GifLibraryCoordinator :
             item);
 
         if (!ProviderMediaPolicy.AllowsPersistentLibrary(item.ProviderId))
-            throw new InvalidOperationException("GIPHY GIFs cannot be added to the local library.");
+            throw new InvalidOperationException("This provider cannot save GIFs to the local library.");
 
         await _gate
             .WaitAsync(
@@ -149,7 +149,7 @@ public sealed class GifLibraryCoordinator :
                 downloadedGif =
                     await _gifDownloader
                         .DownloadAsync(
-                            item,
+                            item with { GifUri = item.Renditions.Select(settings.Library.SaveQuality, item.GifUri) },
                             GifDownloadPurpose.Favorite,
                             cancellationToken)
                         .ConfigureAwait(false);
@@ -369,18 +369,35 @@ public sealed class GifLibraryCoordinator :
                         cancellationToken)
                     .ConfigureAwait(false);
 
+            LibrarySnapshot current =
+                await _libraryStore
+                    .LoadAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+            Uri savedUri = item.Renditions.Select(settings.Library.SaveQuality, item.GifUri);
+            if (settings.Library.StoreRecentsLocally && copiedGif.Purpose == GifDownloadPurpose.Clipboard &&
+                item.Renditions.Select(settings.Library.GifQuality, item.GifUri) != savedUri)
+            {
+                copiedGif = await _gifDownloader.DownloadAsync(item with { GifUri = savedUri },
+                    GifDownloadPurpose.Recent, cancellationToken).ConfigureAwait(false);
+            }
+
+            bool retainedClipboardFile = settings.Library.StoreRecentsLocally &&
+                copiedGif.Purpose == GifDownloadPurpose.Clipboard &&
+                _gifDownloader is IReusableGifDownloader;
+            if (retainedClipboardFile &&
+                _gifDownloader is IReusableGifDownloader reusable)
+            {
+                copiedGif = await reusable.RetainAsync(item, copiedGif,
+                    GifDownloadPurpose.Recent, cancellationToken).ConfigureAwait(false);
+            }
+
             if (settings.Library.StoreRecentsLocally &&
                 copiedGif.Purpose != GifDownloadPurpose.Recent)
             {
                 throw new InvalidDataException(
                     "A locally retained Recent must use a Recent download.");
             }
-
-            LibrarySnapshot current =
-                await _libraryStore
-                    .LoadAsync(
-                        cancellationToken)
-                    .ConfigureAwait(false);
 
             LibraryEntry? existing =
                 current.Recents
@@ -445,11 +462,16 @@ public sealed class GifLibraryCoordinator :
                     Recents = retained
                 };
 
-            await _libraryStore
-                .SaveAsync(
-                    updated,
-                    cancellationToken)
-                .ConfigureAwait(false);
+            try
+            {
+                await _libraryStore.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                if (retainedClipboardFile)
+                    await TryDeletePathsAsync(settings, [copiedGif.FilePath]).ConfigureAwait(false);
+                throw;
+            }
 
             List<string> cleanupPaths =
                 GetLocalPaths(
@@ -625,6 +647,7 @@ public sealed class GifLibraryCoordinator :
             Title = item.Title,
             Description = item.Description,
             GifUri = item.GifUri,
+            Renditions = item.Renditions,
             ThumbnailUri = item.ThumbnailUri,
             PreviewUri = item.PreviewUri,
             SourcePageUri = item.SourcePageUri,

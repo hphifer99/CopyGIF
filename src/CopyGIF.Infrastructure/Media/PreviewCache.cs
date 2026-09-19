@@ -42,6 +42,9 @@ public sealed class PreviewCache :
     private readonly SemaphoreSlim _gate =
         new(1, 1);
 
+    private DateTimeOffset _lastCleanupUtc = DateTimeOffset.MinValue;
+    private long _bytesSinceCleanup;
+
     private bool _disposed;
 
     public PreviewCache(
@@ -247,9 +250,17 @@ public sealed class PreviewCache :
                 finalPath,
                 storedAtUtc.UtcDateTime);
 
-            await CleanupCoreAsync(
-                    cancellationToken)
-                .ConfigureAwait(false);
+            _bytesSinceCleanup += sizeBytes;
+            long budget = kind == PreviewCacheKind.Thumbnail
+                ? _limits.MaximumThumbnailCacheBytes : _limits.MaximumPreviewCacheBytes;
+            if (_lastCleanupUtc == DateTimeOffset.MinValue ||
+                storedAtUtc - _lastCleanupUtc >= TimeSpan.FromMinutes(10) ||
+                _bytesSinceCleanup >= Math.Max(1, Math.Min(budget / 8, 16L * 1024 * 1024)))
+            {
+                await CleanupCoreAsync(cancellationToken).ConfigureAwait(false);
+                _lastCleanupUtc = storedAtUtc;
+                _bytesSinceCleanup = 0;
+            }
 
             return new PreviewCacheEntry
             {

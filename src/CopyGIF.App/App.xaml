@@ -34,6 +34,7 @@
                 x:Key="CopyGifMessageSeverityConverter" />
 
             <services:SettingChoiceLabelConverter x:Key="SettingChoiceLabelConverter" />
+            <services:BooleanVisibilityConverter x:Key="MsiVisibilityConverter" />
             <DataTemplate x:Key="SettingChoiceTemplate">
                 <TextBlock Text="{Binding Converter={StaticResource SettingChoiceLabelConverter}}" TextWrapping="Wrap" />
             </DataTemplate>
@@ -46,6 +47,8 @@
                     AutomationProperties.HelpText="Press Enter to copy this GIF. Use the Favorite button to change its saved state."
                     IsBusy="{Binding IsBusy}"
                     IsFavorite="{Binding IsFavorite}"
+                    DecodePixelSize="{Binding DecodePixelSize}"
+                    DecodeByHeight="{Binding DecodeByHeight}"
                     PreviewUri="{Binding CurrentSource}"
                     LoadThumbnailCommand="{Binding LoadThumbnailCommand}"
                     StartPreviewCommand="{Binding StartPreviewCommand}"
@@ -109,16 +112,18 @@
 
                             <TextBox
                                 AutomationProperties.Name="Global hotkey"
-                                Header="Global hotkey"
+
                                 PlaceholderText="Alt+G"
-                                Text="{Binding Hotkey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Text="After Apply, this shortcut opens GIF search from any app. Alt+G is the default; an unavailable shortcut is reported." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+                                Text="{Binding Hotkey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                <TextBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Global hotkey" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Global hotkey information" AutomationProperties.HelpText="Opens GIF search from any app. An unavailable shortcut is reported." ToolTipService.ToolTip="Opens GIF search from any app. An unavailable shortcut is reported." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></TextBox.Header>
+                            </TextBox>
 
                             <ToggleSwitch
                                 AutomationProperties.Name="Start CopyGIF with Windows"
-                                Header="Start with Windows"
-                                IsOn="{Binding StartWithWindows, Mode=TwoWay}" />
-                            <TextBlock Text="After Apply, CopyGIF starts when you sign in to Windows. Windows may require you to enable this in Startup apps." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+
+                                IsOn="{Binding StartWithWindows, Mode=TwoWay}">
+                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Start with Windows" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Start with Windows information" AutomationProperties.HelpText="Starts CopyGIF in the tray at sign-in. Windows Startup apps can also disable it." ToolTipService.ToolTip="Starts CopyGIF in the tray at sign-in. Windows Startup apps can also disable it." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ToggleSwitch.Header>
+                            </ToggleSwitch>
 
                         </StackPanel>
 
@@ -135,36 +140,42 @@
 
                             <ToggleSwitch
                                 AutomationProperties.Name="Hide when CopyGIF loses focus"
-                                Header="Hide when CopyGIF loses focus"
-                                IsOn="{Binding CloseWhenFocusLost, Mode=TwoWay}" />
-                            <TextBlock Text="Previews immediately: hides CopyGIF when you switch to another app, while keeping your Settings draft." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+
+                                IsOn="{Binding CloseWhenFocusLost, Mode=TwoWay}">
+                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Hide when CopyGIF loses focus" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Hide when CopyGIF loses focus information" AutomationProperties.HelpText="Hides the picker when another app gets focus. Your Settings draft is kept." ToolTipService.ToolTip="Hides the picker when another app gets focus. Your Settings draft is kept." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ToggleSwitch.Header>
+                            </ToggleSwitch>
 
                             <ToggleSwitch
                                 AutomationProperties.Name="Hide CopyGIF after copying a GIF"
-                                Header="Hide after copy"
-                                IsOn="{Binding HideAfterCopy, Mode=TwoWay}" />
-                            <TextBlock Text="Previews immediately: hides GIF search after a successful copy so you can paste into your other app." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
 
-                            <ToggleSwitch Header="Close to system tray"
-                                AutomationProperties.Name="Close to system tray" IsOn="{Binding CloseToTray, Mode=TwoWay}" />
-                            <TextBlock Text="Previews immediately: the main window X keeps CopyGIF running in the tray. Turn off to exit; tray Exit always exits." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
-                            <ToggleSwitch Header="Center window when opened from tray"
-                                AutomationProperties.Name="Center window when opened from tray" IsOn="{Binding CenterOnTrayOpen, Mode=TwoWay}" />
-                            <TextBlock Text="Previews immediately: tray Open centers the window on that screen. Turn off to use normal window placement." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+                                IsOn="{Binding HideAfterCopy, Mode=TwoWay}">
+                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Hide after copy" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Hide after copy information" AutomationProperties.HelpText="Hides the picker after a successful clipboard copy." ToolTipService.ToolTip="Hides the picker after a successful clipboard copy." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ToggleSwitch.Header>
+                            </ToggleSwitch>
+
+                            <ToggleSwitch
+                                AutomationProperties.Name="Close to system tray" IsOn="{Binding CloseToTray, Mode=TwoWay}">
+                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Close to system tray" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Close to system tray information" AutomationProperties.HelpText="Closing the picker keeps CopyGIF in the tray. Tray Exit quits the app." ToolTipService.ToolTip="Closing the picker keeps CopyGIF in the tray. Tray Exit quits the app." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ToggleSwitch.Header>
+                            </ToggleSwitch>
+                            <ToggleSwitch
+                                AutomationProperties.Name="Center window when opened from tray" IsOn="{Binding CenterOnTrayOpen, Mode=TwoWay}">
+                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Center window when opened from tray" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Center window when opened from tray information" AutomationProperties.HelpText="Tray Open centers the picker on that screen." ToolTipService.ToolTip="Tray Open centers the picker on that screen." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ToggleSwitch.Header>
+                            </ToggleSwitch>
 
                             <ComboBox
                                 AutomationProperties.Name="Window placement mode"
-                                Header="Window placement"
+
                                 ItemsSource="{Binding PlacementModes}"
                                 ItemTemplate="{StaticResource SettingChoiceTemplate}"
-                                SelectedItem="{Binding PlacementMode, Mode=TwoWay}" />
-                            <TextBlock Text="Previews on the next activation. Choose near the mouse, centered on the current screen, or your last position." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+                                SelectedItem="{Binding PlacementMode, Mode=TwoWay}">
+                                <ComboBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Window placement" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Window placement information" AutomationProperties.HelpText="Choose near the pointer, screen center, or the last position." ToolTipService.ToolTip="Choose near the pointer, screen center, or the last position." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ComboBox.Header>
+                            </ComboBox>
 
                             <ToggleSwitch
                                 AutomationProperties.Name="Remember window size"
-                                Header="Remember window size"
-                                IsOn="{Binding RememberWindowSize, Mode=TwoWay}" />
-                            <TextBlock Text="Previews on the next activation: restores the width and height you last used." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+
+                                IsOn="{Binding RememberWindowSize, Mode=TwoWay}">
+                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Remember window size" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Remember window size information" AutomationProperties.HelpText="Restores the last picker width and height." ToolTipService.ToolTip="Restores the last picker width and height." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ToggleSwitch.Header>
+                            </ToggleSwitch>
 
                         </StackPanel>
 
@@ -193,41 +204,53 @@
                                 Style="{StaticResource CopyGifSectionTitleTextStyle}"
                                 Text="Results" />
 
+                            <ComboBox AutomationProperties.Name="GIPHY content filter"
+                                ItemsSource="{Binding ContentRatings}"
+                                ItemTemplate="{StaticResource SettingChoiceTemplate}"
+                                SelectedItem="{Binding ContentRating, Mode=TwoWay}">
+                                <ComboBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Content filter" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Content filter information" AutomationProperties.HelpText="GIPHY uses this rating for search and trending. KLIPY uses the rating set for its API key. The default is All available." ToolTipService.ToolTip="GIPHY uses this rating for search and trending. KLIPY uses the rating set for its API key. The default is All available." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ComboBox.Header>
+                            </ComboBox>
+
                             <NumberBox
                                 AutomationProperties.Name="Results per search"
-                                Header="Results per search"
+
                                 Maximum="{Binding MaximumResultsPerSearch}"
                                 Minimum="{Binding MinimumResultsPerSearch}"
                                 SpinButtonPlacementMode="Inline"
-                                Value="{Binding ResultsPerSearch, Mode=TwoWay}" />
-                            <TextBlock Text="Previews on the next request: sets the number of GIFs requested per page. GIPHY allows up to 50 per page." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+                                Value="{Binding ResultsPerSearch, Mode=TwoWay}">
+                                <NumberBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Results per search" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Results per search information" AutomationProperties.HelpText="GIFs requested per page. GIPHY allows up to 50." ToolTipService.ToolTip="GIFs requested per page. GIPHY allows up to 50." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></NumberBox.Header>
+                            </NumberBox>
 
                             <NumberBox
                                 AutomationProperties.Name="Search debounce milliseconds"
-                                Header="Search delay after typing (ms)"
+
                                 Maximum="{Binding MaximumDebounceMilliseconds}"
                                 Minimum="{Binding MinimumDebounceMilliseconds}"
                                 SpinButtonPlacementMode="Inline"
-                                Value="{Binding DebounceMilliseconds, Mode=TwoWay}" />
-                            <TextBlock Text="Previews immediately: waits this many milliseconds after typing stops before searching. Enter or Search runs immediately." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+                                Value="{Binding DebounceMilliseconds, Mode=TwoWay}">
+                                <NumberBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Search delay after typing (ms)" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Search delay after typing (ms) information" AutomationProperties.HelpText="Waits after typing stops. Enter starts immediately." ToolTipService.ToolTip="Waits after typing stops. Enter starts immediately." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></NumberBox.Header>
+                            </NumberBox>
 
                             <ToggleSwitch
                                 AutomationProperties.Name="Animate GIF previews"
-                                Header="Animate previews"
-                                IsOn="{Binding AnimatePreviews, Mode=TwoWay}" />
-                            <TextBlock Text="Previews immediately: GIFs animate only while hovered. Windows animation preferences can also disable playback." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+
+                                IsOn="{Binding AnimatePreviews, Mode=TwoWay}">
+                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Animate previews" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Animate previews information" AutomationProperties.HelpText="GIFs animate on hover when Windows permits animation." ToolTipService.ToolTip="GIFs animate on hover when Windows permits animation." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ToggleSwitch.Header>
+                            </ToggleSwitch>
 
                             <ToggleSwitch
                                 AutomationProperties.Name="Automatically load more GIF results"
-                                Header="Automatically load more results"
-                                IsOn="{Binding AutoLoadMoreResults, Mode=TwoWay}" />
-                            <TextBlock Text="Previews immediately: scroll downward again at the bottom to request one more page. Load more remains available." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+
+                                IsOn="{Binding AutoLoadMoreResults, Mode=TwoWay}">
+                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Automatically load more results" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Automatically load more results information" AutomationProperties.HelpText="Scrolling to the bottom can request another page." ToolTipService.ToolTip="Scrolling to the bottom can request another page." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ToggleSwitch.Header>
+                            </ToggleSwitch>
 
                             <ToggleSwitch
                                 AutomationProperties.Name="Show Trending GIFs when search is empty"
-                                Header="Show Trending GIFs when search is empty"
-                                IsOn="{Binding ShowTrendingWhenEmpty, Mode=TwoWay}" />
-                            <TextBlock Text="Previews immediately: shows trending GIFs when the search is empty, including after you clear a search." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+
+                                IsOn="{Binding ShowTrendingWhenEmpty, Mode=TwoWay}">
+                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Show Trending GIFs when search is empty" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Show Trending GIFs when search is empty information" AutomationProperties.HelpText="Shows trending GIFs when you clear the search." ToolTipService.ToolTip="Shows trending GIFs when you clear the search." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ToggleSwitch.Header>
+                            </ToggleSwitch>
 
                         </StackPanel>
 
@@ -244,24 +267,27 @@
 
                             <ToggleSwitch
                                 AutomationProperties.Name="Save search history"
-                                Header="Save search history"
-                                IsOn="{Binding SaveSearchHistory, Mode=TwoWay}" />
-                            <TextBlock Text="After Apply, remembers future search terms on this PC. Turning this off does not delete existing history." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+
+                                IsOn="{Binding SaveSearchHistory, Mode=TwoWay}">
+                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Save search history" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Save search history information" AutomationProperties.HelpText="Remembers submitted terms on this PC. Disabling it keeps existing terms." ToolTipService.ToolTip="Remembers submitted terms on this PC. Disabling it keeps existing terms." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ToggleSwitch.Header>
+                            </ToggleSwitch>
 
                             <ToggleSwitch
                                 AutomationProperties.Name="Use search history for suggestions"
-                                Header="Use history for suggestions"
-                                IsOn="{Binding UseHistorySuggestions, Mode=TwoWay}" />
-                            <TextBlock Text="After Apply, offers matching saved search terms as you type." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+
+                                IsOn="{Binding UseHistorySuggestions, Mode=TwoWay}">
+                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Use history for suggestions" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Use history for suggestions information" AutomationProperties.HelpText="Offers matching saved terms as you type." ToolTipService.ToolTip="Offers matching saved terms as you type." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ToggleSwitch.Header>
+                            </ToggleSwitch>
 
                             <NumberBox
                                 AutomationProperties.Name="Search history limit"
-                                Header="Search history limit"
+
                                 Maximum="{Binding MaximumSearchHistoryLimit}"
                                 Minimum="{Binding MinimumSearchHistoryLimit}"
                                 SpinButtonPlacementMode="Inline"
-                                Value="{Binding SearchHistoryLimit, Mode=TwoWay}" />
-                            <TextBlock Text="After Apply, limits the number of search terms retained when history is next updated." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+                                Value="{Binding SearchHistoryLimit, Mode=TwoWay}">
+                                <NumberBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Search history limit" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Search history limit information" AutomationProperties.HelpText="Maximum number of saved search terms." ToolTipService.ToolTip="Maximum number of saved search terms." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></NumberBox.Header>
+                            </NumberBox>
 
                         </StackPanel>
 
@@ -292,14 +318,30 @@
 
                             <ComboBox
                                 AutomationProperties.Name="Application theme"
-                                Header="Application theme"
+
                                 ItemsSource="{Binding Themes}"
                                 ItemTemplate="{StaticResource SettingChoiceTemplate}"
-                                SelectedItem="{Binding Theme, Mode=TwoWay}" />
-                            <TextBlock Text="Previews immediately in all CopyGIF windows. Follow Windows uses its light or dark theme; high contrast follows Windows." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+                                SelectedItem="{Binding Theme, Mode=TwoWay}">
+                                <ComboBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Application theme" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Application theme information" AutomationProperties.HelpText="Choose Windows, light, or dark. High contrast follows Windows." ToolTipService.ToolTip="Choose Windows, light, or dark. High contrast follows Windows." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ComboBox.Header>
+                            </ComboBox>
 
                         </StackPanel>
 
+                    </Border>
+
+                    <Border Style="{StaticResource CopyGifSettingsSectionBorderStyle}">
+                        <StackPanel Spacing="16">
+                            <TextBlock Style="{StaticResource CopyGifSectionTitleTextStyle}" Text="Quality" />
+                            <ComboBox Header="Copy quality" AutomationProperties.Name="Copy quality"
+                                ItemsSource="{Binding GifQualities}" ItemTemplate="{StaticResource SettingChoiceTemplate}"
+                                SelectedItem="{Binding CopyQuality, Mode=TwoWay}" ToolTipService.ToolTip="Size and detail of GIFs copied to other apps." />
+                            <ComboBox Header="Save quality" AutomationProperties.Name="Save quality"
+                                ItemsSource="{Binding GifQualities}" ItemTemplate="{StaticResource SettingChoiceTemplate}"
+                                SelectedItem="{Binding SaveQuality, Mode=TwoWay}" ToolTipService.ToolTip="Size and detail of new local Favorites and Recents. Existing files are kept." />
+                            <ComboBox Header="Display quality" AutomationProperties.Name="Display quality"
+                                ItemsSource="{Binding GifQualities}" ItemTemplate="{StaticResource SettingChoiceTemplate}"
+                                SelectedItem="{Binding DisplayQuality, Mode=TwoWay}" ToolTipService.ToolTip="Detail shown inside CopyGIF. Lower settings use less image memory." />
+                        </StackPanel>
                     </Border>
 
                     <TextBlock
@@ -327,33 +369,37 @@
 
                             <NumberBox
                                 AutomationProperties.Name="Recent GIF limit"
-                                Header="Recent GIF limit"
+
                                 Maximum="{Binding MaximumRecentLimit}"
                                 Minimum="{Binding MinimumRecentLimit}"
                                 SpinButtonPlacementMode="Inline"
-                                Value="{Binding RecentLimit, Mode=TwoWay}" />
-                            <TextBlock Text="After Apply, limits future recent GIF history. New copies may remove the oldest entries at the limit." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+                                Value="{Binding RecentLimit, Mode=TwoWay}">
+                                <NumberBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Recent GIF limit" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Recent GIF limit information" AutomationProperties.HelpText="A new copy removes the oldest Recent when the limit is reached." ToolTipService.ToolTip="A new copy removes the oldest Recent when the limit is reached." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></NumberBox.Header>
+                            </NumberBox>
 
                             <NumberBox
                                 AutomationProperties.Name="Favorite GIF limit"
-                                Header="Favorite GIF limit"
+
                                 Maximum="{Binding MaximumFavoriteLimit}"
                                 Minimum="{Binding MinimumFavoriteLimit}"
                                 SpinButtonPlacementMode="Inline"
-                                Value="{Binding FavoriteLimit, Mode=TwoWay}" />
-                            <TextBlock Text="After Apply, sets the maximum number of Favorites. Lowering it does not delete existing Favorites." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+                                Value="{Binding FavoriteLimit, Mode=TwoWay}">
+                                <NumberBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Favorite GIF limit" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Favorite GIF limit information" AutomationProperties.HelpText="Maximum Favorites. Lowering it keeps existing entries." ToolTipService.ToolTip="Maximum Favorites. Lowering it keeps existing entries." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></NumberBox.Header>
+                            </NumberBox>
 
                             <ToggleSwitch
                                 AutomationProperties.Name="Store Favorite GIFs locally"
-                                Header="Store Favorites locally"
-                                IsOn="{Binding StoreFavoritesLocally, Mode=TwoWay}" />
-                            <TextBlock Text="After Apply, new KLIPY Favorites include a local GIF file. Existing saved files are kept." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+
+                                IsOn="{Binding StoreFavoritesLocally, Mode=TwoWay}">
+                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Store Favorites locally" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Store Favorites locally information" AutomationProperties.HelpText="Saves new Favorites as files for either provider." ToolTipService.ToolTip="Saves new Favorites as files for either provider." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ToggleSwitch.Header>
+                            </ToggleSwitch>
 
                             <ToggleSwitch
                                 AutomationProperties.Name="Store Recent GIFs locally"
-                                Header="Store Recents locally"
-                                IsOn="{Binding StoreRecentsLocally, Mode=TwoWay}" />
-                            <TextBlock Text="After Apply, new KLIPY Recents include local GIF files. Clipboard files remain independent of Recents." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+
+                                IsOn="{Binding StoreRecentsLocally, Mode=TwoWay}">
+                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Store Recents locally" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Store Recents locally information" AutomationProperties.HelpText="Saves new Recents as files. Clipboard files are separate." ToolTipService.ToolTip="Saves new Recents as files. Clipboard files are separate." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ToggleSwitch.Header>
+                            </ToggleSwitch>
 
                         </StackPanel>
 
@@ -367,7 +413,10 @@
                             <TextBlock
                                 Style="{StaticResource CopyGifSectionTitleTextStyle}"
                                 Text="Storage location" />
-                            <TextBlock Text="Choose a folder to stage a new location. Apply moves existing library files; Discard keeps the old location. Use default stages the standard app folder." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+                            <Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" HorizontalAlignment="Left"
+                                AutomationProperties.Name="Storage location information"
+                                AutomationProperties.HelpText="Apply moves saved library files to the selected folder. Discard keeps the current location."
+                                ToolTipService.ToolTip="Apply moves saved library files to the selected folder. Discard keeps the current location." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button>
 
                             <TextBlock
                                 AutomationProperties.Name="Current library storage location"
@@ -407,32 +456,31 @@
                 <StackPanel Spacing="16">
                     <ComboBox Header="GIF provider" ItemsSource="{Binding Providers}"
                         DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding ActiveProviderId, Mode=TwoWay}" />
-                    <TextBlock Text="After Apply, new searches use this provider. Keys are independent and are encrypted on this PC. Leaving a key blank keeps its saved value." TextWrapping="Wrap" />
+                    <Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" HorizontalAlignment="Left"
+                        AutomationProperties.Name="GIF provider information"
+                        AutomationProperties.HelpText="Choose a provider for future searches. Each provider has a separate protected API key."
+                        ToolTipService.ToolTip="Choose a provider for future searches. Each provider has a separate protected API key." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button>
                     <Border Style="{StaticResource CopyGifSettingsSectionBorderStyle}">
                         <StackPanel Spacing="10">
                             <TextBlock Text="KLIPY" Style="{StaticResource CopyGifSectionTitleTextStyle}" />
-                            <TextBlock Text="{Binding KlipyStatus}" TextWrapping="Wrap" />
                             <PasswordBox Header="KLIPY API key" Password="{Binding KlipyCredential, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                PasswordRevealMode="Peek" PlaceholderText="Enter a replacement key" />
-                            <TextBlock Text="A changed key is checked and encrypted only when you select Apply." TextWrapping="Wrap" />
+                                PasswordRevealMode="Peek" PlaceholderText="{Binding KlipyPlaceholder}" />
+                            <TextBlock Text="A replacement key is checked when you apply changes." TextWrapping="Wrap" />
                             <CheckBox Content="Remove saved KLIPY key on Apply" IsChecked="{Binding DeleteKlipyKey, Mode=TwoWay}" />
-                            <TextBlock Text="Removal takes effect on Apply. Uncheck this box or Discard to keep the saved key." TextWrapping="Wrap" />
                             <HyperlinkButton Content="Open KLIPY API key help" NavigateUri="https://partner.klipy.com/api-keys" />
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource CopyGifSettingsSectionBorderStyle}">
                         <StackPanel Spacing="10">
                             <TextBlock Text="GIPHY" Style="{StaticResource CopyGifSectionTitleTextStyle}" />
-                            <TextBlock Text="{Binding GiphyStatus}" TextWrapping="Wrap" />
                             <PasswordBox Header="GIPHY API key" Password="{Binding GiphyCredential, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                PasswordRevealMode="Peek" PlaceholderText="Enter a replacement key" />
-                            <TextBlock Text="A changed key is checked and encrypted only when you select Apply." TextWrapping="Wrap" />
+                                PasswordRevealMode="Peek" PlaceholderText="{Binding GiphyPlaceholder}" />
+                            <TextBlock Text="A replacement key is checked when you apply changes." TextWrapping="Wrap" />
                             <CheckBox Content="Remove saved GIPHY key on Apply" IsChecked="{Binding DeleteGiphyKey, Mode=TwoWay}" />
-                            <TextBlock Text="Removal takes effect on Apply. Uncheck this box or Discard to keep the saved key." TextWrapping="Wrap" />
                             <HyperlinkButton Content="Open GIPHY API key help" NavigateUri="https://developers.giphy.com/dashboard/" />
                         </StackPanel>
                     </Border>
-                    <TextBlock Text="For GIPHY, create an API key for the native app. GIPHY results use direct media and are not added to Favorites or Recents; KLIPY library settings continue to apply to KLIPY." TextWrapping="Wrap" />
+
                 </StackPanel>
             </DataTemplate>
 
@@ -442,6 +490,7 @@
                 <StackPanel Spacing="16">
 
                     <Border
+                        Visibility="{Binding Update.IsMsiInstallation, Converter={StaticResource MsiVisibilityConverter}}"
                         Style="{StaticResource CopyGifSettingsSectionBorderStyle}">
 
                         <StackPanel Spacing="16">
@@ -452,27 +501,30 @@
 
                             <ToggleSwitch
                                 AutomationProperties.Name="Check for CopyGIF updates"
-                                Header="Check automatically for updates"
-                                IsOn="{Binding Settings.CheckForUpdates, Mode=TwoWay}" />
-                            <TextBlock Text="After Apply, checks for updates while CopyGIF runs, including in the tray. Check now remains available." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+
+                                IsOn="{Binding Settings.CheckForUpdates, Mode=TwoWay}">
+                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Check automatically for updates" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Check automatically for updates information" AutomationProperties.HelpText="Checks while CopyGIF runs. Check now is always available." ToolTipService.ToolTip="Checks while CopyGIF runs. Check now is always available." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ToggleSwitch.Header>
+                            </ToggleSwitch>
 
                             <ComboBox
                                 AutomationProperties.Name="Update check frequency"
-                                Header="Check frequency"
+
                                 IsEnabled="{Binding Settings.CheckForUpdates}"
                                 ItemsSource="{Binding Settings.CheckFrequencies}"
                                 ItemTemplate="{StaticResource SettingChoiceTemplate}"
-                                SelectedItem="{Binding Settings.CheckFrequency, Mode=TwoWay}" />
-                            <TextBlock Text="After Apply, checks when this interval has elapsed since the last successful check." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+                                SelectedItem="{Binding Settings.CheckFrequency, Mode=TwoWay}">
+                                <ComboBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Check frequency" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Check frequency information" AutomationProperties.HelpText="How often an automatic check becomes due." ToolTipService.ToolTip="How often an automatic check becomes due." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ComboBox.Header>
+                            </ComboBox>
 
                             <ComboBox
                                 AutomationProperties.Name="Update installation mode"
-                                Header="Update mode"
+
                                 IsEnabled="{Binding Settings.CheckForUpdates}"
                                 ItemsSource="{Binding Settings.Modes}"
                                 ItemTemplate="{StaticResource SettingChoiceTemplate}"
-                                SelectedItem="{Binding Settings.Mode, Mode=TwoWay}" />
-                            <TextBlock Text="Recommended installs verified per-user MSI updates automatically and asks before other MSI installs. Store updates follow Microsoft Store." TextWrapping="Wrap" Style="{StaticResource CopyGifPageSubtitleTextStyle}" />
+                                SelectedItem="{Binding Settings.Mode, Mode=TwoWay}">
+                                <ComboBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Update mode" /><Button Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0" AutomationProperties.Name="Update mode information" AutomationProperties.HelpText="Choose notifications, download and prompt, or automatic install for supported MSI installations." ToolTipService.ToolTip="Choose notifications, download and prompt, or automatic install for supported MSI installations." ><FontIcon Glyph="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="14" /></Button></StackPanel></ComboBox.Header>
+                            </ComboBox>
 
                         </StackPanel>
 
@@ -520,6 +572,7 @@
                                 Text="{Binding Update.Message.Text}" />
 
                             <ProgressBar
+                                Visibility="{Binding Update.IsMsiInstallation, Converter={StaticResource MsiVisibilityConverter}}"
                                 AutomationProperties.Name="Update download progress"
                                 Maximum="100"
                                 Value="{Binding Update.DownloadPercentage}" />
@@ -535,11 +588,13 @@
 
                                 <Button
                                     AutomationProperties.Name="Download and verify update"
+                                    Visibility="{Binding Update.IsMsiInstallation, Converter={StaticResource MsiVisibilityConverter}}"
                                     Command="{Binding Update.PrepareCommand}"
                                     Content="Download" />
 
                                 <Button
                                     AutomationProperties.Name="Install verified update"
+                                    Visibility="{Binding Update.IsMsiInstallation, Converter={StaticResource MsiVisibilityConverter}}"
                                     Command="{Binding Update.InstallCommand}"
                                     Content="Install"
                                     Style="{StaticResource CopyGifPrimaryButtonStyle}" />

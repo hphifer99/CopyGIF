@@ -56,6 +56,11 @@ public sealed class GifCopyCoordinator :
         GifItem item,
         string? searchQuery,
         CancellationToken cancellationToken = default)
+        => await CopyAsync(item, searchQuery, onClipboardReady: null, cancellationToken).ConfigureAwait(false);
+
+    public async Task<DownloadedGif> CopyAsync(
+        GifItem item, string? searchQuery, Func<Task>? onClipboardReady,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(
             item);
@@ -69,14 +74,16 @@ public sealed class GifCopyCoordinator :
 
         const GifDownloadPurpose purpose = GifDownloadPurpose.Clipboard;
 
+        RepairDiagnostics.Record("copy-download", item.ProviderId, "started");
         DownloadedGif downloadedGif =
             await _gifDownloader
                 .DownloadAsync(
-                    item,
+                    item with { GifUri = item.Renditions.Select(settings.Library.GifQuality, item.GifUri) },
                     purpose,
                     cancellationToken)
                 .ConfigureAwait(false);
 
+        RepairDiagnostics.Record("copy-download", item.ProviderId, "ready", downloadedGif.SizeBytes);
         await _clipboardService
             .CopyGifAsync(
                 downloadedGif,
@@ -84,12 +91,21 @@ public sealed class GifCopyCoordinator :
             .ConfigureAwait(false);
 
         RepairDiagnostics.Record("clipboard-handoff", item.ProviderId, "copied", downloadedGif.SizeBytes);
+        if (onClipboardReady is not null) await onClipboardReady().ConfigureAwait(false);
+        if (_gifDownloader is IReusableGifDownloader cleaner)
+        {
+            try { await cleaner.CleanupClipboardAsync(downloadedGif.FilePath, CancellationToken.None)
+                .ConfigureAwait(false); }
+            catch (Exception exception)
+            { RepairDiagnostics.Record("clipboard-cleanup", item.ProviderId, exception.GetType().Name); }
+        }
         if (ProviderMediaPolicy.AllowsPersistentLibrary(item.ProviderId))
         {
             try
             {
-                DownloadedGif recent = settings.Library.StoreRecentsLocally
-                    ? await _gifDownloader.DownloadAsync(item, GifDownloadPurpose.Recent, CancellationToken.None).ConfigureAwait(false)
+                DownloadedGif recent = settings.Library.StoreRecentsLocally &&
+                    _gifDownloader is not IReusableGifDownloader
+                    ? await _gifDownloader.DownloadAsync(item with { GifUri = item.Renditions.Select(settings.Library.SaveQuality, item.GifUri) }, GifDownloadPurpose.Recent, CancellationToken.None).ConfigureAwait(false)
                     : downloadedGif;
                 await _libraryCoordinator.RecordRecentAsync(item, recent, CancellationToken.None).ConfigureAwait(false);
             }
@@ -135,6 +151,10 @@ public sealed class GifCopyCoordinator :
         }
         catch (GifProviderException)
         {
+        }
+        catch (Exception exception)
+        {
+            RepairDiagnostics.Record("register-share", item.ProviderId, exception.GetType().Name);
         }
     }
 

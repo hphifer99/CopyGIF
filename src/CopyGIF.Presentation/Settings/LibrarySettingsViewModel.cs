@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CopyGIF.Application.Settings;
+using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Settings;
 using CopyGIF.Presentation.Common;
 
@@ -12,6 +13,7 @@ public sealed class LibrarySettingsViewModel :
 {
     private readonly ISettingsCoordinator
         _settingsCoordinator;
+    private readonly IApplicationPaths? _paths;
 
     private CancellationTokenSource?
         _operationCancellation;
@@ -39,10 +41,12 @@ public sealed class LibrarySettingsViewModel :
     private UserMessage? _message;
 
     private bool _disposed;
+    private GifQuality _gifQuality = GifQuality.Medium;
 
     public LibrarySettingsViewModel(
-        ISettingsCoordinator settingsCoordinator)
+        ISettingsCoordinator settingsCoordinator, IApplicationPaths? paths = null)
     {
+        _paths = paths;
         _settingsCoordinator =
             settingsCoordinator ??
             throw new ArgumentNullException(
@@ -75,6 +79,14 @@ public sealed class LibrarySettingsViewModel :
     }
 
     public Func<string?, CancellationToken, Task<string?>>? PickFolder { get; set; }
+
+    public IReadOnlyList<GifQuality> GifQualities { get; } = Enum.GetValues<GifQuality>();
+
+    public GifQuality GifQuality
+    {
+        get => _gifQuality;
+        set => SetProperty(ref _gifQuality, value);
+    }
 
     public IAsyncRelayCommand LoadCommand
     { get; }
@@ -188,9 +200,8 @@ public sealed class LibrarySettingsViewModel :
             CustomStorageRoot);
 
     public string StorageLocationText =>
-        HasCustomStorageRoot
-            ? CustomStorageRoot!
-            : "Default CopyGIF storage";
+        _paths?.GetLibraryRoot(CustomStorageRoot) ??
+            (HasCustomStorageRoot ? CustomStorageRoot! : "Default CopyGIF storage");
 
     public bool IsValid =>
         RecentLimit >=
@@ -396,6 +407,8 @@ public sealed class LibrarySettingsViewModel :
                             RecentLimit =
                                 RecentLimit,
 
+                            GifQuality = GifQuality,
+
                             FavoriteLimit =
                                 FavoriteLimit,
 
@@ -486,7 +499,8 @@ public sealed class LibrarySettingsViewModel :
         {
             try
             {
-                string? path = await PickFolder(CustomStorageRoot, cancellationToken);
+                string? path = await PickFolder(_paths?.GetLibraryRoot(CustomStorageRoot) ??
+                    CustomStorageRoot, cancellationToken);
                 if (path is not null) CustomStorageRoot = path;
             }
             catch (Exception)
@@ -708,6 +722,8 @@ public sealed class LibrarySettingsViewModel :
 
         RecentLimit =
             settings.RecentLimit;
+
+        GifQuality = settings.GifQuality;
 
         FavoriteLimit =
             settings.FavoriteLimit;

@@ -41,6 +41,7 @@ public sealed record AppSettings
 
 public sealed record SearchSettings
 {
+    public GifContentRating ContentRating { get; init; } = GifContentRating.AllAvailable;
     public int ResultsPerSearch { get; init; } = 24;
 
     public int DebounceMilliseconds { get; init; } = 300;
@@ -60,6 +61,8 @@ public sealed record SearchSettings
 
 public sealed record LibrarySettings
 {
+    public GifQuality GifQuality { get; init; } = GifQuality.Medium;
+    public GifQuality SaveQuality { get; init; } = GifQuality.Medium;
     public int RecentLimit { get; init; } = 30;
 
     public int FavoriteLimit { get; init; } = 100;
@@ -102,6 +105,7 @@ public sealed record BehaviorSettings
 
 public sealed record AppearanceSettings
 {
+    public GifQuality DisplayQuality { get; init; } = GifQuality.Medium;
     public AppTheme Theme { get; init; } =
         AppTheme.System;
 }

@@ -68,18 +68,17 @@ public sealed class WindowsStartupServiceTests
     }
 
     [TestMethod]
-    public async Task SetEnabledAsync_UninstalledEnable_IsRejected()
+    public async Task SetEnabledAsync_UninstalledEnable_IsNoOp()
     {
+        FakeStartupController msi = new();
         WindowsStartupService service =
             CreateService(
                 InstallChannel.None,
                 new FakeStartupController(),
-                new FakeStartupController());
+                msi);
 
-        await Assert.ThrowsExactlyAsync<InvalidOperationException>(
-            () =>
-                service.SetEnabledAsync(
-                    enabled: true));
+        await service.SetEnabledAsync(enabled: true);
+        Assert.AreEqual(0, msi.WriteCallCount);
     }
 
     [TestMethod]

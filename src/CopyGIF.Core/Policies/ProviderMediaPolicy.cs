@@ -3,7 +3,11 @@ namespace CopyGIF.Core.Policies;
 public static class ProviderMediaPolicy
 {
     public static bool AllowsPersistentLibrary(string providerId) =>
-        !string.Equals(providerId, "giphy", StringComparison.OrdinalIgnoreCase);
+        string.Equals(providerId, "klipy", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(providerId, "giphy", StringComparison.OrdinalIgnoreCase);
+
+    public static bool UsesDirectPreview(string providerId) =>
+        string.Equals(providerId, "giphy", StringComparison.OrdinalIgnoreCase);
 
     public static bool IsDirectMediaUri(Uri? uri) => uri is { IsAbsoluteUri: true } &&
         uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort &&

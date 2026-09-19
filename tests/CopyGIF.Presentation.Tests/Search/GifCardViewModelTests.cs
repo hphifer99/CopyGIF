@@ -10,6 +10,41 @@ namespace CopyGIF.Presentation.Tests.Search;
 public sealed class GifCardViewModelTests
 {
     [TestMethod]
+    public async Task CopyCommand_DownloadFailureReportsStageWithoutLeakingSourceDetails()
+    {
+        var model = CreateViewModel(CreateGif(), copyCoordinator: new FakeGifCopyCoordinator
+        {
+            Exception = new MediaDownloadException(MediaDownloadFailure.Network, "https://private.example/secret")
+        });
+        await model.CopyCommand.ExecuteAsync(null);
+        StringAssert.Contains(model.Message!.Text, "download failed (Network)");
+        Assert.IsFalse(model.Message.Text.Contains("private.example", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task ThumbnailLoad_RecycledCardReusesResolvedSourceUntilRetry()
+    {
+        var preview = new FakePreviewCoordinator();
+        var model = CreateViewModel(CreateGif(), previewCoordinator: preview);
+        await model.LoadThumbnailCommand.ExecuteAsync(null);
+        await model.LoadThumbnailCommand.ExecuteAsync(null);
+        Assert.AreEqual(1, preview.ThumbnailCalls);
+        await model.LoadThumbnailCommand.ExecuteAsync(true);
+        Assert.AreEqual(2, preview.ThumbnailCalls);
+    }
+
+    [TestMethod]
+    public void DisplayQuality_BoundsDecodeSizeAndPreservesPortraitOrientation()
+    {
+        var model = CreateViewModel(CreateGif() with { Width = 100, Height = 300 });
+        Assert.IsTrue(model.DecodeByHeight);
+        model.DisplayQuality = CopyGIF.Core.Settings.GifQuality.Minimum;
+        Assert.AreEqual(128, model.DecodePixelSize);
+        model.DisplayQuality = CopyGIF.Core.Settings.GifQuality.Maximum;
+        Assert.AreEqual(512, model.DecodePixelSize);
+    }
+
+    [TestMethod]
     public void Constructor_ExposesGifAndInitialState()
     {
         GifItem item =
@@ -58,13 +93,8 @@ public sealed class GifCardViewModelTests
             "Test description",
             viewModel.Description);
 
-        Assert.AreEqual(
-            item.ThumbnailUri,
-            viewModel.ThumbnailSource);
-
-        Assert.AreEqual(
-            item.ThumbnailUri,
-            viewModel.CurrentSource);
+        Assert.IsNull(viewModel.ThumbnailSource);
+        Assert.IsNull(viewModel.CurrentSource);
 
         Assert.IsTrue(
             viewModel.IsFavorite);
@@ -214,9 +244,9 @@ public sealed class GifCardViewModelTests
             UserMessageSeverity.Error,
             viewModel.Message.Severity);
 
-        Assert.AreEqual(
-            "Unable to copy the GIF.",
-            viewModel.Message.Text);
+        StringAssert.Contains(viewModel.Message.Text, "InvalidOperationException");
+        Assert.AreEqual("gif_copy_failed", viewModel.Message.Code);
+        Assert.IsFalse(viewModel.Message.Text.Contains("Test failure.", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -770,6 +800,7 @@ public sealed class GifCardViewModelTests
     private sealed class FakePreviewCoordinator :
         IPreviewCoordinator
     {
+        public int ThumbnailCalls { get; private set; }
         public GifItem? LastThumbnailItem
         {
             get;
@@ -807,6 +838,7 @@ public sealed class GifCardViewModelTests
             cancellationToken
                 .ThrowIfCancellationRequested();
 
+            ThumbnailCalls++;
             LastThumbnailItem =
                 item;
 

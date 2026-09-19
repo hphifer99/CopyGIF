@@ -17,6 +17,11 @@ public sealed class SettingChoiceLabelConverter : IValueConverter
         AppTheme.System => "Follow Windows",
         AppTheme.Light => "Light",
         AppTheme.Dark => "Dark",
+        GifContentRating.AllAvailable => "All available",
+        GifContentRating.G => "G",
+        GifContentRating.Pg => "PG",
+        GifContentRating.Pg13 => "PG-13",
+        GifContentRating.R => "R",
         _ => value?.ToString() ?? string.Empty
     };
     public object ConvertBack(object value, Type targetType, object parameter, string language) =>

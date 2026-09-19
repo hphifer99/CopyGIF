@@ -11,8 +11,30 @@ namespace CopyGIF.App.Controls;
 public sealed partial class GifCard :
 UserControl
 {
-    private const int PreviewDecodePixelWidth =
-    320;
+    public static readonly DependencyProperty DecodeByHeightProperty =
+        DependencyProperty.Register(nameof(DecodeByHeight), typeof(bool), typeof(GifCard),
+            new PropertyMetadata(false, HandleDecodePixelSizeChanged));
+    public bool DecodeByHeight
+    {
+        get => (bool)GetValue(DecodeByHeightProperty);
+        set => SetValue(DecodeByHeightProperty, value);
+    }
+
+    public static readonly DependencyProperty DecodePixelSizeProperty =
+        DependencyProperty.Register(nameof(DecodePixelSize), typeof(int), typeof(GifCard),
+            new PropertyMetadata(256, HandleDecodePixelSizeChanged));
+    public int DecodePixelSize
+    {
+        get => (int)GetValue(DecodePixelSizeProperty);
+        set => SetValue(DecodePixelSizeProperty, value);
+    }
+    private static void HandleDecodePixelSizeChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
+    {
+        GifCard card = (GifCard)sender;
+        card.ResetPreview();
+        card.RefreshThumbnail();
+        card.UpdatePreviewPlayback();
+    }
 
     public static readonly DependencyProperty
     TitleProperty =
@@ -132,7 +154,7 @@ UserControl
 
     public static readonly DependencyProperty LoadThumbnailCommandProperty =
     DependencyProperty.Register(nameof(LoadThumbnailCommand), typeof(ICommand),
-    typeof(GifCard), new PropertyMetadata(null));
+    typeof(GifCard), new PropertyMetadata(null, HandleLoadThumbnailCommandChanged));
 
     public static readonly DependencyProperty StartPreviewCommandProperty =
     DependencyProperty.Register(nameof(StartPreviewCommand), typeof(ICommand),
@@ -160,6 +182,10 @@ UserControl
         set => SetValue(StopPreviewCommandProperty, value);
     }
 
+    private ICommand? _observedThumbnailCommand;
+    private bool _thumbnailRequested;
+    private CancellationTokenSource? _thumbnailCancellation;
+    private CancellationTokenSource? _previewCancellation;
     private ICommand? _observedStartPreviewCommand;
     private bool _previewRequested;
     private XamlRoot? _observedRoot;
@@ -190,6 +216,12 @@ UserControl
                 _previewRequested = false;
                 ExecuteIfAvailable(StopPreviewCommand);
                 ResetPreview();
+                ReleaseThumbnail();
+            }
+            else if (_isLoaded)
+            {
+                RequestThumbnail();
+                if (ThumbnailImage.Source is null && _thumbnailCancellation is null) RefreshThumbnail();
             }
         };
 
@@ -456,6 +488,67 @@ UserControl
         RequestPreview();
     }
 
+    private async void SelectButton_Click(object sender, RoutedEventArgs args)
+    {
+        CopyGIF.Core.Models.RepairDiagnostics.Record("card-click", ProviderName, "received");
+        if (SelectCommand is CommunityToolkit.Mvvm.Input.IAsyncRelayCommand command && command.CanExecute(SelectCommandParameter))
+        {
+            await command.ExecuteAsync(SelectCommandParameter);
+        }
+        else
+        {
+            CopyGIF.Core.Models.RepairDiagnostics.Record("card-click", ProviderName, "command-unavailable");
+        }
+    }
+
+    private static void HandleLoadThumbnailCommandChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
+    {
+        GifCard card = (GifCard)sender;
+        card._thumbnailRequested = false;
+        card.ObserveThumbnailCommand();
+        card.RequestThumbnail();
+    }
+
+    private void ObserveThumbnailCommand()
+    {
+        if (_observedThumbnailCommand is not null)
+            _observedThumbnailCommand.CanExecuteChanged -= ThumbnailCommandChanged;
+        _observedThumbnailCommand = _isLoaded ? LoadThumbnailCommand : null;
+        if (_observedThumbnailCommand is not null)
+            _observedThumbnailCommand.CanExecuteChanged += ThumbnailCommandChanged;
+    }
+
+    private void ThumbnailCommandChanged(object? sender, EventArgs args) => RequestThumbnail();
+
+    private async void RequestThumbnail()
+    {
+        if (!_isLoaded || !_inViewport || _thumbnailRequested || XamlRoot?.IsHostVisible != true ||
+            LoadThumbnailCommand is not CommunityToolkit.Mvvm.Input.IAsyncRelayCommand command || !command.CanExecute(null)) return;
+        _thumbnailRequested = true;
+        try
+        {
+            await command.ExecuteAsync(null);
+            if (_isLoaded && _inViewport)
+            {
+                await RefreshThumbnailAsync();
+                if (ThumbnailUri is null) RetryThumbnailButton.Visibility = Visibility.Visible;
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception exception)
+        {
+            CopyGIF.Core.Models.RepairDiagnostics.Record("card-thumbnail", ProviderName, exception.GetType().Name);
+            if (_isLoaded) RetryThumbnailButton.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void ReleaseThumbnail()
+    {
+        _thumbnailVersion++;
+        _thumbnailCancellation?.Cancel();
+        ThumbnailImage.Source = null;
+    }
+
     private void SelectButton_PointerEntered(
     object sender,
     PointerRoutedEventArgs eventArgs)
@@ -533,6 +626,10 @@ UserControl
         _ = eventArgs;
 
         _isLoaded = false;
+        _thumbnailRequested = false;
+        ObserveThumbnailCommand();
+        (LoadThumbnailCommand as CommunityToolkit.Mvvm.Input.IAsyncRelayCommand)?.Cancel();
+        ReleaseThumbnail();
         _previewRequested = false;
         ObserveStartPreviewCommand();
         _thumbnailVersion++;
@@ -550,6 +647,7 @@ UserControl
     private void Root_Loaded(object sender, RoutedEventArgs eventArgs)
     {
         _isLoaded = true;
+        ObserveThumbnailCommand();
         ObserveStartPreviewCommand();
         if (_observedRoot is not null)
         {
@@ -560,7 +658,7 @@ UserControl
         {
             _observedRoot.Changed += Root_Changed;
         }
-        ExecuteIfAvailable(LoadThumbnailCommand);
+        RequestThumbnail();
         RefreshThumbnail();
         RequestPreview();
     }
@@ -573,6 +671,12 @@ UserControl
             _isPointerOver = false;
                 ExecuteIfAvailable(StopPreviewCommand);
             ResetPreview();
+            ReleaseThumbnail();
+        }
+        else
+        {
+            RequestThumbnail();
+            if (ThumbnailImage.Source is null && _thumbnailCancellation is null) RefreshThumbnail();
         }
     }
 
@@ -631,31 +735,39 @@ UserControl
     private async Task RefreshThumbnailAsync()
     {
         int version = ++_thumbnailVersion;
+        _thumbnailCancellation?.Cancel();
         Uri? thumbnailUri = ThumbnailUri;
         ThumbnailImage.Source = null;
         PlaceholderIcon.Visibility = Visibility.Visible;
         RetryThumbnailButton.Visibility = Visibility.Collapsed;
 
-        if (!_isLoaded || thumbnailUri is null) return;
+        if (!_isLoaded || !_inViewport || XamlRoot?.IsHostVisible != true || thumbnailUri is null) return;
         if (!IsSafeLocalSource(thumbnailUri))
         {
             RetryThumbnailButton.Visibility = Visibility.Visible;
             return;
         }
 
-        BitmapImage bitmap = new BitmapImage
-        {
-            AutoPlay = false,
-            DecodePixelWidth = PreviewDecodePixelWidth
-        };
-
-        bool loaded = await LocalBitmapLoader.TryLoadAsync(bitmap, thumbnailUri);
+        using var cancellation = new CancellationTokenSource();
+        _thumbnailCancellation = cancellation;
+        BitmapImage bitmap = CreateBitmap();
+        bool loaded;
+        try { loaded = await LocalBitmapLoader.TryLoadAsync(bitmap, thumbnailUri, cancellation.Token); }
+        finally { if (ReferenceEquals(_thumbnailCancellation, cancellation)) _thumbnailCancellation = null; }
+        if (cancellation.IsCancellationRequested) return;
         if (version != _thumbnailVersion || !_isLoaded) return;
         if (!loaded) { RetryThumbnailButton.Visibility = Visibility.Visible; return; }
 
         ThumbnailImage.Source = bitmap;
         PlaceholderIcon.Visibility = Visibility.Collapsed;
     }
+
+    private BitmapImage CreateBitmap() => new BitmapImage()
+    {
+        AutoPlay = false,
+        DecodePixelWidth = DecodeByHeight ? 0 : Math.Clamp(DecodePixelSize, 128, 512),
+        DecodePixelHeight = DecodeByHeight ? Math.Clamp(DecodePixelSize, 128, 512) : 0
+    };
 
     private void EnsurePreviewLoaded()
     {
@@ -665,18 +777,19 @@ UserControl
             return;
         }
 
-        BitmapImage bitmap = new BitmapImage
-        {
-            AutoPlay = false,
-            DecodePixelWidth = PreviewDecodePixelWidth
-        };
+        BitmapImage bitmap = CreateBitmap();
         _previewBitmap = bitmap;
         _ = LoadPreviewAsync(bitmap, previewUri);
     }
 
     private async Task LoadPreviewAsync(BitmapImage bitmap, Uri previewUri)
     {
-        bool loaded = await LocalBitmapLoader.TryLoadAsync(bitmap, previewUri);
+        using var cancellation = new CancellationTokenSource();
+        _previewCancellation = cancellation;
+        bool loaded;
+        try { loaded = await LocalBitmapLoader.TryLoadAsync(bitmap, previewUri, cancellation.Token); }
+        finally { if (ReferenceEquals(_previewCancellation, cancellation)) _previewCancellation = null; }
+        if (cancellation.IsCancellationRequested) return;
         if (!ReferenceEquals(_previewBitmap, bitmap) || !_isLoaded)
         {
             return;
@@ -739,6 +852,7 @@ UserControl
 
     private void ResetPreview()
     {
+        _previewCancellation?.Cancel();
         StopPreviewPlayback();
 
         AnimatedImage.Source =

@@ -12,6 +12,7 @@ public sealed class WindowsSingleInstanceService :
 {
     private const int ConnectionAttempts = 20;
     private const int ConnectionTimeoutMilliseconds = 100;
+    private static readonly TimeSpan PipeMessageTimeout = TimeSpan.FromSeconds(5);
 
     private readonly string _mutexName;
     private readonly string _pipeName;
@@ -177,17 +178,21 @@ public sealed class WindowsSingleInstanceService :
                         cancellationToken)
                     .ConfigureAwait(false);
 
+                using CancellationTokenSource messageDeadline =
+                    CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                messageDeadline.CancelAfter(PipeMessageTimeout);
+
                 IReadOnlyList<string> arguments =
                     await SingleInstanceProtocol
                         .ReadArgumentsAsync(
                             server,
-                            cancellationToken)
+                            messageDeadline.Token)
                         .ConfigureAwait(false);
 
                 await SingleInstanceProtocol
-                    .WriteAcknowledgementAsync(
-                        server,
-                        cancellationToken)
+                        .WriteAcknowledgementAsync(
+                            server,
+                            messageDeadline.Token)
                     .ConfigureAwait(false);
 
                 RaiseActivationRequested(
@@ -204,6 +209,10 @@ public sealed class WindowsSingleInstanceService :
             }
             catch (InvalidDataException)
             {
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                RepairDiagnostics.Record("single-instance-pipe", "local", "read-timeout");
             }
         }
     }
@@ -234,17 +243,21 @@ public sealed class WindowsSingleInstanceService :
                         cancellationToken)
                     .ConfigureAwait(false);
 
+                using CancellationTokenSource messageDeadline =
+                    CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                messageDeadline.CancelAfter(PipeMessageTimeout);
+
                 await SingleInstanceProtocol
                     .WriteArgumentsAsync(
                         client,
                         arguments,
-                        cancellationToken)
+                        messageDeadline.Token)
                     .ConfigureAwait(false);
 
                 await SingleInstanceProtocol
                     .ReadAcknowledgementAsync(
                         client,
-                        cancellationToken)
+                        messageDeadline.Token)
                     .ConfigureAwait(false);
 
                 return;
@@ -255,6 +268,11 @@ public sealed class WindowsSingleInstanceService :
                     IOException)
             {
                 lastException = exception;
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new InvalidOperationException("The existing CopyGIF instance did not acknowledge activation.",
+                    new TimeoutException("The activation pipe timed out."));
             }
 
             if (attempt < ConnectionAttempts - 1)

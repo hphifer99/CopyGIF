@@ -10,6 +10,8 @@ public sealed record LibraryEntry
 
     public required Uri GifUri { get; init; }
 
+    public GifRenditions Renditions { get; init; } = new();
+
     public required Uri ThumbnailUri { get; init; }
 
     public Uri? PreviewUri { get; init; }

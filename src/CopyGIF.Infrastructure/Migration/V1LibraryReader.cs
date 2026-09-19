@@ -101,19 +101,36 @@ public sealed class V1LibraryReader
 
             List<string> warnings = [];
 
-            List<LibraryEntry> favorites =
+            List<LibraryEntry> validFavorites =
                 MapEntries(
                     data.Favorites,
                     isRecent: false,
                     "favorite",
                     warnings);
 
-            List<LibraryEntry> recents =
+            List<LibraryEntry> favorites =
+                validFavorites
+                .OrderByDescending(entry => entry.AddedAtUtc)
+                .Take(500)
+                .ToList();
+
+            List<LibraryEntry> validRecents =
                 MapEntries(
                     data.Recents,
                     isRecent: true,
                     "recent",
                     warnings);
+
+            List<LibraryEntry> recents =
+                validRecents
+                .OrderByDescending(entry => entry.AddedAtUtc)
+                .Take(100)
+                .ToList();
+
+            if (validFavorites.Count > favorites.Count)
+                warnings.Add("The V1 Favorites list was trimmed to its 500 newest valid items.");
+            if (validRecents.Count > recents.Count)
+                warnings.Add("The V1 Recents list was trimmed to its 100 newest valid items.");
 
             return new V1LibrarySnapshot
             {
@@ -186,19 +203,17 @@ public sealed class V1LibraryReader
             return false;
         }
 
-        Uri thumbnailUri =
-            TryGetHttpsUri(
-                item.ThumbnailUrl,
-                out Uri? thumbnail)
-                ? thumbnail
-                : gifUri;
-
         Uri? previewUri =
             TryGetHttpsUri(
                 item.PreviewGifUrl,
                 out Uri? preview)
                 ? preview
                 : null;
+
+        Uri thumbnailUri =
+            TryGetHttpsUri(item.ThumbnailUrl, out Uri? thumbnail)
+                ? thumbnail
+                : previewUri ?? gifUri;
 
         entry = new LibraryEntry
         {

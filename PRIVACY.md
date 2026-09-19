@@ -10,7 +10,7 @@ If update checking is enabled, CopyGIF requests release information from GitHub.
 
 ## Local data
 
-CopyGIF stores settings, favorites, recents, optional search history, cache files, update state, and diagnostic information in `%LOCALAPPDATA%\CopyGIF`. If you choose a custom library storage folder, the relevant GIF files are stored there. Provider keys are saved separately under the `Secrets` folder using Windows Data Protection API for the current Windows user. They are not stored as plain text in `settings.json`.
+CopyGIF stores settings, favorites, recents, optional search history, cache files, update state, and diagnostic information in `%LOCALAPPDATA%\CopyGIF`. If you choose a custom library storage folder, the relevant GIF files are stored there. Clipboard GIF files are kept separately from Recents and older copies are cleaned up after later successful copies. Provider keys are saved separately under the `Secrets` folder using Windows Data Protection API for the current Windows user. They are not stored as plain text in `settings.json`. After a successful import from an older version, CopyGIF removes the old key field from its archived settings file.
 
 CopyGIF does not include a CopyGIF account, its own advertising service, or a first-party analytics upload service.
 

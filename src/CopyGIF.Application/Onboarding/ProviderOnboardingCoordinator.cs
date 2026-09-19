@@ -1,11 +1,13 @@
+using CopyGIF.Application.Settings;
 using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 using CopyGIF.Core.Settings;
 
 namespace CopyGIF.Application.Onboarding;
 
-public sealed class ProviderOnboardingCoordinator(ISettingsStore settings, ISecretStore secrets,
-    IEnumerable<IGifProviderCredentialManager> managers)
+public sealed class ProviderOnboardingCoordinator(ISettingsCoordinator settings, ISecretStore secrets,
+    IEnumerable<IGifProviderCredentialManager> managers, IStartupService startup,
+    IApplicationPaths paths)
 {
     public async Task<CredentialValidationResult> CompleteAsync(string providerId, string credential, CancellationToken token)
     {
@@ -13,15 +15,25 @@ public sealed class ProviderOnboardingCoordinator(ISettingsStore settings, ISecr
         var validation = await manager.ValidateCredentialAsync(credential, token).ConfigureAwait(false);
         if (!validation.IsValid) return validation;
         string name = providerId == "giphy" ? SecretNames.GiphyApiKey : SecretNames.KlipyApiKey;
+        bool firstSetup = !File.Exists(paths.SettingsPath);
         string? previous = await secrets.GetAsync(name, token).ConfigureAwait(false);
         try
         {
             await manager.SaveCredentialAsync(credential, token).ConfigureAwait(false);
-            AppSettings latest = await settings.LoadAsync(token).ConfigureAwait(false);
-            await settings.SaveAsync(latest with
+            SettingsSaveResult saved = await settings.UpdateAsync(latest => latest with
             {
                 Providers = latest.Providers with { ActiveProviderId = providerId }
             }, token).ConfigureAwait(false);
+            if (!saved.Succeeded)
+                throw new InvalidOperationException(saved.ErrorMessage ?? "Provider settings could not be saved.");
+            if (firstSetup && saved.EffectiveSettings.Startup.StartWithWindows)
+            {
+                try { await startup.SetEnabledAsync(true, token).ConfigureAwait(false); }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    RepairDiagnostics.Record("startup-registration", providerId, exception.GetType().Name);
+                }
+            }
         }
         catch (Exception failure)
         {

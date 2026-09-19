@@ -14,6 +14,8 @@ public sealed record GifItem
 
     public required Uri GifUri { get; init; }
 
+    public GifRenditions Renditions { get; init; } = new();
+
     public Uri? PreviewUri { get; init; }
 
     public Uri? SourcePageUri { get; init; }

@@ -148,6 +148,8 @@ public static class AppSettingsValidator
             return;
         }
 
+        ValidateEnum(search.ContentRating, "Search.ContentRating", issues);
+
         ValidateRange(
             search.ResultsPerSearch,
             MinimumResultsPerSearch,
@@ -183,6 +185,9 @@ public static class AppSettingsValidator
 
             return;
         }
+
+        ValidateEnum(library.GifQuality, "Library.GifQuality", issues);
+        ValidateEnum(library.SaveQuality, "Library.SaveQuality", issues);
 
         ValidateRange(
             library.RecentLimit,
@@ -273,6 +278,7 @@ public static class AppSettingsValidator
             appearance.Theme,
             "Appearance.Theme",
             issues);
+        ValidateEnum(appearance.DisplayQuality, "Appearance.DisplayQuality", issues);
     }
 
     private static void ValidateUpdates(

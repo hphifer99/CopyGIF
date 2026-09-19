@@ -181,11 +181,42 @@ public sealed class WindowsUpdateInstaller :
         DownloadedUpdatePackage package,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(
+            package);
+
+        UpdatePackageVerificationResult?
+            packageShapeFailure =
+                ValidatePackageShape(
+                    package);
+
+        if (packageShapeFailure is not null)
+        {
+            throw new InvalidOperationException(
+                packageShapeFailure.Message ??
+                "The update package could not be verified.");
+        }
+
+        string fullPath =
+            Path.GetFullPath(
+                package.FilePath);
+
+        // Keep a read-only handle open from verification through process
+        // launch. FileShare.Read prevents another process from replacing,
+        // deleting, or modifying the verified MSI during the handoff.
+        await using FileStream installationLock =
+            new(
+                fullPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 1,
+                useAsync: true);
+
         UpdatePackageVerificationResult verification =
             await VerifyAsync(
-                package,
-                cancellationToken)
-            .ConfigureAwait(false);
+                    package,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
         if (!verification.IsValid)
         {
@@ -195,8 +226,7 @@ public sealed class WindowsUpdateInstaller :
         }
 
         await _packageLauncher.LaunchAsync(
-                Path.GetFullPath(
-                    package.FilePath),
+                fullPath,
                 cancellationToken)
             .ConfigureAwait(false);
     }

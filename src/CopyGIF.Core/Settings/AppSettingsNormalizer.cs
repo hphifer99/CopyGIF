@@ -42,6 +42,7 @@ public static class AppSettingsNormalizer
 
             Search = search with
             {
+                ContentRating = NormalizeEnum(search.ContentRating, GifContentRating.AllAvailable),
                 ResultsPerSearch = UseValueOrFallback(
                     search.ResultsPerSearch,
                     AppSettingsValidator.MinimumResultsPerSearch,
@@ -63,6 +64,8 @@ public static class AppSettingsNormalizer
 
             Library = library with
             {
+                GifQuality = NormalizeEnum(library.GifQuality, GifQuality.Medium),
+                SaveQuality = NormalizeEnum(library.SaveQuality, GifQuality.Medium),
                 RecentLimit = UseValueOrFallback(
                     library.RecentLimit,
                     AppSettingsValidator.MinimumRecentLimit,
@@ -113,6 +116,7 @@ public static class AppSettingsNormalizer
 
             Appearance = appearance with
             {
+                DisplayQuality = NormalizeEnum(appearance.DisplayQuality, GifQuality.Medium),
                 Theme = NormalizeEnum(
                     appearance.Theme,
                     AppTheme.System)

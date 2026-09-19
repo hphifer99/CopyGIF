@@ -11,6 +11,54 @@ namespace CopyGIF.Application.Tests.Media;
 public sealed class GifCopyCoordinatorTests
 {
     [TestMethod]
+    public async Task CopyAsync_UsesSelectedAnimatedQualityAndSignalsClipboardBeforeRecents()
+    {
+        var steps = new List<string>();
+        FakeGifDownloader downloader = new();
+        FakeLibraryCoordinator library = new()
+        {
+            RecordRecentHandler = (_, _, _) =>
+            {
+                steps.Add("recent");
+                return Task.CompletedTask;
+            }
+        };
+        GifCopyCoordinator coordinator = CreateCoordinator(new FakeGifProvider(), downloader,
+            new FakeClipboardService(), library);
+        GifItem item = CreateItem() with
+        {
+            Renditions = new GifRenditions
+            {
+                Medium = new Uri("https://static.klipy.com/cat-medium.gif")
+            }
+        };
+
+        DownloadedGif copied = await coordinator.CopyAsync(item, null,
+            () => { steps.Add("clipboard-ready"); return Task.CompletedTask; });
+
+        Assert.AreEqual(item.Renditions.Medium, downloader.Requests[0].Item.GifUri);
+        Assert.AreEqual(item.GifUri, library.RecordedRecents[0].Item.GifUri);
+        Assert.AreEqual(item.Renditions.Medium, copied.SourceUri);
+        CollectionAssert.AreEqual(new[] { "clipboard-ready", "recent" }, steps);
+    }
+
+    [TestMethod]
+    public async Task CopyAsync_RecentFailureDoesNotUndoClipboardSuccess()
+    {
+        FakeLibraryCoordinator library = new()
+        {
+            RecordRecentHandler = (_, _, _) => throw new IOException("Recent storage unavailable")
+        };
+        FakeClipboardService clipboard = new();
+        GifCopyCoordinator coordinator = CreateCoordinator(new FakeGifProvider(),
+            new FakeGifDownloader(), clipboard, library);
+
+        DownloadedGif result = await coordinator.CopyAsync(CreateItem(), null);
+
+        Assert.AreSame(result, clipboard.CopiedGifs.Single());
+    }
+
+    [TestMethod]
     public async Task CopyAsync_WithLocalRecents_DownloadsPersistentFile()
     {
         FakeGifProvider provider =

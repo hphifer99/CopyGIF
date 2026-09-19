@@ -19,6 +19,14 @@ public sealed class AppearanceSettingsViewModel :
     private AppTheme _theme =
         AppTheme.System;
 
+    private GifQuality _copyQuality = GifQuality.Medium;
+    private GifQuality _saveQuality = GifQuality.Medium;
+    private GifQuality _displayQuality = GifQuality.Medium;
+    public IReadOnlyList<GifQuality> GifQualities { get; } = Enum.GetValues<GifQuality>();
+    public GifQuality CopyQuality { get => _copyQuality; set => SetProperty(ref _copyQuality, value); }
+    public GifQuality SaveQuality { get => _saveQuality; set => SetProperty(ref _saveQuality, value); }
+    public GifQuality DisplayQuality { get => _displayQuality; set => SetProperty(ref _displayQuality, value); }
+
     private bool _isLoaded;
 
     private AsyncOperationState
@@ -126,6 +134,9 @@ public sealed class AppearanceSettingsViewModel :
     public void ApplySettings(AppSettings settings)
     {
         Theme = settings.Appearance.Theme;
+        CopyQuality = settings.Library.GifQuality;
+        SaveQuality = settings.Library.SaveQuality;
+        DisplayQuality = settings.Appearance.DisplayQuality;
     }
 
     public void ClearMessage()
@@ -189,8 +200,7 @@ public sealed class AppearanceSettingsViewModel :
                     .LoadAsync(
                         linkedCancellation.Token);
 
-            Theme =
-                settings.Appearance.Theme;
+            ApplySettings(settings);
 
             IsLoaded =
                 true;
@@ -250,9 +260,11 @@ public sealed class AppearanceSettingsViewModel :
             AppSettings requested =
                 current with
                 {
+                    Library = current.Library with { GifQuality = CopyQuality, SaveQuality = SaveQuality },
                     Appearance =
                         current.Appearance with
                         {
+                            DisplayQuality = DisplayQuality,
                             Theme =
                                 Theme
                         }
@@ -264,10 +276,7 @@ public sealed class AppearanceSettingsViewModel :
                         requested,
                         linkedCancellation.Token);
 
-            Theme =
-                result.EffectiveSettings
-                    .Appearance
-                    .Theme;
+            ApplySettings(result.EffectiveSettings);
 
             IsLoaded =
                 true;

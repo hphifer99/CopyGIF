@@ -128,6 +128,49 @@ public sealed class JsonSettingsStoreTests
     }
 
     [TestMethod]
+    public async Task SeparateStoreInstances_ConcurrentReadsAndWrites_NeverQuarantineValidSettings()
+    {
+        ApplicationPaths paths = new(_testDirectory);
+        JsonSettingsStore first = new(paths);
+        JsonSettingsStore second = new(paths);
+        await first.SaveAsync(new AppSettings());
+
+        Task writer = Task.Run(async () =>
+        {
+            for (int i = 0; i < 30; i++)
+                await first.SaveAsync(new AppSettings { Hotkey = i % 2 == 0 ? "Alt+G" : "Ctrl+G" });
+        });
+        Task reader = Task.Run(async () =>
+        {
+            for (int i = 0; i < 30; i++)
+            {
+                AppSettings current = await second.LoadAsync();
+                Assert.IsTrue(current.Hotkey is "Alt+G" or "Ctrl+G");
+            }
+        });
+        await Task.WhenAll(writer, reader);
+
+        Assert.IsEmpty(Directory.GetFiles(_testDirectory, "settings.json.corrupt.*"));
+        Assert.IsTrue((await second.LoadAsync()).Hotkey is "Alt+G" or "Ctrl+G");
+    }
+
+    [TestMethod]
+    public async Task LoadAsync_FileLocked_DoesNotReplaceTheSettingsWithBackup()
+    {
+        ApplicationPaths paths = new(_testDirectory);
+        JsonSettingsStore store = new(paths);
+        await store.SaveAsync(new AppSettings { Hotkey = "Ctrl+G" });
+        using (FileStream exclusive = new(paths.SettingsPath, FileMode.Open,
+            FileAccess.ReadWrite, FileShare.None))
+        {
+            await Assert.ThrowsAsync<IOException>(() => store.LoadAsync());
+        }
+
+        Assert.AreEqual("Ctrl+G", (await store.LoadAsync()).Hotkey);
+        Assert.IsEmpty(Directory.GetFiles(_testDirectory, "settings.json.corrupt.*"));
+    }
+
+    [TestMethod]
     public async Task LoadAsync_CorruptPrimary_UsesBackup()
     {
         ApplicationPaths paths =

@@ -55,6 +55,7 @@ public sealed class UpdateViewModel :
     private UserMessage? _message;
 
     private bool _disposed;
+    private DateTimeOffset _lastManualInteractionUtc;
 
     public UpdateViewModel(
         IUpdateCoordinator updateCoordinator)
@@ -156,6 +157,8 @@ public sealed class UpdateViewModel :
                 OnPropertyChanged(
                     nameof(IsManagedByStore));
 
+                OnPropertyChanged(nameof(IsMsiInstallation));
+
                 NotifyCommandStates();
             }
         }
@@ -174,6 +177,8 @@ public sealed class UpdateViewModel :
             UpdateCheckStatus.ManagedByStore ||
         InstallChannel ==
             CoreInstallChannel.MicrosoftStore;
+
+    public bool IsMsiInstallation => InstallChannel == CoreInstallChannel.Msi;
 
     public UpdateMode? ResolvedMode
     {
@@ -403,6 +408,8 @@ public sealed class UpdateViewModel :
         CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
+
+        _lastManualInteractionUtc = DateTimeOffset.UtcNow;
 
         if (!HasCurrentVersion)
         {
@@ -775,6 +782,8 @@ public sealed class UpdateViewModel :
     public void AcceptAutomaticResult(AutomaticUpdateResult result)
     {
         if (IsBusy) return;
+        if (result.Action == AutomaticUpdateAction.None &&
+            DateTimeOffset.UtcNow - _lastManualInteractionUtc < TimeSpan.FromMinutes(15)) return;
         ApplyCheckResult(result.Check);
         if (result.Preparation is { IsReady: true, Package: not null })
         {

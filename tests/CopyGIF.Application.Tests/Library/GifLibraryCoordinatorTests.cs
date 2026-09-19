@@ -508,6 +508,21 @@ public sealed class GifLibraryCoordinatorTests
     }
 
     [TestMethod]
+    public async Task GiphyFavoritesAndRecents_PreserveProviderIdentity()
+    {
+        GifItem item = CreateItem("giphy-1") with { ProviderId = "giphy" };
+        using GifLibraryCoordinator coordinator = CreateCoordinator(settingsStore:
+            CreateSettingsStore(storeFavoritesLocally: false, storeRecentsLocally: false));
+
+        await coordinator.AddFavoriteAsync(item);
+        LibrarySnapshot result = await coordinator.RecordRecentAsync(item,
+            CreateDownloadedGif(item, GifDownloadPurpose.Clipboard, "C:\\Cache\\giphy-1.gif"));
+
+        Assert.AreEqual("giphy", result.Favorites.Single().Identity.ProviderId);
+        Assert.AreEqual("giphy", result.Recents.Single().Identity.ProviderId);
+    }
+
+    [TestMethod]
     public async Task RecordRecentAsync_WhenLimitExceeded_EvictsOldestRecent()
     {
         FakeApplicationPaths paths =
@@ -768,6 +783,32 @@ public sealed class GifLibraryCoordinatorTests
                 .Select(
                     entry => entry.Identity.Id)
                 .ToArray());
+    }
+
+    [TestMethod]
+    public async Task FavoritesAndRecents_UseSaveQualityInsteadOfCopyQuality()
+    {
+        var settings = new FakeSettingsStore { Value = new AppSettings
+        {
+            Library = new LibrarySettings { GifQuality = GifQuality.High, SaveQuality = GifQuality.Low }
+        }};
+        var downloader = new FakeGifDownloader();
+        var item = CreateItem("separate-qualities") with
+        {
+            Renditions = new GifRenditions
+            {
+                Low = new Uri("https://static.klipy.com/low.gif"),
+                High = new Uri("https://static.klipy.com/high.gif")
+            }
+        };
+        using var coordinator = CreateCoordinator(settingsStore: settings, downloader: downloader);
+        await coordinator.AddFavoriteAsync(item);
+        await coordinator.RecordRecentAsync(item, CreateDownloadedGif(item,
+            GifDownloadPurpose.Clipboard, Path.Combine(Path.GetTempPath(), "clipboard.gif")));
+        Assert.HasCount(2, downloader.Requests);
+        Assert.IsTrue(downloader.Requests.All(r => r.Item.GifUri == item.Renditions.Low));
+        Assert.AreEqual(GifDownloadPurpose.Favorite, downloader.Requests[0].Purpose);
+        Assert.AreEqual(GifDownloadPurpose.Recent, downloader.Requests[1].Purpose);
     }
 
     private static GifLibraryCoordinator CreateCoordinator(

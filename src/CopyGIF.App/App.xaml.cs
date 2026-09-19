@@ -1,5 +1,6 @@
 using CopyGIF.Application.Startup;
 using CopyGIF.App.Composition;
+using CopyGIF.Core.Models;
 using Microsoft.UI.Xaml;
 using XamlApplication = Microsoft.UI.Xaml.Application;
 
@@ -86,10 +87,17 @@ public partial class App :
                     return;
             }
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            ShowStartupFailure(
-                "CopyGIF could not complete its safe startup checks.");
+            RepairDiagnostics.Record("startup", "local", exception.GetType().Name);
+            ShowStartupFailure(exception switch
+            {
+                IOException or UnauthorizedAccessException =>
+                    "CopyGIF could not read its saved data. Check access to the app data folder and try again.",
+                InvalidDataException =>
+                    "CopyGIF found saved data it could not safely load. Check the local repair log before changing files.",
+                _ => "CopyGIF could not finish startup. Check the local repair log for the failing stage."
+            });
         }
     }
 

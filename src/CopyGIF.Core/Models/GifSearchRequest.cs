@@ -1,3 +1,5 @@
+using CopyGIF.Core.Settings;
+
 namespace CopyGIF.Core.Models;
 
 public enum GifSearchKind
@@ -8,6 +10,7 @@ public enum GifSearchKind
 
 public sealed record GifSearchRequest
 {
+    public GifContentRating ContentRating { get; init; } = GifContentRating.AllAvailable;
     public required string Query { get; init; }
 
     public GifSearchKind Kind { get; init; } =

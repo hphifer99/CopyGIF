@@ -155,14 +155,7 @@ public sealed class ApplicationStartupCoordinatorTests
             "Ctrl+Alt+G",
             harness.HotkeyService.RegisteredGesture);
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                true
-            },
-            harness.StartupService
-                .RequestedStates
-                .ToArray());
+        Assert.IsEmpty(harness.StartupService.RequestedStates);
 
         Assert.AreEqual(
             1,
@@ -237,9 +230,7 @@ public sealed class ApplicationStartupCoordinatorTests
         Assert.IsNull(
             harness.HotkeyService.RegisteredGesture);
 
-        Assert.HasCount(
-            1,
-            harness.StartupService.RequestedStates);
+        Assert.IsEmpty(harness.StartupService.RequestedStates);
 
         Assert.AreEqual(
             1,
@@ -284,7 +275,7 @@ public sealed class ApplicationStartupCoordinatorTests
     }
 
     [TestMethod]
-    public async Task InitializeAsync_StartupRegistrationFails_RollsBackHotkey()
+    public async Task InitializeAsync_WindowsStartupWasDisabled_DoesNotPreventLaunch()
     {
         AppSettings settings =
             CreateSettings(
@@ -307,31 +298,13 @@ public sealed class ApplicationStartupCoordinatorTests
                         "Startup registration failed.")
                     : Task.CompletedTask;
 
-        await Assert.ThrowsExactlyAsync<IOException>(
-            () =>
-                harness.Coordinator.InitializeAsync(
-                    []));
-
-        Assert.IsNull(
-            harness.HotkeyService.RegisteredGesture);
-
-        Assert.AreEqual(
-            1,
-            harness.HotkeyService.UnregisterCallCount);
-
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                true,
-                false
-            },
-            harness.StartupService
-                .RequestedStates
-                .ToArray());
-
-        Assert.AreEqual(
-            0,
-            harness.TrayService.InitializeCallCount);
+        ApplicationStartupResult result = await harness.Coordinator.InitializeAsync([]);
+        Assert.IsTrue(result.IsReady);
+        Assert.AreEqual("Ctrl+Alt+G", harness.HotkeyService.RegisteredGesture);
+        Assert.AreEqual(0, harness.HotkeyService.UnregisterCallCount);
+        Assert.IsEmpty(harness.StartupService.RequestedStates);
+        Assert.AreEqual(0, harness.StartupService.IsEnabledCallCount);
+        Assert.AreEqual(1, harness.TrayService.InitializeCallCount);
     }
 
     [TestMethod]
@@ -372,15 +345,7 @@ public sealed class ApplicationStartupCoordinatorTests
         Assert.IsTrue(
             harness.StartupService.IsEnabled);
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                false,
-                true
-            },
-            harness.StartupService
-                .RequestedStates
-                .ToArray());
+        Assert.IsEmpty(harness.StartupService.RequestedStates);
     }
 
     [TestMethod]

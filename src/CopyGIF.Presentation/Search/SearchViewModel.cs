@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CopyGIF.Application.Library;
@@ -22,6 +23,12 @@ public sealed class SearchViewModel :
     IDisposable
 {
     private const int MaximumSuggestions = 8;
+    private bool _isLoadingMore;
+    public bool IsLoadingMore
+    {
+        get => _isLoadingMore;
+        private set => SetProperty(ref _isLoadingMore, value);
+    }
 
     private readonly IGifSearchCoordinator
         _searchCoordinator;
@@ -83,13 +90,14 @@ public sealed class SearchViewModel :
         bool providerChanged = !string.Equals(ActiveProviderId, settings.Providers.ActiveProviderId, StringComparison.OrdinalIgnoreCase);
         bool emptyModeChanged = _settings.Search.ShowTrendingWhenEmpty != settings.Search.ShowTrendingWhenEmpty;
         bool pageSizeChanged = _settings.Search.ResultsPerSearch != settings.Search.ResultsPerSearch;
+        bool ratingChanged = _settings.Search.ContentRating != settings.Search.ContentRating;
         _settings = settings;
         OnPropertyChanged(nameof(AutoLoadMoreResults));
         OnPropertyChanged(nameof(ActiveProviderId));
         OnPropertyChanged(nameof(AttributionText));
         OnPropertyChanged(nameof(IsGiphy));
-        if (providerChanged || pageSizeChanged) { _trendingSnapshot = null; TrendingScrollOffset = 0; }
-        if (providerChanged)
+        if (providerChanged || pageSizeChanged || ratingChanged) { _trendingSnapshot = null; TrendingScrollOffset = 0; }
+        if (providerChanged || ratingChanged)
         {
             _operationCancellation?.Cancel();
             _operationCancellation = null;
@@ -329,6 +337,17 @@ public sealed class SearchViewModel :
         }
     }
 
+    private CopyGIF.Core.Settings.GifQuality _displayQuality = CopyGIF.Core.Settings.GifQuality.Medium;
+    public CopyGIF.Core.Settings.GifQuality DisplayQuality
+    {
+        get => _displayQuality;
+        set
+        {
+            if (!SetProperty(ref _displayQuality, value)) return;
+            foreach (GifCardViewModel card in Results) card.DisplayQuality = value;
+        }
+    }
+
     public bool ReducedMotion
     {
         get => _reducedMotion;
@@ -399,6 +418,7 @@ public sealed class SearchViewModel :
         foreach (GifCardViewModel card
                  in Results)
         {
+            card.PropertyChanged -= OnCardPropertyChanged;
             card.StopPreviewCommand
                 .Execute(null);
         }
@@ -692,6 +712,7 @@ public sealed class SearchViewModel :
         string continuationToken =
             _continuationToken;
 
+        IsLoadingMore = true;
         CancellationTokenSource operation =
             BeginOperation(
                 "Loading more GIFs...",
@@ -799,6 +820,7 @@ public sealed class SearchViewModel :
         {
             EndOperation(
                 operation);
+            IsLoadingMore = false;
         }
     }
 
@@ -1096,8 +1118,7 @@ public sealed class SearchViewModel :
                 continue;
             }
 
-            Results.Add(
-                new GifCardViewModel(
+            GifCardViewModel card = new(
                     item,
                     _copyCoordinator,
                     _libraryCoordinator,
@@ -1105,7 +1126,10 @@ public sealed class SearchViewModel :
                     favoriteIdentities.Contains(
                         item.Identity),
                     searchQuery,
-                    ReducedMotion));
+                    ReducedMotion);
+            card.DisplayQuality = DisplayQuality;
+            card.PropertyChanged += OnCardPropertyChanged;
+            Results.Add(card);
         }
 
         _continuationToken = page.ContinuationToken;
@@ -1223,12 +1247,20 @@ public sealed class SearchViewModel :
         foreach (GifCardViewModel card
                  in Results)
         {
+            card.PropertyChanged -= OnCardPropertyChanged;
             card.StopPreviewCommand
                 .Execute(null);
         }
 
         Results.Clear();
         _resultIdentities.Clear();
+    }
+
+    private void OnCardPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(GifCardViewModel.Message) &&
+            sender is GifCardViewModel { Message: { } message })
+            Message = message;
     }
 
     private void NotifyPaginationState()

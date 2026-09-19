@@ -12,6 +12,8 @@ CopyGIF is a Windows GIF picker. Press a global keyboard shortcut, search with K
 - Search and browse GIFs with the provider you configure.
 - Copy a real GIF file to paste into applications that accept file pastes.
 - Keep Favorites, Recents, and optional search history on your device.
+- Choose one of five animated GIF copy sizes and a GIPHY content rating in Settings.
+- Clear saved search terms separately from your GIF Recents.
 - Adjust the hotkey, window placement, appearance, startup, and update settings.
 - Protect your provider API keys for your Windows user with Windows Data Protection API.
 
@@ -34,6 +36,7 @@ To remove an MSI installation, use Windows **Installed apps**. Uninstalling the 
 4. Paste it into an application that accepts file pastes.
 
 The app lives in the Windows notification area. Settings let you choose what happens when you close the search window or open it from the tray.
+The content rating setting filters GIPHY search and trending requests. KLIPY uses the rating associated with your KLIPY API key. Both providers support local Favorites and Recents.
 
 ## Local data and privacy
 

@@ -104,6 +104,17 @@
           "minimum": 1,
           "maximum": 500,
           "default": 50
+        },
+        "contentRating": {
+          "type": "string",
+          "enum": [
+            "allAvailable",
+            "g",
+            "pg",
+            "pg13",
+            "r"
+          ],
+          "default": "allAvailable"
         }
       }
     },
@@ -146,6 +157,28 @@
           "minLength": 1,
           "maxLength": 32767,
           "default": null
+        },
+        "gifQuality": {
+          "type": "string",
+          "enum": [
+            "minimum",
+            "low",
+            "medium",
+            "high",
+            "maximum"
+          ],
+          "default": "medium"
+        },
+        "saveQuality": {
+          "type": "string",
+          "enum": [
+            "minimum",
+            "low",
+            "medium",
+            "high",
+            "maximum"
+          ],
+          "default": "medium"
         }
       }
     },
@@ -257,6 +290,17 @@
             "dark"
           ],
           "default": "system"
+        },
+        "displayQuality": {
+          "type": "string",
+          "enum": [
+            "minimum",
+            "low",
+            "medium",
+            "high",
+            "maximum"
+          ],
+          "default": "medium"
         }
       }
     },

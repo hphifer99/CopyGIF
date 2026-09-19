@@ -124,7 +124,7 @@ public sealed class GifSearchCoordinator :
                     query,
                     continuationToken: null,
                     settings,
-                    recordSearch: true,
+                    recordSearch: false,
                     operationCancellation.Token)
                 .ConfigureAwait(false);
         }
@@ -291,19 +291,29 @@ public sealed class GifSearchCoordinator :
                         Kind = kind,
                         PageSize =
                             settings.Search.ResultsPerSearch,
+                        ContentRating = settings.Search.ContentRating,
                         ContinuationToken =
                             continuationToken
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
 
-        if (recordSearch)
+        if (recordSearch && normalizedQuery.Length <= 500)
         {
-            await _suggestionCoordinator
-                .RecordSearchAsync(
-                    normalizedQuery,
-                    cancellationToken)
-                .ConfigureAwait(false);
+            try
+            {
+                await _suggestionCoordinator.RecordSearchAsync(
+                    normalizedQuery, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                // Results have already arrived. A local history error must not lose them.
+                RepairDiagnostics.Record("search-history", provider.Id, exception.GetType().Name);
+            }
         }
 
         return page;

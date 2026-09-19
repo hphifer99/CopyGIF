@@ -38,6 +38,8 @@ public sealed class ProviderKeysViewModel(SettingsEditSession session) : Observa
         get => _deleteGiphyKey;
         set { if (SetProperty(ref _deleteGiphyKey, value)) Stage("giphy", GiphyCredential, value); }
     }
+    public string KlipyPlaceholder => _hasKlipyKey && !DeleteKlipyKey ? "●●●●●●●●●●●●" : "Enter API key";
+    public string GiphyPlaceholder => _hasGiphyKey && !DeleteGiphyKey ? "●●●●●●●●●●●●" : "Enter API key";
     public string KlipyStatus => _hasKlipyKey ? "A KLIPY key is saved." : "No KLIPY key is saved.";
     public string GiphyStatus => _hasGiphyKey ? "A GIPHY key is saved." : "No GIPHY key is saved.";
 
@@ -52,13 +54,17 @@ public sealed class ProviderKeysViewModel(SettingsEditSession session) : Observa
             _hasKlipyKey = await session.HasCredentialAsync("klipy", cancellationToken);
             _hasGiphyKey = await session.HasCredentialAsync("giphy", cancellationToken);
             OnPropertyChanged(nameof(KlipyStatus));
+            OnPropertyChanged(nameof(KlipyPlaceholder));
             OnPropertyChanged(nameof(GiphyStatus));
+            OnPropertyChanged(nameof(GiphyPlaceholder));
         }
         finally { _refreshing = false; }
     }
 
     private void Stage(string id, string? value, bool delete)
     {
+        OnPropertyChanged(nameof(KlipyPlaceholder));
+        OnPropertyChanged(nameof(GiphyPlaceholder));
         if (_refreshing) return;
         if (delete) session.StageCredential(id, null);
         else if (!string.IsNullOrWhiteSpace(value)) session.StageCredential(id, value);

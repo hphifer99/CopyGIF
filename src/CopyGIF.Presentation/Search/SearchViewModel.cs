@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using CopyGIF.Application.Library;
 using CopyGIF.Application.Media;
 using CopyGIF.Application.Search;
+using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 using CopyGIF.Core.Settings;
 using CopyGIF.Presentation.Common;
@@ -45,6 +46,9 @@ public sealed class SearchViewModel :
     private readonly IPreviewCoordinator
         _previewCoordinator;
 
+    private readonly IProviderCatalog
+        _providerCatalog;
+
     private readonly HashSet<string>
         _resultIdentities =
             new(
@@ -81,8 +85,27 @@ public sealed class SearchViewModel :
     private Task? _emptyQueryOperation;
     public bool AutoLoadMoreResults => _settings.Search.AutoLoadMoreResults;
     public string ActiveProviderId => _settings.Providers.ActiveProviderId;
-    public bool IsGiphy => ActiveProviderId == "giphy";
-    public string AttributionText => ActiveProviderId == "giphy" ? "Powered By GIPHY" : "Powered by KLIPY";
+
+    // What the page shows and does for the active provider comes from its descriptor, so a new
+    // provider needs no change here. An id that is not registered gets the neutral defaults.
+    private ProviderDescriptor? ActiveProvider =>
+        _providerCatalog.Providers.FirstOrDefault(
+            provider => string.Equals(provider.Id, ActiveProviderId, StringComparison.OrdinalIgnoreCase));
+
+    public string AttributionText =>
+        ActiveProvider is { } provider
+            ? provider.AttributionText ?? $"Powered by {provider.DisplayName}"
+            : string.Empty;
+
+    /// <summary>The attribution image of the active provider, or null when it uses text only.</summary>
+    public string? AttributionImageAsset => ActiveProvider?.AttributionImageAsset;
+
+    public bool ShowsAttributionImage => AttributionImageAsset is not null;
+
+    /// <summary>True when the first page of trending results of the active provider is kept and reused.</summary>
+    public bool CachesTrendingSnapshot => ActiveProvider?.CachesTrendingSnapshot == true;
+
+    private bool DeduplicatesResults => ActiveProvider?.DeduplicatesResults ?? true;
     public double TrendingScrollOffset { get; set; }
 
     public void Configure(AppSettings settings)
@@ -95,7 +118,9 @@ public sealed class SearchViewModel :
         OnPropertyChanged(nameof(AutoLoadMoreResults));
         OnPropertyChanged(nameof(ActiveProviderId));
         OnPropertyChanged(nameof(AttributionText));
-        OnPropertyChanged(nameof(IsGiphy));
+        OnPropertyChanged(nameof(AttributionImageAsset));
+        OnPropertyChanged(nameof(ShowsAttributionImage));
+        OnPropertyChanged(nameof(CachesTrendingSnapshot));
         if (providerChanged || pageSizeChanged || ratingChanged) { _trendingSnapshot = null; TrendingScrollOffset = 0; }
         if (providerChanged || ratingChanged)
         {
@@ -117,8 +142,14 @@ public sealed class SearchViewModel :
         ISearchSuggestionCoordinator suggestionCoordinator,
         IGifCopyCoordinator copyCoordinator,
         IGifLibraryCoordinator libraryCoordinator,
-        IPreviewCoordinator previewCoordinator)
+        IPreviewCoordinator previewCoordinator,
+        IProviderCatalog providerCatalog)
     {
+        _providerCatalog =
+            providerCatalog ??
+            throw new ArgumentNullException(
+                nameof(providerCatalog));
+
         _searchCoordinator =
             searchCoordinator ??
             throw new ArgumentNullException(
@@ -626,7 +657,7 @@ public sealed class SearchViewModel :
 
         try
         {
-            GifSearchPage page = ActiveProviderId == "klipy" && _trendingSnapshot is not null
+            GifSearchPage page = CachesTrendingSnapshot && _trendingSnapshot is not null
                 ? _trendingSnapshot
                 : await _searchCoordinator.TrendingAsync(operation.Token);
 
@@ -1112,7 +1143,7 @@ public sealed class SearchViewModel :
         foreach (GifItem item
                  in page.Items)
         {
-            if (ActiveProviderId != "giphy" && !_resultIdentities.Add(
+            if (DeduplicatesResults && !_resultIdentities.Add(
                     item.Identity))
             {
                 continue;
@@ -1133,7 +1164,7 @@ public sealed class SearchViewModel :
         }
 
         _continuationToken = page.ContinuationToken;
-        if (Mode == GifSearchMode.Trending && ActiveProviderId == "klipy")
+        if (Mode == GifSearchMode.Trending && CachesTrendingSnapshot)
             _trendingSnapshot = new GifSearchPage
             {
                 Items = Results.Select(card => card.Item).ToArray(),

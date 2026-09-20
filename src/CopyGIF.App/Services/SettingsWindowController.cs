@@ -56,7 +56,7 @@ internal sealed class SettingsWindowController : IDisposable
             await _session.BeginAsync();
             await _model.LoadCommand.ExecuteAsync(null);
             if (!_model.IsLoaded || _model.HasSectionErrors)
-                throw new InvalidOperationException("Settings could not be loaded. Close and reopen Settings to retry.");
+                throw new CopyGIF.Core.Models.UserFacingException("Settings could not be loaded. Close and reopen Settings to retry.");
             await _keys.RefreshAsync();
             _loading = false;
             CaptureDraft();
@@ -64,7 +64,9 @@ internal sealed class SettingsWindowController : IDisposable
         }
         catch (Exception exception)
         {
-            _window.StatusMessage = exception.Message;
+            // Only messages CopyGIF wrote itself are shown as written; everything else is
+            // mapped to a fixed sentence and the exception type is logged.
+            _window.StatusMessage = CopyGIF.Application.UserFailureMessages.Describe("settings-load", exception);
             _window.StatusSeverity = InfoBarSeverity.Error;
         }
         finally { _window.IsBusy = false; }
@@ -137,7 +139,7 @@ internal sealed class SettingsWindowController : IDisposable
         }
         catch (Exception exception)
         {
-            _window.StatusMessage = exception.Message;
+            _window.StatusMessage = CopyGIF.Application.UserFailureMessages.Describe("settings-apply", exception);
             _window.StatusSeverity = InfoBarSeverity.Error;
             return false;
         }

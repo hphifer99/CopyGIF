@@ -271,7 +271,7 @@ public sealed class GeneralSettingsViewModel :
         {
             AppSettings settings =
                 await _settingsCoordinator
-                    .LoadAsync(
+                    .LoadForEditingAsync(
                         linkedCancellation.Token);
 
             ApplySettings(

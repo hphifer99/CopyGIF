@@ -10,6 +10,44 @@ namespace CopyGIF.Presentation.Tests.Settings;
 public sealed class GeneralSettingsViewModelTests
 {
     [TestMethod]
+    public async Task LoadCommand_ShowsRealStartupStateFromEditingLoad()
+    {
+        FakeSettingsCoordinator coordinator =
+            new(
+                new AppSettings
+                {
+                    Startup =
+                        new StartupSettings
+                        {
+                            StartWithWindows = true
+                        }
+                })
+            {
+                EditingSettings =
+                    new AppSettings
+                    {
+                        Startup =
+                            new StartupSettings
+                            {
+                                StartWithWindows = false
+                            }
+                    }
+            };
+
+        GeneralSettingsViewModel viewModel =
+            new(
+                coordinator);
+
+        await viewModel
+            .LoadCommand
+            .ExecuteAsync(null);
+
+        Assert.IsFalse(
+            viewModel.StartWithWindows,
+            "Settings must show what Windows actually has registered.");
+    }
+
+    [TestMethod]
     public async Task LoadCommand_LoadsGeneralSettings()
     {
         AppSettings settings =
@@ -416,6 +454,23 @@ public sealed class GeneralSettingsViewModelTests
                 .ThrowIfCancellationRequested();
 
             return Task.FromResult(
+                CurrentSettings);
+        }
+
+        public AppSettings? EditingSettings
+        {
+            get;
+            set;
+        }
+
+        public Task<AppSettings> LoadForEditingAsync(
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            return Task.FromResult(
+                EditingSettings ??
                 CurrentSettings);
         }
 

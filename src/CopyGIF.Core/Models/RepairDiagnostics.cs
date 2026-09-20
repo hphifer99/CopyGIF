@@ -13,6 +13,41 @@ public static class RepairDiagnostics
         try { Sink?.Invoke(message); } catch { /* Diagnostics must never fail the user action. */ }
     }
 
+    /// <summary>
+    /// Records that an exception escaped to a global handler or a window-level failure path.
+    /// Only the exception type and the name of the method that threw are written. The message
+    /// is deliberately left out because messages can contain file paths, URLs or query text.
+    /// </summary>
+    public static void RecordException(string stage, Exception exception)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stage);
+        ArgumentNullException.ThrowIfNull(exception);
+
+        Exception root = exception is AggregateException aggregate && aggregate.InnerExceptions.Count > 0
+            ? aggregate.InnerExceptions[0]
+            : exception;
+
+        string origin = "unknown";
+
+        try
+        {
+            System.Reflection.MethodBase? method = root.TargetSite;
+
+            if (method is not null)
+            {
+                origin = $"{method.DeclaringType?.Name ?? "?"}.{method.Name}";
+            }
+        }
+        catch
+        {
+            // Reading the throwing method is best effort and must never fail the caller.
+        }
+
+        RecordContext(
+            stage,
+            $"exception={root.GetType().Name} origin={origin}");
+    }
+
     public static void RecordContext(string stage, string detail)
     {
         // Callers pass fixed stage names and local folder paths, never credential values.

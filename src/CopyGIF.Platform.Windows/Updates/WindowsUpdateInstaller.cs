@@ -12,8 +12,19 @@ public sealed class WindowsUpdateInstaller :
     private readonly IAuthenticodeVerifier
         _authenticodeVerifier;
 
+    // After an elevated installer has been started, the verified package stays locked for a
+    // short while, so it cannot be swapped before the installer has opened it. The wait is
+    // only for a per-machine installation, where the installer runs with more rights than
+    // CopyGIF. A per-user installer runs as the same user and crosses no privilege boundary.
+    internal static readonly TimeSpan
+        DefaultElevatedHandoffSettleTime =
+            TimeSpan.FromSeconds(5);
+
     private readonly IUpdatePackageLauncher
         _packageLauncher;
+
+    private readonly TimeSpan
+        _elevatedHandoffSettleTime;
 
     public WindowsUpdateInstaller()
         : this(
@@ -24,8 +35,13 @@ public sealed class WindowsUpdateInstaller :
 
     internal WindowsUpdateInstaller(
         IAuthenticodeVerifier authenticodeVerifier,
-        IUpdatePackageLauncher packageLauncher)
+        IUpdatePackageLauncher packageLauncher,
+        TimeSpan? elevatedHandoffSettleTime = null)
     {
+        _elevatedHandoffSettleTime =
+            elevatedHandoffSettleTime ??
+            DefaultElevatedHandoffSettleTime;
+
         _authenticodeVerifier =
             authenticodeVerifier ??
             throw new ArgumentNullException(
@@ -37,13 +53,25 @@ public sealed class WindowsUpdateInstaller :
                 nameof(packageLauncher));
     }
 
+    public Task<UpdatePackageVerificationResult> VerifyAsync(
+        DownloadedUpdatePackage package,
+        CancellationToken cancellationToken = default) =>
+        VerifyAsync(
+            package,
+            UpdateVerificationOptions.Full,
+            cancellationToken);
+
     public async Task<
         UpdatePackageVerificationResult> VerifyAsync(
         DownloadedUpdatePackage package,
+        UpdateVerificationOptions options,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(
             package);
+
+        ArgumentNullException.ThrowIfNull(
+            options);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -135,7 +163,8 @@ public sealed class WindowsUpdateInstaller :
             AuthenticodeVerificationStatus
                 signatureStatus =
                     _authenticodeVerifier.Verify(
-                        fullPath);
+                        fullPath,
+                        options.CheckRevocationOnline);
 
             return signatureStatus switch
             {
@@ -149,6 +178,14 @@ public sealed class WindowsUpdateInstaller :
                             UpdatePackageVerificationFailure
                                 .UntrustedPublisher,
                             "The update package was not signed by the installed CopyGIF publisher."),
+
+                AuthenticodeVerificationStatus
+                    .RevocationUnavailable =>
+                    UpdatePackageVerificationResult
+                        .Invalid(
+                            UpdatePackageVerificationFailure
+                                .RevocationCheckUnavailable,
+                            "Windows could not confirm that the update signing certificate is still valid. It will be checked again later."),
 
                 _ =>
                     UpdatePackageVerificationResult
@@ -177,12 +214,24 @@ public sealed class WindowsUpdateInstaller :
         }
     }
 
+    public Task InstallAsync(
+        DownloadedUpdatePackage package,
+        CancellationToken cancellationToken = default) =>
+        InstallAsync(
+            package,
+            UpdateInstallOptions.Interactive,
+            cancellationToken);
+
     public async Task InstallAsync(
         DownloadedUpdatePackage package,
+        UpdateInstallOptions options,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(
             package);
+
+        ArgumentNullException.ThrowIfNull(
+            options);
 
         UpdatePackageVerificationResult?
             packageShapeFailure =
@@ -215,6 +264,11 @@ public sealed class WindowsUpdateInstaller :
         UpdatePackageVerificationResult verification =
             await VerifyAsync(
                     package,
+                    new UpdateVerificationOptions
+                    {
+                        CheckRevocationOnline =
+                            options.CheckRevocationOnline
+                    },
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -227,8 +281,25 @@ public sealed class WindowsUpdateInstaller :
 
         await _packageLauncher.LaunchAsync(
                 fullPath,
+                options,
                 cancellationToken)
             .ConfigureAwait(false);
+
+        if (options.RequiresElevation &&
+            _elevatedHandoffSettleTime > TimeSpan.Zero)
+        {
+            try
+            {
+                await Task.Delay(
+                        _elevatedHandoffSettleTime,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // The installer is already running. Cancelling only ends the extra wait.
+            }
+        }
     }
 
     private static UpdatePackageVerificationResult?

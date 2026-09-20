@@ -159,7 +159,8 @@ public sealed class FakeGifProviderCredentialManager :
 
     public FakeGifProviderCredentialManager(
         string providerId = "klipy",
-        string displayName = "KLIPY")
+        string displayName = "KLIPY",
+        string? secretName = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(
             providerId);
@@ -169,11 +170,20 @@ public sealed class FakeGifProviderCredentialManager :
 
         ProviderId = providerId.Trim();
         DisplayName = displayName.Trim();
+
+        // By default this follows the pattern of the real secret names, for example
+        // providers.klipy.apiKey. A test can pass its own name.
+        SecretName =
+            string.IsNullOrWhiteSpace(secretName)
+                ? $"providers.{ProviderId}.apiKey"
+                : secretName.Trim();
     }
 
     public string ProviderId { get; }
 
     public string DisplayName { get; }
+
+    public string SecretName { get; }
 
     public string? StoredCredential { get; set; }
 

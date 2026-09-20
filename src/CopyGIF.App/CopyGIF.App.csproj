@@ -6,10 +6,10 @@
     <TargetPlatformMinVersion>$(CopyGifWindowsMinimumVersion)</TargetPlatformMinVersion>
     <SupportedOSPlatformVersion>$(CopyGifWindowsMinimumVersion)</SupportedOSPlatformVersion>
 
-    <AssemblyName>CopyGif</AssemblyName>
-    <Title>CopyGif</Title>
-    <Product>CopyGif</Product>
-    <Description>CopyGif</Description>
+    <AssemblyName>CopyGIF</AssemblyName>
+    <Title>CopyGIF</Title>
+    <Product>CopyGIF</Product>
+    <Description>CopyGIF</Description>
     <Version>2.0.0</Version>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
     <FileVersion>2.0.0.0</FileVersion>

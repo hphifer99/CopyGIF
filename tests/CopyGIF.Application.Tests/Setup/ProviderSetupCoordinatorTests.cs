@@ -310,6 +310,9 @@ public sealed class ProviderSetupCoordinatorTests
         public string DisplayName =>
             "Test Provider";
 
+        public string SecretName =>
+            "providers.test.apiKey";
+
         public bool HasCredential
         {
             get;

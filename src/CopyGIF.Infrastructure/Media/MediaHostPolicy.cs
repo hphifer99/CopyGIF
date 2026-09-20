@@ -89,6 +89,10 @@ public sealed class MediaHostPolicy
         if (!_approvedHosts.Contains(
                 host))
         {
+            CopyGIF.Core.Policies.ProviderMediaPolicy.RecordRejectedHost(
+                "local",
+                uri);
+
             throw new MediaDownloadException(
                 MediaDownloadFailure.UnapprovedHost,
                 $"The media host '{host}' is not approved.");

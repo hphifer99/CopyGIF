@@ -115,7 +115,7 @@ public sealed partial class SearchPage :
     public SearchPage()
     {
         InitializeComponent();
-        _behavior = new SearchPageBehavior(this, ResultsGridView, GiphyAttribution, ProviderAttributionText);
+        _behavior = new SearchPageBehavior(this, ResultsGridView, ProviderAttributionImage, ProviderAttributionText);
 
         UpdateVisualState();
         UpdateStatus();
@@ -313,17 +313,26 @@ public sealed partial class SearchPage :
     private async void ClearHistory_Click(object sender, RoutedEventArgs args)
     {
         if (ClearHistoryCommand?.CanExecute(null) != true) return;
-        ContentDialog dialog = new()
+        try
         {
-            XamlRoot = XamlRoot,
-            Title = "Clear search history?",
-            Content = "This removes saved search terms. Your GIF Recents and Favorites are kept.",
-            PrimaryButtonText = "Clear history",
-            CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close
-        };
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-            ClearHistoryCommand.Execute(null);
+            ContentDialog dialog = new()
+            {
+                XamlRoot = XamlRoot,
+                Title = "Clear search history?",
+                Content = "This removes saved search terms. Your GIF Recents and Favorites are kept.",
+                PrimaryButtonText = "Clear history",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close
+            };
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+                ClearHistoryCommand.Execute(null);
+        }
+        catch (Exception exception)
+        {
+            // An async void handler must not let an exception escape (for example when another
+            // dialog is already open). Leave a trace and keep the page usable.
+            CopyGIF.Core.Models.RepairDiagnostics.RecordException("clear-history-click", exception);
+        }
     }
 
     private void ReturnToTop_Click(object sender, RoutedEventArgs args)

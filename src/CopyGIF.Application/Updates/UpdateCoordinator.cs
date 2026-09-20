@@ -155,12 +155,377 @@ public sealed class UpdateCoordinator :
         {
             return await InstallCoreAsync(
                     package,
+                    UpdateInstallOptions.Interactive,
                     cancellationToken)
                 .ConfigureAwait(false);
         }
         finally
         {
             _gate.Release();
+        }
+    }
+
+    public async Task<UpdateInstallationResult> InstallAsync(
+        DownloadedUpdatePackage package,
+        UpdateInstallOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+
+        ArgumentNullException.ThrowIfNull(
+            package);
+
+        ArgumentNullException.ThrowIfNull(
+            options);
+
+        await _gate
+            .WaitAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            return await InstallCoreAsync(
+                    package,
+                    options,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task SkipVersionAsync(
+        string version,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            version);
+
+        string skipped =
+            version.Trim();
+
+        if (skipped.Length > MaximumVersionLength)
+        {
+            throw new ArgumentException(
+                "The version to skip is too long.",
+                nameof(version));
+        }
+
+        await _gate
+            .WaitAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            UpdateState state =
+                await _stateStore
+                    .LoadAsync(
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            // Skipping a version also cancels a "Not now" for that same version, so a skipped
+            // update is never installed by the next start.
+            PendingUpdateInstall? pending =
+                state.PendingInstall is not null &&
+                string.Equals(
+                    state.PendingInstall.Manifest.Version,
+                    skipped,
+                    StringComparison.OrdinalIgnoreCase)
+                    ? null
+                    : state.PendingInstall;
+
+            await _stateStore
+                .SaveAsync(
+                    state with
+                    {
+                        SchemaVersion =
+                            UpdateState.CurrentSchemaVersion,
+                        SkippedVersion = skipped,
+                        PendingInstall = pending
+                    },
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<bool> DeferInstallToNextLaunchAsync(
+        DownloadedUpdatePackage package,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+
+        ArgumentNullException.ThrowIfNull(
+            package);
+
+        await _gate
+            .WaitAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            InstallationContext installation =
+                await _installChannelService
+                    .GetCurrentAsync(
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            // Only a per-user installation can be installed at start without an
+            // administrator (UAC) prompt appearing out of nowhere.
+            if (!CanInstallAtNextLaunch(
+                    installation))
+            {
+                return false;
+            }
+
+            UpdateState state =
+                await _stateStore
+                    .LoadAsync(
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            await _stateStore
+                .SaveAsync(
+                    state with
+                    {
+                        SchemaVersion =
+                            UpdateState.CurrentSchemaVersion,
+                        PendingInstall =
+                            new PendingUpdateInstall
+                            {
+                                Manifest = package.Manifest,
+                                DeferredAtUtc = _clock.UtcNow
+                            }
+                    },
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<PendingUpdateInstallResult>
+        InstallPendingAsync(
+            string currentVersion,
+            CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+
+        await _gate
+            .WaitAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            UpdateState state =
+                await _stateStore
+                    .LoadAsync(
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            PendingUpdateInstall? pending =
+                state.PendingInstall;
+
+            if (pending is null)
+            {
+                return CreatePendingResult(
+                    PendingUpdateInstallStatus.NothingPending,
+                    null);
+            }
+
+            string pendingVersion =
+                pending.Manifest.Version;
+
+            // At most one automatic attempt per deferred update. The record is removed before
+            // anything below can fail or hang, so a broken package cannot cause a start-up loop.
+            await _stateStore
+                .SaveAsync(
+                    state with
+                    {
+                        SchemaVersion =
+                            UpdateState.CurrentSchemaVersion,
+                        PendingInstall = null
+                    },
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!IsNewerVersion(
+                    pendingVersion,
+                    currentVersion))
+            {
+                return CreatePendingResult(
+                    PendingUpdateInstallStatus.AlreadyCurrent,
+                    pendingVersion);
+            }
+
+            AppSettings settings =
+                AppSettingsNormalizer.Normalize(
+                    await _settingsStore
+                        .LoadAsync(
+                            cancellationToken)
+                        .ConfigureAwait(false));
+
+            InstallationContext installation =
+                await _installChannelService
+                    .GetCurrentAsync(
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            // The user may have turned updates off, or changed to notify-only, after choosing
+            // "Not now". That choice wins.
+            if (!settings.Updates.CheckForUpdates ||
+                !CanInstallAtNextLaunch(
+                    installation) ||
+                UpdatePolicy.ResolveMode(
+                    settings.Updates.Mode,
+                    installation) ==
+                UpdateMode.NotifyOnly ||
+                string.Equals(
+                    state.SkippedVersion,
+                    pendingVersion,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return CreatePendingResult(
+                    PendingUpdateInstallStatus.NotApplicable,
+                    pendingVersion);
+            }
+
+            DownloadedUpdatePackage? package =
+                await _packageService
+                    .FindExistingAsync(
+                        pending.Manifest,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            if (package is null)
+            {
+                return CreatePendingResult(
+                    PendingUpdateInstallStatus.PackageUnavailable,
+                    pendingVersion);
+            }
+
+            // The package was fully verified, revocation included, when it was downloaded.
+            // Starting CopyGIF must not wait for the network, so the final check here leaves
+            // out the online revocation lookup. Everything else is checked again.
+            UpdateInstallationResult installResult =
+                await InstallCoreAsync(
+                        package,
+                        new UpdateInstallOptions
+                        {
+                            Silent = true,
+                            RestartApplication = true,
+                            CheckRevocationOnline = false
+                        },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            return CreatePendingResult(
+                installResult.Status switch
+                {
+                    UpdateInstallationStatus.Installed =>
+                        PendingUpdateInstallStatus.Started,
+
+                    UpdateInstallationStatus.ManagedExternally =>
+                        PendingUpdateInstallStatus.NotApplicable,
+
+                    UpdateInstallationStatus.VerificationDeferred =>
+                        PendingUpdateInstallStatus.PackageUnavailable,
+
+                    _ =>
+                        PendingUpdateInstallStatus.VerificationFailed
+                },
+                pendingVersion);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private static PendingUpdateInstallResult CreatePendingResult(
+        PendingUpdateInstallStatus status,
+        string? version)
+    {
+        return new PendingUpdateInstallResult
+        {
+            Status = status,
+            Version = version
+        };
+    }
+
+    private static bool CanInstallAtNextLaunch(
+        InstallationContext installation)
+    {
+        return UpdatePolicy.UsesApplicationUpdater(
+                   installation) &&
+               installation.Scope ==
+               InstallScope.CurrentUser;
+    }
+
+    private static bool IsNewerVersion(
+        string candidateVersion,
+        string currentVersion)
+    {
+        try
+        {
+            return SemanticVersion
+                       .Parse(
+                           candidateVersion,
+                           nameof(candidateVersion))
+                       .CompareTo(
+                           SemanticVersion.Parse(
+                               currentVersion,
+                               nameof(currentVersion))) >
+                   0;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private async Task ClearPendingInstallAsync()
+    {
+        try
+        {
+            UpdateState state =
+                await _stateStore
+                    .LoadAsync(
+                        CancellationToken.None)
+                    .ConfigureAwait(false);
+
+            if (state.PendingInstall is null)
+            {
+                return;
+            }
+
+            await _stateStore
+                .SaveAsync(
+                    state with
+                    {
+                        PendingInstall = null
+                    },
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Housekeeping. The installer was already started.
         }
     }
 
@@ -179,6 +544,11 @@ public sealed class UpdateCoordinator :
 
         try
         {
+            await TryPruneAsync(
+                    currentVersion,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
             UpdateCheckResult check =
                 await CheckCoreAsync(
                         currentVersion,
@@ -186,7 +556,9 @@ public sealed class UpdateCoordinator :
                         cancellationToken)
                     .ConfigureAwait(false);
 
-            if (!check.HasUpdate)
+            if (!check.HasUpdate ||
+                IsSkipped(
+                    check))
             {
                 return new AutomaticUpdateResult
                 {
@@ -205,56 +577,146 @@ public sealed class UpdateCoordinator :
                 };
             }
 
-            UpdatePreparationResult preparation =
-                await PrepareCoreAsync(
-                        check.Candidate!,
+            try
+            {
+                return await RunAutomaticPreparationAsync(
+                        check,
                         progress,
                         cancellationToken)
                     .ConfigureAwait(false);
-
-            if (!preparation.IsReady)
-            {
-                return new AutomaticUpdateResult
-                {
-                    Action =
-                        AutomaticUpdateAction
-                            .VerificationFailed,
-                    Check = check,
-                    Preparation = preparation
-                };
             }
-
-            if (check.ResolvedMode !=
-                UpdateMode.DownloadAndInstall)
+            catch (Exception)
             {
-                return new AutomaticUpdateResult
-                {
-                    Action = AutomaticUpdateAction.Prompt,
-                    Check = check,
-                    Preparation = preparation
-                };
-            }
-
-            UpdateInstallationResult installation =
-                await InstallCoreAsync(
-                        preparation.Package!,
-                        cancellationToken)
+                // The check time was saved before the download started. Clear it so
+                // an interrupted or failed download is retried at the next opportunity
+                // instead of waiting for the next daily or weekly interval.
+                await ClearLastCheckAsync()
                     .ConfigureAwait(false);
 
-            return new AutomaticUpdateResult
-            {
-                Action = installation.WasInstalled
-                    ? AutomaticUpdateAction.Installed
-                    : AutomaticUpdateAction
-                        .VerificationFailed,
-                Check = check,
-                Preparation = preparation,
-                Installation = installation
-            };
+                throw;
+            }
         }
         finally
         {
             _gate.Release();
+        }
+    }
+
+    private async Task<AutomaticUpdateResult>
+        RunAutomaticPreparationAsync(
+            UpdateCheckResult check,
+            IProgress<UpdateDownloadProgress>? progress,
+            CancellationToken cancellationToken)
+    {
+        UpdatePreparationResult preparation =
+            await PrepareCoreAsync(
+                    check.Candidate!,
+                    progress,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        if (preparation.Status ==
+            UpdatePreparationStatus.VerificationDeferred)
+        {
+            // The check time was saved before the download started. Clear it so the next
+            // attempt is not pushed out to the next daily or weekly interval.
+            await ClearLastCheckAsync()
+                .ConfigureAwait(false);
+
+            return new AutomaticUpdateResult
+            {
+                Action =
+                    AutomaticUpdateAction.RetryLater,
+                Check = check,
+                Preparation = preparation
+            };
+        }
+
+        if (!preparation.IsReady)
+        {
+            return new AutomaticUpdateResult
+            {
+                Action =
+                    AutomaticUpdateAction
+                        .VerificationFailed,
+                Check = check,
+                Preparation = preparation
+            };
+        }
+
+        // The package is downloaded and verified. Installing it means closing and restarting
+        // CopyGIF, and only the host application knows whether the user is looking at it.
+        // So the coordinator never installs from the background timer. It reports a prepared
+        // update, and the host decides using Check.ResolvedMode: DownloadAndInstall installs
+        // when CopyGIF is hidden in the tray and asks when it is on screen, DownloadAndPrompt
+        // only ever asks.
+        return new AutomaticUpdateResult
+        {
+            Action = AutomaticUpdateAction.Prompt,
+            Check = check,
+            Preparation = preparation
+        };
+    }
+
+    private static bool IsSkipped(
+        UpdateCheckResult check)
+    {
+        UpdateCandidate? candidate =
+            check.Candidate;
+
+        // A required update can never be skipped.
+        return candidate is not null &&
+               !candidate.IsRequired &&
+               string.Equals(
+                   check.State.SkippedVersion,
+                   candidate.AvailableVersion,
+                   StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task TryPruneAsync(
+        string currentVersion,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _packageService
+                .PruneAsync(
+                    currentVersion,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // Housekeeping must never stop an update check.
+        }
+    }
+
+    private async Task ClearLastCheckAsync()
+    {
+        try
+        {
+            UpdateState state =
+                await _stateStore
+                    .LoadAsync(
+                        CancellationToken.None)
+                    .ConfigureAwait(false);
+
+            await _stateStore
+                .SaveAsync(
+                    state with
+                    {
+                        LastCheckedAtUtc = null
+                    },
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // The original failure is the one worth reporting.
         }
     }
 
@@ -468,6 +930,21 @@ public sealed class UpdateCoordinator :
 
         if (!verification.IsValid)
         {
+            // A package that only could not be confirmed (revocation servers unreachable) is
+            // not damaged, so it stays on disk and is checked again later.
+            if (verification.Failure ==
+                UpdatePackageVerificationFailure
+                    .RevocationCheckUnavailable)
+            {
+                return new UpdatePreparationResult
+                {
+                    Status =
+                        UpdatePreparationStatus
+                            .VerificationDeferred,
+                    Verification = verification
+                };
+            }
+
             await DeletePackageOrThrowAsync(
                     package,
                     originalException: null)
@@ -533,6 +1010,7 @@ public sealed class UpdateCoordinator :
     private async Task<UpdateInstallationResult>
         InstallCoreAsync(
             DownloadedUpdatePackage package,
+            UpdateInstallOptions options,
             CancellationToken cancellationToken)
     {
         InstallationContext installation =
@@ -562,6 +1040,11 @@ public sealed class UpdateCoordinator :
                 await _installer
                     .VerifyAsync(
                         package,
+                        new UpdateVerificationOptions
+                        {
+                            CheckRevocationOnline =
+                                options.CheckRevocationOnline
+                        },
                         cancellationToken)
                     .ConfigureAwait(false);
         }
@@ -580,6 +1063,20 @@ public sealed class UpdateCoordinator :
             throw;
         }
 
+        if (!verification.IsValid &&
+            verification.Failure ==
+            UpdatePackageVerificationFailure
+                .RevocationCheckUnavailable)
+        {
+            return new UpdateInstallationResult
+            {
+                Status =
+                    UpdateInstallationStatus
+                        .VerificationDeferred,
+                Verification = verification
+            };
+        }
+
         if (!verification.IsValid)
         {
             await DeletePackageOrThrowAsync(
@@ -596,10 +1093,21 @@ public sealed class UpdateCoordinator :
             };
         }
 
+        // Only a per-machine installation needs the elevation (UAC) prompt.
         await _installer
             .InstallAsync(
                 package,
+                options with
+                {
+                    RequiresElevation =
+                        installation.Scope !=
+                        InstallScope.CurrentUser
+                },
                 cancellationToken)
+            .ConfigureAwait(false);
+
+        // The installer is running, so a remembered "Not now" is finished.
+        await ClearPendingInstallAsync()
             .ConfigureAwait(false);
 
         return new UpdateInstallationResult

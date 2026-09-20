@@ -811,6 +811,305 @@ public sealed class GifLibraryCoordinatorTests
         Assert.AreEqual(GifDownloadPurpose.Recent, downloader.Requests[1].Purpose);
     }
 
+    private static GifItem CreateItemWithSeparateQualities(
+        string id) =>
+        CreateItem(id) with
+        {
+            Renditions = new GifRenditions
+            {
+                Low = new Uri("https://static.klipy.com/low.gif"),
+                High = new Uri("https://static.klipy.com/high.gif")
+            }
+        };
+
+    private static FakeSettingsStore CreateSeparateQualitySettings() =>
+        new()
+        {
+            Value = new AppSettings
+            {
+                Library = new LibrarySettings
+                {
+                    GifQuality = GifQuality.High,
+                    SaveQuality = GifQuality.Low
+                }
+            }
+        };
+
+    [TestMethod]
+    public async Task RecordRecentAsync_SecondDownload_DoesNotHoldTheLibraryLock()
+    {
+        FakeSettingsStore settings = CreateSeparateQualitySettings();
+        FakeGifDownloader downloader = new();
+        TaskCompletionSource<DownloadedGif> slowDownload =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        GifItem item = CreateItemWithSeparateQualities("slow-save-quality");
+
+        downloader.DownloadHandler =
+            (_, purpose, _) =>
+                purpose == GifDownloadPurpose.Recent
+                    ? slowDownload.Task
+                    : throw new InvalidOperationException("Only the Recent download is expected.");
+
+        using GifLibraryCoordinator coordinator =
+            CreateCoordinator(
+                settingsStore: settings,
+                downloader: downloader);
+
+        Task<LibrarySnapshot> record =
+            coordinator.RecordRecentAsync(
+                item,
+                CreateDownloadedGif(
+                    item,
+                    GifDownloadPurpose.Clipboard,
+                    Path.Combine(
+                        Path.GetTempPath(),
+                        "clipboard.gif")));
+
+        while (downloader.Requests.Count == 0)
+        {
+            await Task.Delay(10);
+        }
+
+        // The slow network download is in flight. Other library work must not queue behind it.
+        Task<LibrarySnapshot> otherWork =
+            coordinator.LoadAsync();
+
+        Task finished =
+            await Task.WhenAny(
+                otherWork,
+                Task.Delay(
+                    TimeSpan.FromSeconds(3)));
+
+        Assert.AreSame(
+            otherWork,
+            finished,
+            "reading the library must not wait for a Recent's second download");
+
+        Assert.IsFalse(
+            record.IsCompleted);
+
+        slowDownload.SetResult(
+            CreateDownloadedGif(
+                item,
+                GifDownloadPurpose.Recent,
+                Path.Combine(
+                    Path.GetTempPath(),
+                    "recent-low.gif")));
+
+        LibrarySnapshot snapshot =
+            await record;
+
+        Assert.HasCount(
+            1,
+            snapshot.Recents);
+    }
+
+    [TestMethod]
+    public async Task RecordRecentAsync_SaveFailsAfterTheSecondDownload_RemovesTheDownloadedFile()
+    {
+        FakeSettingsStore settings = CreateSeparateQualitySettings();
+        FakeLibraryStore libraryStore = new();
+        FakeLibraryStorageMover mover = new();
+        GifItem item = CreateItemWithSeparateQualities("save-fails");
+        string downloadedPath =
+            Path.Combine(
+                Path.GetTempPath(),
+                "recent-low.gif");
+
+        FakeGifDownloader downloader = new()
+        {
+            DownloadHandler =
+                (_, _, _) =>
+                    Task.FromResult(
+                        CreateDownloadedGif(
+                            item,
+                            GifDownloadPurpose.Recent,
+                            downloadedPath))
+        };
+
+        libraryStore.SaveHandler =
+            static (_, _) =>
+                throw new IOException("The disk is full.");
+
+        using GifLibraryCoordinator coordinator =
+            CreateCoordinator(
+                libraryStore: libraryStore,
+                settingsStore: settings,
+                downloader: downloader,
+                storageMover: mover);
+
+        await Assert.ThrowsExactlyAsync<IOException>(
+            () => coordinator.RecordRecentAsync(
+                item,
+                CreateDownloadedGif(
+                    item,
+                    GifDownloadPurpose.Clipboard,
+                    Path.Combine(
+                        Path.GetTempPath(),
+                        "clipboard.gif"))));
+
+        Assert.IsTrue(
+            mover.DeleteRequests.Any(
+                request =>
+                    request.FilePaths.Contains(
+                        downloadedPath)),
+            "the file downloaded for a Recent that was never saved must not be left behind");
+    }
+
+    [TestMethod]
+    public async Task RecordRecentAsync_SaveFails_KeepsAFileThatAnExistingEntryAlreadyUses()
+    {
+        FakeSettingsStore settings = CreateSeparateQualitySettings();
+        FakeLibraryStorageMover mover = new();
+        GifItem item = CreateItemWithSeparateQualities("shared-path");
+        string sharedPath =
+            Path.Combine(
+                Path.GetTempPath(),
+                "recent-low.gif");
+
+        FakeLibraryStore libraryStore = new()
+        {
+            Value =
+                new LibrarySnapshot
+                {
+                    Recents =
+                    [
+                        CreateEntry(
+                            "shared-path",
+                            ReferenceTime,
+                            localFilePath: sharedPath)
+                    ]
+                }
+        };
+
+        FakeGifDownloader downloader = new()
+        {
+            DownloadHandler =
+                (_, _, _) =>
+                    Task.FromResult(
+                        CreateDownloadedGif(
+                            item,
+                            GifDownloadPurpose.Recent,
+                            sharedPath))
+        };
+
+        libraryStore.SaveHandler =
+            static (_, _) =>
+                throw new IOException("The disk is full.");
+
+        using GifLibraryCoordinator coordinator =
+            CreateCoordinator(
+                libraryStore: libraryStore,
+                settingsStore: settings,
+                downloader: downloader,
+                storageMover: mover);
+
+        await Assert.ThrowsExactlyAsync<IOException>(
+            () => coordinator.RecordRecentAsync(
+                item,
+                CreateDownloadedGif(
+                    item,
+                    GifDownloadPurpose.Clipboard,
+                    Path.Combine(
+                        Path.GetTempPath(),
+                        "clipboard.gif"))));
+
+        Assert.IsFalse(
+            mover.DeleteRequests.Any(
+                request =>
+                    request.FilePaths.Contains(
+                        sharedPath)),
+            "the older Recent still points at this file");
+    }
+
+    [TestMethod]
+    public async Task RecordRecentAsync_CancelledWhileWaitingForTheLock_RemovesTheSecondDownload()
+    {
+        FakeSettingsStore settings = CreateSeparateQualitySettings();
+        FakeLibraryStore libraryStore = new();
+        FakeLibraryStorageMover mover = new();
+        GifItem item = CreateItemWithSeparateQualities("cancelled");
+        string downloadedPath =
+            Path.Combine(
+                Path.GetTempPath(),
+                "recent-low.gif");
+
+        FakeGifDownloader downloader = new()
+        {
+            DownloadHandler =
+                (_, _, _) =>
+                    Task.FromResult(
+                        CreateDownloadedGif(
+                            item,
+                            GifDownloadPurpose.Recent,
+                            downloadedPath))
+        };
+
+        // Another operation holds the library lock (its first read never finishes until released).
+        TaskCompletionSource<LibrarySnapshot> holdLock =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        int loads = 0;
+
+        libraryStore.LoadHandler =
+            _ =>
+                Interlocked.Increment(ref loads) == 1
+                    ? holdLock.Task
+                    : Task.FromResult(new LibrarySnapshot());
+
+        using GifLibraryCoordinator coordinator =
+            CreateCoordinator(
+                libraryStore: libraryStore,
+                settingsStore: settings,
+                downloader: downloader,
+                storageMover: mover);
+
+        Task<LibrarySnapshot> holder =
+            coordinator.LoadAsync();
+
+        while (Volatile.Read(ref loads) == 0)
+        {
+            await Task.Delay(10);
+        }
+
+        using CancellationTokenSource cancellation = new();
+
+        Task<LibrarySnapshot> record =
+            coordinator.RecordRecentAsync(
+                item,
+                CreateDownloadedGif(
+                    item,
+                    GifDownloadPurpose.Clipboard,
+                    Path.Combine(
+                        Path.GetTempPath(),
+                        "clipboard.gif")),
+                cancellation.Token);
+
+        while (downloader.Requests.Count == 0)
+        {
+            await Task.Delay(10);
+        }
+
+        await Task.Delay(50);
+
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => record);
+
+        holdLock.SetResult(
+            new LibrarySnapshot());
+
+        await holder;
+
+        Assert.IsTrue(
+            mover.DeleteRequests.Any(
+                request =>
+                    request.FilePaths.Contains(
+                        downloadedPath)));
+    }
+
     private static GifLibraryCoordinator CreateCoordinator(
         FakeLibraryStore? libraryStore = null,
         FakeSettingsStore? settingsStore = null,

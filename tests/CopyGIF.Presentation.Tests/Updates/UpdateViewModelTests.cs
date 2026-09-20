@@ -460,6 +460,173 @@ public sealed class UpdateViewModelTests
     }
 
     [TestMethod]
+    public async Task InstallCommand_UsesRestartOptionsAndRequestsApplicationExit()
+    {
+        (UpdateViewModel viewModel, FakeUpdateCoordinator coordinator) =
+            await CreateViewModelWithPreparedPackageAsync(
+                UpdateInstallationStatus.Installed);
+
+        int exitRequests = 0;
+
+        viewModel.ApplicationExitRequested +=
+            (_, _) => exitRequests++;
+
+        await viewModel
+            .InstallCommand
+            .ExecuteAsync(null);
+
+        Assert.AreSame(
+            UpdateViewModel.RestartInstallOptions,
+            coordinator.LastInstallOptions);
+
+        Assert.IsTrue(
+            coordinator.LastInstallOptions!.RestartApplication);
+
+        Assert.IsFalse(
+            coordinator.LastInstallOptions.Silent);
+
+        Assert.AreEqual(
+            1,
+            exitRequests);
+    }
+
+    [TestMethod]
+    public async Task InstallCommand_VerificationFailure_DoesNotRequestApplicationExit()
+    {
+        (UpdateViewModel viewModel, _) =
+            await CreateViewModelWithPreparedPackageAsync(
+                UpdateInstallationStatus.VerificationFailed);
+
+        int exitRequests = 0;
+
+        viewModel.ApplicationExitRequested +=
+            (_, _) => exitRequests++;
+
+        await viewModel
+            .InstallCommand
+            .ExecuteAsync(null);
+
+        Assert.AreEqual(
+            0,
+            exitRequests);
+    }
+
+    [TestMethod]
+    public async Task InstallInBackgroundAsync_UsesSilentRestartOptionsAndRequestsExit()
+    {
+        (UpdateViewModel viewModel, FakeUpdateCoordinator coordinator) =
+            await CreateViewModelWithPreparedPackageAsync(
+                UpdateInstallationStatus.Installed);
+
+        int exitRequests = 0;
+
+        viewModel.ApplicationExitRequested +=
+            (_, _) => exitRequests++;
+
+        await viewModel.InstallInBackgroundAsync();
+
+        Assert.AreSame(
+            UpdateViewModel.SilentRestartInstallOptions,
+            coordinator.LastInstallOptions);
+
+        Assert.IsTrue(
+            coordinator.LastInstallOptions!.Silent);
+
+        Assert.AreEqual(
+            1,
+            exitRequests);
+    }
+
+    [TestMethod]
+    public async Task InstallInBackgroundAsync_WithoutPreparedPackage_DoesNothing()
+    {
+        FakeUpdateCoordinator coordinator =
+            new();
+
+        UpdateViewModel viewModel =
+            CreateInitializedViewModel(
+                coordinator);
+
+        int exitRequests = 0;
+
+        viewModel.ApplicationExitRequested +=
+            (_, _) => exitRequests++;
+
+        await viewModel.InstallInBackgroundAsync();
+
+        Assert.AreEqual(
+            0,
+            coordinator.InstallCount);
+
+        Assert.AreEqual(
+            0,
+            exitRequests);
+    }
+
+    private static async Task<(UpdateViewModel ViewModel, FakeUpdateCoordinator Coordinator)>
+        CreateViewModelWithPreparedPackageAsync(
+            UpdateInstallationStatus installationStatus)
+    {
+        UpdateCandidate candidate =
+            CreateCandidate();
+
+        DownloadedUpdatePackage package =
+            CreatePackage(
+                candidate.Manifest);
+
+        FakeUpdateCoordinator coordinator =
+            new()
+            {
+                CheckResult =
+                    CreateCheckResult(
+                        UpdateCheckStatus.UpdateAvailable,
+                        candidate),
+
+                PreparationResult =
+                    new UpdatePreparationResult
+                    {
+                        Status =
+                            UpdatePreparationStatus.Ready,
+
+                        Verification =
+                            UpdatePackageVerificationResult.Valid(),
+
+                        Package =
+                            package
+                    },
+
+                InstallationResult =
+                    new UpdateInstallationResult
+                    {
+                        Status =
+                            installationStatus,
+
+                        Verification =
+                            installationStatus ==
+                            UpdateInstallationStatus.Installed
+                                ? UpdatePackageVerificationResult.Valid()
+                                : UpdatePackageVerificationResult.Invalid(
+                                    UpdatePackageVerificationFailure.Unknown,
+                                    "Verification failed.")
+                    }
+            };
+
+        UpdateViewModel viewModel =
+            CreateInitializedViewModel(
+                coordinator);
+
+        await viewModel
+            .CheckCommand
+            .ExecuteAsync(null);
+
+        await viewModel
+            .PrepareCommand
+            .ExecuteAsync(null);
+
+        return (viewModel, coordinator);
+    }
+
+    [TestMethod]
     public async Task InstallCommand_ReverificationFailure_ClearsPackage()
     {
         UpdateCandidate candidate =
@@ -650,6 +817,249 @@ public sealed class UpdateViewModelTests
         Assert.IsFalse(
             viewModel.CancelCommand
                 .CanExecute(null));
+    }
+
+    private static async Task<(UpdateViewModel ViewModel, FakeUpdateCoordinator Coordinator)>
+        CreatePreparedViewModelAsync(
+            InstallScope scope,
+            UpdateInstallationResult installationResult)
+    {
+        UpdateCandidate candidate =
+            CreateCandidate();
+
+        FakeUpdateCoordinator coordinator =
+            new()
+            {
+                CheckResult =
+                    CreateCheckResult(
+                        UpdateCheckStatus.UpdateAvailable,
+                        candidate,
+                        scope: scope),
+
+                PreparationResult =
+                    new UpdatePreparationResult
+                    {
+                        Status =
+                            UpdatePreparationStatus.Ready,
+
+                        Verification =
+                            UpdatePackageVerificationResult.Valid(),
+
+                        Package =
+                            CreatePackage(
+                                candidate.Manifest)
+                    },
+
+                InstallationResult =
+                    installationResult
+            };
+
+        UpdateViewModel viewModel =
+            CreateInitializedViewModel(
+                coordinator);
+
+        await viewModel
+            .CheckCommand
+            .ExecuteAsync(null);
+
+        await viewModel
+            .PrepareCommand
+            .ExecuteAsync(null);
+
+        return (viewModel, coordinator);
+    }
+
+    private static readonly UpdateInstallationResult InstalledResult =
+        new()
+        {
+            Status =
+                UpdateInstallationStatus.Installed,
+
+            Verification =
+                UpdatePackageVerificationResult.Valid()
+        };
+
+    private static readonly UpdateInstallationResult DeferredInstallResult =
+        new()
+        {
+            Status =
+                UpdateInstallationStatus.VerificationDeferred,
+
+            Verification =
+                UpdatePackageVerificationResult.Invalid(
+                    UpdatePackageVerificationFailure
+                        .RevocationCheckUnavailable,
+                    "The certificate servers could not be reached.")
+        };
+
+    [TestMethod]
+    public async Task InstallCommand_PerUser_SaysCopyGifWillStartAgain()
+    {
+        (UpdateViewModel viewModel, _) =
+            await CreatePreparedViewModelAsync(
+                InstallScope.CurrentUser,
+                InstalledResult);
+
+        await viewModel
+            .InstallCommand
+            .ExecuteAsync(null);
+
+        Assert.IsTrue(
+            viewModel.Message!.Text.Contains(
+                "will close and start again"),
+            viewModel.Message.Text);
+    }
+
+    [TestMethod]
+    public async Task InstallCommand_PerMachine_DoesNotPromiseARestart()
+    {
+        // An elevated installer does not start CopyGIF (it would run with administrator rights).
+        (UpdateViewModel viewModel, _) =
+            await CreatePreparedViewModelAsync(
+                InstallScope.AllUsers,
+                InstalledResult);
+
+        await viewModel
+            .InstallCommand
+            .ExecuteAsync(null);
+
+        Assert.IsFalse(
+            viewModel.Message!.Text.Contains(
+                "start again"),
+            viewModel.Message.Text);
+
+        Assert.IsTrue(
+            viewModel.Message.Text.Contains(
+                "Open it again"),
+            viewModel.Message.Text);
+    }
+
+    [TestMethod]
+    public async Task InstallCommand_RevocationServersUnreachable_WarnsKeepsThePackageAndDoesNotExit()
+    {
+        (UpdateViewModel viewModel, _) =
+            await CreatePreparedViewModelAsync(
+                InstallScope.CurrentUser,
+                DeferredInstallResult);
+
+        int exitRequests = 0;
+
+        viewModel.ApplicationExitRequested +=
+            (_, _) => exitRequests++;
+
+        await viewModel
+            .InstallCommand
+            .ExecuteAsync(null);
+
+        Assert.AreEqual(
+            0,
+            exitRequests);
+
+        Assert.IsNotNull(
+            viewModel.PreparedPackage,
+            "the package is fine, so the user can simply try again");
+
+        Assert.IsTrue(
+            viewModel.Message!.IsWarning);
+
+        Assert.AreEqual(
+            "update_revocation_unavailable",
+            viewModel.Message.Code);
+    }
+
+    [TestMethod]
+    public async Task PrepareCommand_RevocationServersUnreachable_IsAWarningNotAnError()
+    {
+        UpdateCandidate candidate =
+            CreateCandidate();
+
+        FakeUpdateCoordinator coordinator =
+            new()
+            {
+                CheckResult =
+                    CreateCheckResult(
+                        UpdateCheckStatus.UpdateAvailable,
+                        candidate),
+
+                PreparationResult =
+                    new UpdatePreparationResult
+                    {
+                        Status =
+                            UpdatePreparationStatus
+                                .VerificationDeferred,
+
+                        Verification =
+                            DeferredInstallResult.Verification
+                    }
+            };
+
+        UpdateViewModel viewModel =
+            CreateInitializedViewModel(
+                coordinator);
+
+        await viewModel
+            .CheckCommand
+            .ExecuteAsync(null);
+
+        await viewModel
+            .PrepareCommand
+            .ExecuteAsync(null);
+
+        Assert.IsNull(
+            viewModel.PreparedPackage);
+
+        Assert.IsTrue(
+            viewModel.Message!.IsWarning);
+
+        Assert.IsFalse(
+            viewModel.Message.IsError);
+
+        Assert.AreEqual(
+            "update_revocation_unavailable",
+            viewModel.Message.Code);
+    }
+
+    [TestMethod]
+    public void AcceptAutomaticResult_RetryLater_IsAWarningWithTheRetryMessage()
+    {
+        UpdateViewModel viewModel =
+            CreateInitializedViewModel(
+                new FakeUpdateCoordinator());
+
+        viewModel.AcceptAutomaticResult(
+            new AutomaticUpdateResult
+            {
+                Action =
+                    AutomaticUpdateAction.RetryLater,
+
+                Check =
+                    CreateCheckResult(
+                        UpdateCheckStatus.UpdateAvailable,
+                        CreateCandidate(),
+                        scope: InstallScope.CurrentUser),
+
+                Preparation =
+                    new UpdatePreparationResult
+                    {
+                        Status =
+                            UpdatePreparationStatus
+                                .VerificationDeferred,
+
+                        Verification =
+                            DeferredInstallResult.Verification
+                    }
+            });
+
+        Assert.IsTrue(
+            viewModel.Message!.IsWarning);
+
+        Assert.IsTrue(
+            viewModel.Message.Text.Contains(
+                "try again later"),
+            viewModel.Message.Text);
+
+        Assert.IsNull(
+            viewModel.PreparedPackage);
     }
 
     private static UpdateViewModel
@@ -986,6 +1396,61 @@ public sealed class UpdateViewModelTests
             return Task.FromResult(
                 InstallationResult);
         }
+
+        public UpdateInstallOptions? LastInstallOptions
+        {
+            get;
+            private set;
+        }
+
+        public string? LastSkippedVersion
+        {
+            get;
+            private set;
+        }
+
+        public Task<UpdateInstallationResult> InstallAsync(
+            DownloadedUpdatePackage package,
+            UpdateInstallOptions options,
+            CancellationToken cancellationToken = default)
+        {
+            LastInstallOptions =
+                options;
+
+            return InstallAsync(
+                package,
+                cancellationToken);
+        }
+
+        public Task SkipVersionAsync(
+            string version,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            LastSkippedVersion =
+                version;
+
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> DeferInstallToNextLaunchAsync(
+            DownloadedUpdatePackage package,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(
+                false);
+
+        public Task<PendingUpdateInstallResult> InstallPendingAsync(
+            string currentVersion,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(
+                new PendingUpdateInstallResult
+                {
+                    Status =
+                        PendingUpdateInstallStatus
+                            .NothingPending
+                });
 
         public Task<AutomaticUpdateResult> RunAutomaticAsync(
             string currentVersion,

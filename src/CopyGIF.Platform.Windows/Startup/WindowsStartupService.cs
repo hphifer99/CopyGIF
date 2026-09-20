@@ -72,6 +72,25 @@ public sealed class WindowsStartupService :
         };
     }
 
+    public async Task<bool?> GetRegistrationStateAsync(
+        CancellationToken cancellationToken = default)
+    {
+        InstallationContext context =
+            await _installChannelService
+                .GetCurrentAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        if (context.Channel == InstallChannel.None)
+        {
+            return null;
+        }
+
+        return await IsEnabledAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task SetEnabledAsync(
         bool enabled,
         CancellationToken cancellationToken = default)

@@ -5,6 +5,7 @@ using CopyGIF.Core.Models;
 using CopyGIF.Presentation.Library;
 using CopyGIF.Presentation.Main;
 using CopyGIF.Presentation.Search;
+using CopyGIF.Presentation.Tests.Common;
 
 namespace CopyGIF.Presentation.Tests.Main;
 
@@ -284,7 +285,8 @@ public sealed class MainViewModelTests
                     Suggestions,
                     copy,
                     Library,
-                    preview);
+                    preview,
+                    new FakeProviderCatalog());
 
             FavoritesViewModel favorites =
                 new(

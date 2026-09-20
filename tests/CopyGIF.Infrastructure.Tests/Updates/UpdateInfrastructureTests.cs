@@ -427,6 +427,532 @@ public sealed class UpdateInfrastructureTests
                 package.FilePath));
     }
 
+    [TestMethod]
+    public async Task PackageService_ExistingVerifiedPackage_IsReusedWithoutDownloading()
+    {
+        byte[] content =
+            Encoding.UTF8.GetBytes(
+                "signed-msi-content");
+
+        UpdateManifest manifest =
+            CreateManifest(
+                content);
+
+        int requestCount = 0;
+
+        TestHttpMessageHandler handler =
+            new(
+                _ =>
+                {
+                    requestCount++;
+
+                    return new HttpResponseMessage(
+                        HttpStatusCode.OK)
+                    {
+                        Content =
+                            new ByteArrayContent(
+                                content)
+                    };
+                });
+
+        using HttpClient client =
+            new(handler);
+
+        ApplicationPaths paths =
+            new(_testDirectory);
+
+        HttpUpdatePackageService service =
+            CreatePackageService(
+                client,
+                paths);
+
+        DownloadedUpdatePackage first =
+            await service.DownloadAsync(
+                manifest);
+
+        DownloadedUpdatePackage second =
+            await service.DownloadAsync(
+                manifest);
+
+        Assert.AreEqual(
+            1,
+            requestCount);
+
+        Assert.AreEqual(
+            first.FilePath,
+            second.FilePath);
+
+        Assert.AreEqual(
+            manifest.Sha256,
+            second.Sha256);
+
+        Assert.AreEqual(
+            content.LongLength,
+            second.SizeBytes);
+    }
+
+    [TestMethod]
+    public async Task PackageService_ExistingCorruptPackage_IsDownloadedAgain()
+    {
+        byte[] content =
+            Encoding.UTF8.GetBytes(
+                "signed-msi-content");
+
+        UpdateManifest manifest =
+            CreateManifest(
+                content);
+
+        int requestCount = 0;
+
+        TestHttpMessageHandler handler =
+            new(
+                _ =>
+                {
+                    requestCount++;
+
+                    return new HttpResponseMessage(
+                        HttpStatusCode.OK)
+                    {
+                        Content =
+                            new ByteArrayContent(
+                                content)
+                    };
+                });
+
+        using HttpClient client =
+            new(handler);
+
+        ApplicationPaths paths =
+            new(_testDirectory);
+
+        HttpUpdatePackageService service =
+            CreatePackageService(
+                client,
+                paths);
+
+        DownloadedUpdatePackage first =
+            await service.DownloadAsync(
+                manifest);
+
+        // Same length, different bytes: only the hash check can catch this.
+        byte[] corrupted =
+            (byte[])content.Clone();
+
+        corrupted[0] ^= 0xFF;
+
+        await File.WriteAllBytesAsync(
+            first.FilePath,
+            corrupted);
+
+        DownloadedUpdatePackage second =
+            await service.DownloadAsync(
+                manifest);
+
+        Assert.AreEqual(
+            2,
+            requestCount);
+
+        CollectionAssert.AreEqual(
+            content,
+            await File.ReadAllBytesAsync(
+                second.FilePath));
+    }
+
+    [TestMethod]
+    public async Task PackageService_Prune_RemovesOldInstallersAndKeepsNewerOnes()
+    {
+        ApplicationPaths paths =
+            new(_testDirectory);
+
+        paths.EnsureDirectoriesExist();
+
+        string oldInstaller =
+            WriteUpdateFile(
+                paths,
+                "CopyGIF-1.9.0-win-x64.msi");
+
+        string runningInstaller =
+            WriteUpdateFile(
+                paths,
+                "CopyGIF-2.0.0-win-x64.msi");
+
+        string pendingInstaller =
+            WriteUpdateFile(
+                paths,
+                "CopyGIF-2.1.0-win-x64.msi");
+
+        string unrelated =
+            WriteUpdateFile(
+                paths,
+                "notes.txt");
+
+        using HttpClient client =
+            new(
+                new TestHttpMessageHandler(
+                    _ =>
+                        new HttpResponseMessage(
+                            HttpStatusCode.OK)));
+
+        HttpUpdatePackageService service =
+            CreatePackageService(
+                client,
+                paths);
+
+        await service.PruneAsync(
+            "2.0.0");
+
+        Assert.IsFalse(
+            File.Exists(
+                oldInstaller));
+
+        Assert.IsFalse(
+            File.Exists(
+                runningInstaller));
+
+        Assert.IsTrue(
+            File.Exists(
+                pendingInstaller));
+
+        Assert.IsTrue(
+            File.Exists(
+                unrelated));
+    }
+
+    [TestMethod]
+    public async Task PackageService_Prune_IgnoresPrereleaseSuffixOnTheRunningVersion()
+    {
+        ApplicationPaths paths =
+            new(_testDirectory);
+
+        paths.EnsureDirectoriesExist();
+
+        string runningInstaller =
+            WriteUpdateFile(
+                paths,
+                "CopyGIF-2.0.0-win-x64.msi");
+
+        using HttpClient client =
+            new(
+                new TestHttpMessageHandler(
+                    _ =>
+                        new HttpResponseMessage(
+                            HttpStatusCode.OK)));
+
+        HttpUpdatePackageService service =
+            CreatePackageService(
+                client,
+                paths);
+
+        await service.PruneAsync(
+            "2.0.0+build.7");
+
+        Assert.IsFalse(
+            File.Exists(
+                runningInstaller));
+    }
+
+    [TestMethod]
+    public async Task PackageService_Prune_RemovesOnlyStalePartialDownloads()
+    {
+        ApplicationPaths paths =
+            new(_testDirectory);
+
+        paths.EnsureDirectoriesExist();
+
+        string stale =
+            WriteUpdateFile(
+                paths,
+                ".CopyGIF-2.1.0-win-x64.msi.aaaa.tmp");
+
+        string fresh =
+            WriteUpdateFile(
+                paths,
+                ".CopyGIF-2.1.0-win-x64.msi.bbbb.tmp");
+
+        File.SetLastWriteTimeUtc(
+            stale,
+            DateTime.UtcNow.AddHours(-3));
+
+        using HttpClient client =
+            new(
+                new TestHttpMessageHandler(
+                    _ =>
+                        new HttpResponseMessage(
+                            HttpStatusCode.OK)));
+
+        HttpUpdatePackageService service =
+            CreatePackageService(
+                client,
+                paths);
+
+        await service.PruneAsync(
+            "2.0.0");
+
+        Assert.IsFalse(
+            File.Exists(
+                stale));
+
+        Assert.IsTrue(
+            File.Exists(
+                fresh));
+    }
+
+    [TestMethod]
+    public async Task PackageService_Prune_UnparseableVersion_DeletesNothing()
+    {
+        ApplicationPaths paths =
+            new(_testDirectory);
+
+        paths.EnsureDirectoriesExist();
+
+        string installer =
+            WriteUpdateFile(
+                paths,
+                "CopyGIF-1.0.0-win-x64.msi");
+
+        using HttpClient client =
+            new(
+                new TestHttpMessageHandler(
+                    _ =>
+                        new HttpResponseMessage(
+                            HttpStatusCode.OK)));
+
+        HttpUpdatePackageService service =
+            CreatePackageService(
+                client,
+                paths);
+
+        await service.PruneAsync(
+            "not-a-version");
+
+        Assert.IsTrue(
+            File.Exists(
+                installer));
+    }
+
+    [TestMethod]
+    public async Task PackageService_FindExisting_VerifiedPackage_IsFoundWithoutTheNetwork()
+    {
+        byte[] content =
+            Encoding.UTF8.GetBytes(
+                "signed-msi-content");
+
+        UpdateManifest manifest =
+            CreateManifest(
+                content);
+
+        int requestCount = 0;
+
+        TestHttpMessageHandler handler =
+            new(
+                _ =>
+                {
+                    requestCount++;
+
+                    return new HttpResponseMessage(
+                        HttpStatusCode.OK)
+                    {
+                        Content =
+                            new ByteArrayContent(
+                                content)
+                    };
+                });
+
+        using HttpClient client =
+            new(handler);
+
+        ApplicationPaths paths =
+            new(_testDirectory);
+
+        HttpUpdatePackageService service =
+            CreatePackageService(
+                client,
+                paths);
+
+        DownloadedUpdatePackage downloaded =
+            await service.DownloadAsync(
+                manifest);
+
+        Assert.AreEqual(
+            1,
+            requestCount);
+
+        DownloadedUpdatePackage? found =
+            await service.FindExistingAsync(
+                manifest);
+
+        Assert.IsNotNull(
+            found);
+
+        Assert.AreEqual(
+            downloaded.FilePath,
+            found!.FilePath);
+
+        Assert.AreEqual(
+            manifest.Sha256,
+            found.Sha256);
+
+        Assert.AreEqual(
+            manifest,
+            found.Manifest);
+
+        Assert.AreEqual(
+            1,
+            requestCount,
+            "finding an existing package must not download anything");
+    }
+
+    [TestMethod]
+    public async Task PackageService_FindExisting_NoFile_ReturnsNull()
+    {
+        byte[] content =
+            Encoding.UTF8.GetBytes(
+                "signed-msi-content");
+
+        using HttpClient client =
+            new(
+                new TestHttpMessageHandler(
+                    _ =>
+                        throw new InvalidOperationException(
+                            "No request may be made.")));
+
+        ApplicationPaths paths =
+            new(_testDirectory);
+
+        HttpUpdatePackageService service =
+            CreatePackageService(
+                client,
+                paths);
+
+        Assert.IsNull(
+            await service.FindExistingAsync(
+                CreateManifest(
+                    content)));
+    }
+
+    [TestMethod]
+    public async Task PackageService_FindExisting_ChangedFile_ReturnsNull()
+    {
+        byte[] content =
+            Encoding.UTF8.GetBytes(
+                "signed-msi-content");
+
+        UpdateManifest manifest =
+            CreateManifest(
+                content);
+
+        using HttpClient client =
+            new(
+                new TestHttpMessageHandler(
+                    _ =>
+                        new HttpResponseMessage(
+                            HttpStatusCode.OK)
+                        {
+                            Content =
+                                new ByteArrayContent(
+                                    content)
+                        }));
+
+        ApplicationPaths paths =
+            new(_testDirectory);
+
+        HttpUpdatePackageService service =
+            CreatePackageService(
+                client,
+                paths);
+
+        DownloadedUpdatePackage first =
+            await service.DownloadAsync(
+                manifest);
+
+        // Same length, different bytes: only the hash check can catch this.
+        byte[] changed =
+            (byte[])content.Clone();
+
+        changed[0] ^= 0xFF;
+
+        await File.WriteAllBytesAsync(
+            first.FilePath,
+            changed);
+
+        Assert.IsNull(
+            await service.FindExistingAsync(
+                manifest));
+    }
+
+    [TestMethod]
+    public async Task PackageService_FindExisting_ManifestThatNoLongerValidates_ReturnsNull()
+    {
+        byte[] content =
+            Encoding.UTF8.GetBytes(
+                "signed-msi-content");
+
+        UpdateManifest manifest =
+            CreateManifest(
+                content);
+
+        using HttpClient client =
+            new(
+                new TestHttpMessageHandler(
+                    _ =>
+                        new HttpResponseMessage(
+                            HttpStatusCode.OK)
+                        {
+                            Content =
+                                new ByteArrayContent(
+                                    content)
+                        }));
+
+        ApplicationPaths paths =
+            new(_testDirectory);
+
+        HttpUpdatePackageService service =
+            CreatePackageService(
+                client,
+                paths);
+
+        await service.DownloadAsync(
+            manifest);
+
+        // A stored manifest that points outside the updates folder must find nothing.
+        UpdateManifest traversal =
+            manifest with
+            {
+                AssetName =
+                    "..\\..\\CopyGIF-2.1.0-x64.msi"
+            };
+
+        Assert.IsNull(
+            await service.FindExistingAsync(
+                traversal));
+
+        UpdateManifest wrongChannel =
+            manifest with
+            {
+                Channel = "beta"
+            };
+
+        Assert.IsNull(
+            await service.FindExistingAsync(
+                wrongChannel));
+    }
+
+    private static string WriteUpdateFile(
+        ApplicationPaths paths,
+        string fileName)
+    {
+        string path =
+            Path.Combine(
+                paths.UpdatesDirectory,
+                fileName);
+
+        File.WriteAllText(
+            path,
+            "content");
+
+        return path;
+    }
+
     private static HttpUpdatePackageService
         CreatePackageService(
             HttpClient client,

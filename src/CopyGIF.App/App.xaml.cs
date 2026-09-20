@@ -16,6 +16,60 @@ public partial class App :
     public App()
     {
         InitializeComponent();
+
+        RegisterGlobalExceptionLogging();
+    }
+
+    /// <summary>
+    /// Leaves a trace in the local repair log for failures that would otherwise vanish or
+    /// crash the process silently. None of these handlers mark the exception as handled, so
+    /// the default behavior (including a crash for a truly unhandled exception) is unchanged.
+    /// Only the exception type and throwing method are written, never the message.
+    /// </summary>
+    private void RegisterGlobalExceptionLogging()
+    {
+        // The event argument types are deliberately not named because Microsoft.UI.Xaml and
+        // System both define an UnhandledExceptionEventArgs and the lambdas avoid the ambiguity.
+        UnhandledException +=
+            (_, arguments) =>
+                RecordGlobalException(
+                    "unhandled-ui-exception",
+                    arguments.Exception);
+
+        AppDomain.CurrentDomain.UnhandledException +=
+            (_, arguments) =>
+                RecordGlobalException(
+                    arguments.IsTerminating
+                        ? "unhandled-fatal-exception"
+                        : "unhandled-exception",
+                    arguments.ExceptionObject as Exception);
+
+        TaskScheduler.UnobservedTaskException +=
+            (_, arguments) =>
+                RecordGlobalException(
+                    "unobserved-task-exception",
+                    arguments.Exception);
+    }
+
+    private static void RecordGlobalException(
+        string stage,
+        Exception? exception)
+    {
+        if (exception is null)
+        {
+            return;
+        }
+
+        try
+        {
+            RepairDiagnostics.RecordException(
+                stage,
+                exception);
+        }
+        catch
+        {
+            // Diagnostics must never turn one failure into a second one.
+        }
     }
 
     public IServiceProvider Services =>
@@ -59,6 +113,10 @@ public partial class App :
                     return;
 
                 case ApplicationStartupStatus.RedirectedToPrimary:
+                case ApplicationStartupStatus.UpdateInstallStarted:
+                    // The second case: a deferred update was handed to the installer and
+                    // CopyGIF must close at once so the installer can replace its files. The
+                    // installer starts the updated CopyGIF when it finishes.
                     await DisposeHostAsync()
                         .ConfigureAwait(true);
 

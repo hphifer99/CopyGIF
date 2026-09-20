@@ -50,6 +50,20 @@ public sealed class OnboardingViewModel :
         _credentialHelpUri =
             onboardingCoordinator.CredentialHelpUri;
 
+        Providers =
+            Array.AsReadOnly(
+                onboardingCoordinator.Providers
+                    .Select(option => new CopyGIF.Presentation.Settings.ProviderChoice(option.Id, option.DisplayName))
+                    .ToArray());
+
+        // Start on the default provider, or on the first registered one, until the saved setup
+        // state says which provider is active.
+        _selectedProviderId =
+            onboardingCoordinator.Providers.FirstOrDefault(
+                option => string.Equals(option.Id, CopyGIF.Core.Settings.AppSettings.DefaultProviderId, StringComparison.OrdinalIgnoreCase))?.Id ??
+            onboardingCoordinator.Providers.FirstOrDefault()?.Id ??
+            string.Empty;
+
         LoadCommand =
             new AsyncRelayCommand(
                 LoadAsync,
@@ -76,9 +90,10 @@ public sealed class OnboardingViewModel :
 
     public Func<string, string, CancellationToken, Task<CredentialValidationResult>>? CompleteProvider { get; set; }
     public Func<Uri, CancellationToken, Task<bool>>? OpenProviderHelp { get; set; }
-    public IReadOnlyList<CopyGIF.Presentation.Settings.ProviderChoice> Providers { get; } =
-        [new("klipy", "KLIPY"), new("giphy", "GIPHY")];
-    private string _selectedProviderId = "klipy";
+    // The providers a person can pick. They come from the registered providers, so a new provider
+    // appears here without any change to this class.
+    public IReadOnlyList<CopyGIF.Presentation.Settings.ProviderChoice> Providers { get; }
+    private string _selectedProviderId = string.Empty;
     public string SelectedProviderId
     {
         get => _selectedProviderId;
@@ -86,12 +101,33 @@ public sealed class OnboardingViewModel :
         {
             if (SetProperty(ref _selectedProviderId, value))
             {
+                OnboardingProviderOption? option = FindOption(value);
                 ProviderId = value;
-                ProviderDisplayName = value == "giphy" ? "GIPHY" : "KLIPY";
-                CredentialHelpUri = new Uri(value == "giphy" ? "https://developers.giphy.com/dashboard/" : "https://partner.klipy.com/api-keys");
+                ProviderDisplayName = option?.DisplayName ?? value;
+                CredentialHelpUri = option?.CredentialHelpUri;
+                CredentialInstructions = option?.CredentialInstructions;
             }
         }
     }
+
+    private OnboardingProviderOption? FindOption(string providerId) =>
+        _onboardingCoordinator.Providers.FirstOrDefault(
+            option => string.Equals(option.Id, providerId, StringComparison.OrdinalIgnoreCase));
+
+    private string? _credentialInstructions;
+
+    /// <summary>A short hint for the selected provider, for example which kind of key to create.</summary>
+    public string? CredentialInstructions
+    {
+        get => _credentialInstructions;
+        private set
+        {
+            if (SetProperty(ref _credentialInstructions, value))
+                OnPropertyChanged(nameof(HasCredentialInstructions));
+        }
+    }
+
+    public bool HasCredentialInstructions => !string.IsNullOrWhiteSpace(CredentialInstructions);
 
     public IAsyncRelayCommand CompleteCommand
     { get; }
@@ -516,6 +552,9 @@ public sealed class OnboardingViewModel :
 
         CredentialHelpUri =
             state.CredentialHelpUri;
+
+        CredentialInstructions =
+            state.CredentialInstructions;
 
         IsRequired =
             state.IsRequired;

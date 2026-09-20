@@ -47,6 +47,130 @@ public sealed class SettingsCoordinatorTests
     }
 
     [TestMethod]
+    public async Task LoadForEditingAsync_StartupRemovedOutsideApp_ShowsOff()
+    {
+        Harness harness =
+            new(
+                CreateSettings(
+                    startWithWindows: true));
+
+        harness.StartupService.IsEnabled = false;
+
+        AppSettings shown =
+            await harness.Coordinator.LoadForEditingAsync();
+
+        Assert.IsFalse(
+            shown.Startup.StartWithWindows);
+
+        AppSettings saved =
+            await harness.Coordinator.LoadAsync();
+
+        Assert.IsTrue(
+            saved.Startup.StartWithWindows,
+            "Displaying the real state must not rewrite the saved preference.");
+    }
+
+    [TestMethod]
+    public async Task LoadForEditingAsync_StartupRegisteredWhileSavedOff_ShowsOn()
+    {
+        Harness harness =
+            new(
+                CreateSettings(
+                    startWithWindows: false));
+
+        harness.StartupService.IsEnabled = true;
+
+        AppSettings shown =
+            await harness.Coordinator.LoadForEditingAsync();
+
+        Assert.IsTrue(
+            shown.Startup.StartWithWindows);
+    }
+
+    [TestMethod]
+    public async Task LoadForEditingAsync_NoRegistrationTarget_KeepsSavedPreference()
+    {
+        Harness harness =
+            new(
+                CreateSettings(
+                    startWithWindows: true));
+
+        harness.StartupService.RegistrationStateHandler =
+            _ => Task.FromResult<bool?>(null);
+
+        AppSettings shown =
+            await harness.Coordinator.LoadForEditingAsync();
+
+        Assert.IsTrue(
+            shown.Startup.StartWithWindows);
+    }
+
+    [TestMethod]
+    public async Task LoadForEditingAsync_RegistrationReadFails_KeepsSavedPreference()
+    {
+        Harness harness =
+            new(
+                CreateSettings(
+                    startWithWindows: true));
+
+        harness.StartupService.RegistrationStateHandler =
+            _ => throw new InvalidOperationException(
+                "registration unavailable");
+
+        AppSettings shown =
+            await harness.Coordinator.LoadForEditingAsync();
+
+        Assert.IsTrue(
+            shown.Startup.StartWithWindows);
+    }
+
+    [TestMethod]
+    public async Task LoadForEditingAsync_Cancelled_Propagates()
+    {
+        Harness harness =
+            new(
+                CreateSettings());
+
+        using CancellationTokenSource cancellation =
+            new();
+
+        cancellation.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            async () =>
+                await harness.Coordinator.LoadForEditingAsync(
+                    cancellation.Token));
+    }
+
+    [TestMethod]
+    public async Task SaveAsync_AfterDriftDisplayedAsOff_DoesNotTouchWindowsAndPersistsOff()
+    {
+        Harness harness =
+            new(
+                CreateSettings(
+                    startWithWindows: true));
+
+        harness.StartupService.IsEnabled = false;
+
+        AppSettings shown =
+            await harness.Coordinator.LoadForEditingAsync();
+
+        SettingsSaveResult result =
+            await harness.Coordinator.SaveAsync(
+                shown);
+
+        Assert.IsTrue(result.Succeeded);
+
+        Assert.IsFalse(
+            result.EffectiveSettings.Startup.StartWithWindows);
+
+        Assert.AreEqual(
+            0,
+            harness.StartupService.RequestedStates.Count,
+            "Windows already matched the displayed state, so nothing should be rewritten.");
+    }
+
+    [TestMethod]
     public async Task SaveAsync_ValidSettings_AppliesAndPersistsChanges()
     {
         AppSettings current =

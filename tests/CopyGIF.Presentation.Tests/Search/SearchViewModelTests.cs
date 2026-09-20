@@ -1,9 +1,11 @@
 using CopyGIF.Application.Library;
 using CopyGIF.Application.Media;
 using CopyGIF.Application.Search;
+using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 using CopyGIF.Presentation.Common;
 using CopyGIF.Presentation.Search;
+using CopyGIF.Presentation.Tests.Common;
 
 namespace CopyGIF.Presentation.Tests.Search;
 
@@ -734,7 +736,8 @@ public sealed class SearchViewModelTests
     private static SearchViewModel CreateViewModel(
         FakeSearchCoordinator? searchCoordinator = null,
         FakeSuggestionCoordinator? suggestionCoordinator = null,
-        FakeLibraryCoordinator? libraryCoordinator = null)
+        FakeLibraryCoordinator? libraryCoordinator = null,
+        IProviderCatalog? providerCatalog = null)
     {
         return new SearchViewModel(
             searchCoordinator ??
@@ -744,7 +747,9 @@ public sealed class SearchViewModelTests
             new FakeCopyCoordinator(),
             libraryCoordinator ??
                 new FakeLibraryCoordinator(),
-            new FakePreviewCoordinator());
+            new FakePreviewCoordinator(),
+            providerCatalog ??
+                new FakeProviderCatalog());
     }
 
     private static GifItem CreateGif(

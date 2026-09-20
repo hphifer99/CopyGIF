@@ -102,6 +102,56 @@ public sealed class SettingsCoordinator :
         }
     }
 
+    public async Task<AppSettings> LoadForEditingAsync(
+        CancellationToken cancellationToken = default)
+    {
+        AppSettings saved =
+            await LoadAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        bool? registered;
+
+        try
+        {
+            registered =
+                await _startupService
+                    .GetRegistrationStateAsync(
+                        cancellationToken)
+                    .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+            when (exception is not OperationCanceledException)
+        {
+            // An unreadable registration must not stop Settings from opening.
+            RepairDiagnostics.RecordException(
+                "startup-state-read",
+                exception);
+
+            return saved;
+        }
+
+        if (registered is null ||
+            registered.Value == saved.Startup.StartWithWindows)
+        {
+            return saved;
+        }
+
+        RepairDiagnostics.RecordContext(
+            "startup-state-drift",
+            $"saved={saved.Startup.StartWithWindows} actual={registered.Value}");
+
+        return saved with
+        {
+            Startup =
+                saved.Startup with
+                {
+                    StartWithWindows =
+                        registered.Value
+                }
+        };
+    }
+
     public async Task<SettingsSaveResult> SaveAsync(
         AppSettings settings,
         CancellationToken cancellationToken = default)

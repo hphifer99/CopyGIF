@@ -1,9 +1,11 @@
 using CopyGIF.App.Views.Pages;
 using CopyGIF.Presentation.Search;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace CopyGIF.App.Services;
 
@@ -13,6 +15,7 @@ internal sealed class SearchPageBehavior
     private readonly GridView _grid;
     private readonly Border _attribution;
     private readonly TextBlock _attributionText;
+    private string? _attributionAsset;
     public SearchPageBehavior(SearchPage page, GridView grid, Border attribution, TextBlock attributionText)
     {
         _page = page; _grid = grid; _attribution = attribution; _attributionText = attributionText;
@@ -46,7 +49,7 @@ internal sealed class SearchPageBehavior
     }
     private void ScrollChanged(object? sender, ScrollViewerViewChangedEventArgs args)
     {
-        if (!_restoringScroll && _paginationOffset is null && _observedModel is { Mode: GifSearchMode.Trending, IsBusy: false, ActiveProviderId: "klipy" })
+        if (!_restoringScroll && _paginationOffset is null && _observedModel is { Mode: GifSearchMode.Trending, IsBusy: false, CachesTrendingSnapshot: true })
             _observedModel.TrendingScrollOffset = _scrollViewer?.VerticalOffset ?? 0;
     }
     private void ModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
@@ -88,13 +91,24 @@ internal sealed class SearchPageBehavior
 
     private void RefreshAttribution()
     {
-        bool giphy = _observedModel?.IsGiphy == true;
-        _attribution.Visibility = giphy ? Visibility.Visible : Visibility.Collapsed;
-        _attributionText.Visibility = giphy ? Visibility.Collapsed : Visibility.Visible;
+        // A provider can show an image (for example a required logo) instead of its attribution text.
+        string? asset = _observedModel?.AttributionImageAsset;
+        if (asset is not null && _attribution.Child is Image image)
+        {
+            if (!string.Equals(_attributionAsset, asset, StringComparison.Ordinal))
+            {
+                image.Source = new BitmapImage(new Uri($"ms-appx:///{asset}"));
+                AutomationProperties.SetName(image, _observedModel?.AttributionText ?? string.Empty);
+                _attributionAsset = asset;
+            }
+        }
+        bool showImage = asset is not null && _attribution.Child is Image;
+        _attribution.Visibility = showImage ? Visibility.Visible : Visibility.Collapsed;
+        _attributionText.Visibility = showImage ? Visibility.Collapsed : Visibility.Visible;
     }
     private void RestoreTrendingScroll()
     {
-        if (_observedModel is not { Mode: GifSearchMode.Trending, ActiveProviderId: "klipy" } model) return;
+        if (_observedModel is not { Mode: GifSearchMode.Trending, CachesTrendingSnapshot: true } model) return;
         double offset = model.TrendingScrollOffset;
         _restoringScroll = true;
         _page.DispatcherQueue.TryEnqueue(() =>

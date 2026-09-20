@@ -36,6 +36,11 @@ public enum UpdatePackageVerificationFailure
     InvalidSignature,
     UntrustedPublisher,
     UnsupportedPackage,
+
+    // The signature looks fine but Windows could not reach (or has no cached answer from) the
+    // certificate authority to confirm the certificate was not revoked. This is not a fault of
+    // the package, so it is kept and checked again later.
+    RevocationCheckUnavailable,
     Unknown
 }
 

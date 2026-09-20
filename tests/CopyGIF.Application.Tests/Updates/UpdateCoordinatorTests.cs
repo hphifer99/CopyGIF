@@ -632,6 +632,103 @@ public sealed class UpdateCoordinatorTests
     }
 
     [TestMethod]
+    public async Task RunAutomaticAsync_RecommendedPerUser_PreparesAndLeavesInstallToTheHost()
+    {
+        Harness harness =
+            new(
+                CreateSettings(
+                    mode: UpdateMode.Recommended));
+
+        harness.InstallChannelService.Context =
+            new InstallationContext
+            {
+                Channel = InstallChannel.Msi,
+                Scope = InstallScope.CurrentUser
+            };
+
+        harness.UpdateFeed.LatestManifest =
+            CreateManifest();
+
+        AutomaticUpdateResult result =
+            await harness.Coordinator.RunAutomaticAsync(
+                "2.0.0");
+
+        Assert.AreEqual(
+            AutomaticUpdateAction.Prompt,
+            result.Action);
+
+        Assert.AreEqual(
+            UpdateMode.DownloadAndInstall,
+            result.Check.ResolvedMode,
+            "A per-user install resolves Recommended to automatic installation.");
+
+        Assert.IsTrue(result.Preparation!.IsReady);
+
+        Assert.HasCount(
+            0,
+            harness.Installer.InstallationRequests,
+            "Installing means restarting CopyGIF, so the host decides when.");
+    }
+
+    [TestMethod]
+    public async Task InstallAsync_PerUser_DoesNotRequestElevation()
+    {
+        Harness harness =
+            new();
+
+        harness.InstallChannelService.Context =
+            new InstallationContext
+            {
+                Channel = InstallChannel.Msi,
+                Scope = InstallScope.CurrentUser
+            };
+
+        await harness.Coordinator.InstallAsync(
+            CreatePackage(
+                CreateManifest()),
+            new UpdateInstallOptions
+            {
+                Silent = true,
+                RestartApplication = true
+            });
+
+        Assert.HasCount(
+            1,
+            harness.Installer.InstallationOptions);
+
+        Assert.IsFalse(
+            harness.Installer.InstallationOptions[0].RequiresElevation);
+
+        Assert.IsTrue(
+            harness.Installer.InstallationOptions[0].Silent);
+    }
+
+    [TestMethod]
+    public async Task InstallAsync_PerMachine_RequestsElevation()
+    {
+        Harness harness =
+            new();
+
+        harness.InstallChannelService.Context =
+            new InstallationContext
+            {
+                Channel = InstallChannel.Msi,
+                Scope = InstallScope.AllUsers
+            };
+
+        await harness.Coordinator.InstallAsync(
+            CreatePackage(
+                CreateManifest()));
+
+        Assert.HasCount(
+            1,
+            harness.Installer.InstallationOptions);
+
+        Assert.IsTrue(
+            harness.Installer.InstallationOptions[0].RequiresElevation);
+    }
+
+    [TestMethod]
     public async Task RunAutomaticAsync_VerificationFailure_DoesNotInstall()
     {
         Harness harness =
@@ -662,6 +759,264 @@ public sealed class UpdateCoordinatorTests
         Assert.HasCount(
             0,
             harness.Installer.InstallationRequests);
+    }
+
+    [TestMethod]
+    public async Task RunAutomaticAsync_DownloadFails_ClearsLastCheckSoNextPassRetries()
+    {
+        Harness harness =
+            new(
+                CreateSettings(
+                    mode: UpdateMode.Recommended));
+
+        harness.UpdateFeed.LatestManifest =
+            CreateManifest();
+
+        harness.PackageService.DownloadHandler =
+            static (_, _, _) =>
+                throw new HttpRequestException(
+                    "The connection was interrupted.");
+
+        await Assert.ThrowsExactlyAsync<
+            HttpRequestException>(
+            () => harness.Coordinator.RunAutomaticAsync(
+                "2.0.0"));
+
+        Assert.IsNull(
+            harness.StateStore.Value.LastCheckedAtUtc);
+
+        harness.PackageService.DownloadHandler =
+            null;
+
+        AutomaticUpdateResult retry =
+            await harness.Coordinator.RunAutomaticAsync(
+                "2.0.0");
+
+        Assert.AreEqual(
+            AutomaticUpdateAction.Prompt,
+            retry.Action);
+    }
+
+    [TestMethod]
+    public async Task RunAutomaticAsync_SkippedVersion_DoesNotDownloadOrPrompt()
+    {
+        Harness harness =
+            new(
+                CreateSettings(
+                    mode: UpdateMode.Recommended));
+
+        harness.UpdateFeed.LatestManifest =
+            CreateManifest();
+
+        harness.StateStore.Value =
+            new UpdateState
+            {
+                SkippedVersion = "2.1.0"
+            };
+
+        AutomaticUpdateResult result =
+            await harness.Coordinator.RunAutomaticAsync(
+                "2.0.0");
+
+        Assert.AreEqual(
+            AutomaticUpdateAction.None,
+            result.Action);
+
+        Assert.HasCount(
+            0,
+            harness.PackageService.DownloadRequests);
+
+        Assert.IsTrue(
+            result.Check.HasUpdate);
+    }
+
+    [TestMethod]
+    public async Task RunAutomaticAsync_NewerVersionThanSkipped_DownloadsAndPrompts()
+    {
+        Harness harness =
+            new(
+                CreateSettings(
+                    mode: UpdateMode.Recommended));
+
+        harness.UpdateFeed.LatestManifest =
+            CreateManifest(
+                version: "2.2.0");
+
+        harness.StateStore.Value =
+            new UpdateState
+            {
+                SkippedVersion = "2.1.0"
+            };
+
+        AutomaticUpdateResult result =
+            await harness.Coordinator.RunAutomaticAsync(
+                "2.0.0");
+
+        Assert.AreEqual(
+            AutomaticUpdateAction.Prompt,
+            result.Action);
+
+        Assert.HasCount(
+            1,
+            harness.PackageService.DownloadRequests);
+    }
+
+    [TestMethod]
+    public async Task RunAutomaticAsync_SkippedButRequiredVersion_StillDownloads()
+    {
+        Harness harness =
+            new(
+                CreateSettings(
+                    mode: UpdateMode.Recommended));
+
+        harness.UpdateFeed.LatestManifest =
+            CreateManifest(
+                minimumSupportedVersion: "2.1.0");
+
+        harness.StateStore.Value =
+            new UpdateState
+            {
+                SkippedVersion = "2.1.0"
+            };
+
+        AutomaticUpdateResult result =
+            await harness.Coordinator.RunAutomaticAsync(
+                "2.0.0");
+
+        Assert.AreEqual(
+            AutomaticUpdateAction.Prompt,
+            result.Action);
+
+        Assert.HasCount(
+            1,
+            harness.PackageService.DownloadRequests);
+    }
+
+    [TestMethod]
+    public async Task SkipVersionAsync_PersistsTheVersionWithoutLosingOtherState()
+    {
+        Harness harness =
+            new();
+
+        harness.StateStore.Value =
+            new UpdateState
+            {
+                LastAvailableVersion = "2.1.0",
+                LastCheckedAtUtc = ReferenceTime
+            };
+
+        await harness.Coordinator.SkipVersionAsync(
+            " 2.1.0 ");
+
+        Assert.AreEqual(
+            "2.1.0",
+            harness.StateStore.Value.SkippedVersion);
+
+        Assert.AreEqual(
+            "2.1.0",
+            harness.StateStore.Value.LastAvailableVersion);
+
+        Assert.AreEqual(
+            ReferenceTime,
+            harness.StateStore.Value.LastCheckedAtUtc);
+    }
+
+    [TestMethod]
+    public async Task RunAutomaticAsync_PrunesOldPackagesForTheRunningVersion()
+    {
+        Harness harness =
+            new();
+
+        harness.UpdateFeed.LatestManifest =
+            CreateManifest();
+
+        await harness.Coordinator.RunAutomaticAsync(
+            "2.0.0");
+
+        Assert.HasCount(
+            1,
+            harness.PackageService.PruneRequests);
+
+        Assert.AreEqual(
+            "2.0.0",
+            harness.PackageService.PruneRequests[0]);
+    }
+
+    [TestMethod]
+    public async Task RunAutomaticAsync_PruneFailure_DoesNotStopTheCheck()
+    {
+        Harness harness =
+            new(
+                CreateSettings(
+                    mode: UpdateMode.Recommended));
+
+        harness.UpdateFeed.LatestManifest =
+            CreateManifest();
+
+        harness.PackageService.PruneHandler =
+            static (_, _) =>
+                throw new IOException(
+                    "The updates folder is locked.");
+
+        AutomaticUpdateResult result =
+            await harness.Coordinator.RunAutomaticAsync(
+                "2.0.0");
+
+        Assert.AreEqual(
+            AutomaticUpdateAction.Prompt,
+            result.Action);
+    }
+
+    [TestMethod]
+    public async Task InstallAsync_WithOptions_PassesTheOptionsToTheInstaller()
+    {
+        Harness harness =
+            new();
+
+        UpdateManifest manifest =
+            CreateManifest();
+
+        UpdateInstallOptions options =
+            new()
+            {
+                Silent = true,
+                RestartApplication = true
+            };
+
+        UpdateInstallationResult result =
+            await harness.Coordinator.InstallAsync(
+                CreatePackage(
+                    manifest),
+                options);
+
+        Assert.AreEqual(
+            UpdateInstallationStatus.Installed,
+            result.Status);
+
+        Assert.HasCount(
+            1,
+            harness.Installer.InstallationOptions);
+
+        // The coordinator adds the elevation flag from the real install scope (the default
+        // harness is a per-machine MSI, which needs it), so compare by value.
+        Assert.AreEqual(
+            options,
+            harness.Installer.InstallationOptions[0]);
+    }
+
+    [TestMethod]
+    public async Task InstallAsync_WithoutOptions_UsesTheInteractiveDefault()
+    {
+        Harness harness =
+            new();
+
+        await harness.Coordinator.InstallAsync(
+            CreatePackage(
+                CreateManifest()));
+
+        Assert.AreEqual(
+            UpdateInstallOptions.Interactive,
+            harness.Installer.InstallationOptions[0]);
     }
 
     [TestMethod]

@@ -9,8 +9,25 @@ internal sealed class WindowsAuthenticodeVerifier :
     private const uint RevokeWholeChain = 1;
     private const uint FileChoice = 1;
     private const uint IgnoreStateAction = 0;
+    private const uint RevokeNone = 0;
     private const uint RevocationCheckChainExcludeRoot =
         0x00000080;
+
+    // Documented WINTRUST_DATA provider flags. With these two together and RevokeNone, the
+    // check makes no revocation lookup and no network request at all.
+    private const uint RevocationCheckNone =
+        0x00000010;
+    private const uint CacheOnlyUrlRetrieval =
+        0x00001000;
+
+    // Results that mean "revocation could not be checked", not "the signature is bad".
+    // CRYPT_E_REVOCATION_OFFLINE, CRYPT_E_NO_REVOCATION_CHECK and CERT_E_REVOCATION_FAILURE.
+    private const int RevocationOffline =
+        unchecked((int)0x80092013);
+    private const int NoRevocationCheck =
+        unchecked((int)0x80092012);
+    private const int RevocationFailure =
+        unchecked((int)0x800B010E);
 
     private static readonly Guid
         GenericVerificationPolicy =
@@ -36,7 +53,34 @@ internal sealed class WindowsAuthenticodeVerifier :
     }
 
     public AuthenticodeVerificationStatus Verify(
-        string filePath)
+        string filePath) =>
+        Verify(
+            filePath,
+            checkRevocationOnline: true);
+
+    internal static AuthenticodeVerificationStatus
+        ClassifyTrustResult(
+            int trustResult)
+    {
+        if (trustResult == 0)
+        {
+            return AuthenticodeVerificationStatus
+                .Trusted;
+        }
+
+        return trustResult is
+            RevocationOffline or
+            NoRevocationCheck or
+            RevocationFailure
+            ? AuthenticodeVerificationStatus
+                .RevocationUnavailable
+            : AuthenticodeVerificationStatus
+                .InvalidSignature;
+    }
+
+    public AuthenticodeVerificationStatus Verify(
+        string filePath,
+        bool checkRevocationOnline)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(
             filePath);
@@ -72,12 +116,18 @@ internal sealed class WindowsAuthenticodeVerifier :
                     (uint)Marshal.SizeOf<
                         WinTrustData>(),
                 UiChoice = NoUserInterface,
-                RevocationChecks = RevokeWholeChain,
+                RevocationChecks =
+                    checkRevocationOnline
+                        ? RevokeWholeChain
+                        : RevokeNone,
                 UnionChoice = FileChoice,
                 FileInfoPointer = fileInfoPointer,
                 StateAction = IgnoreStateAction,
                 ProviderFlags =
-                    RevocationCheckChainExcludeRoot
+                    checkRevocationOnline
+                        ? RevocationCheckChainExcludeRoot
+                        : RevocationCheckNone |
+                          CacheOnlyUrlRetrieval
             };
 
             Guid policy =
@@ -88,10 +138,14 @@ internal sealed class WindowsAuthenticodeVerifier :
                 ref policy,
                 ref trustData);
 
-            if (result != 0)
+            AuthenticodeVerificationStatus trustStatus =
+                ClassifyTrustResult(
+                    result);
+
+            if (trustStatus !=
+                AuthenticodeVerificationStatus.Trusted)
             {
-                return AuthenticodeVerificationStatus
-                    .InvalidSignature;
+                return trustStatus;
             }
 
             return _publisherTrustPolicy

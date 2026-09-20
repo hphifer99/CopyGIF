@@ -1,6 +1,7 @@
 using System.Runtime.ExceptionServices;
 using CopyGIF.Application.Onboarding;
 using CopyGIF.Application.Settings;
+using CopyGIF.Application.Updates;
 using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 using CopyGIF.Core.Settings;
@@ -29,6 +30,11 @@ public sealed class ApplicationStartupCoordinator :
 
     private readonly ITrayService _trayService;
 
+    // Optional so that a host without an update installer (and older tests) still starts.
+    private readonly IUpdateCoordinator? _updateCoordinator;
+
+    private readonly IApplicationVersion? _applicationVersion;
+
     private readonly SemaphoreSlim _gate =
         new(
             initialCount: 1,
@@ -46,8 +52,16 @@ public sealed class ApplicationStartupCoordinator :
         IOnboardingCoordinator onboardingCoordinator,
         IHotkeyService hotkeyService,
         IStartupService startupService,
-        ITrayService trayService)
+        ITrayService trayService,
+        IUpdateCoordinator? updateCoordinator = null,
+        IApplicationVersion? applicationVersion = null)
     {
+        _updateCoordinator =
+            updateCoordinator;
+
+        _applicationVersion =
+            applicationVersion;
+
         _singleInstanceService =
             singleInstanceService ??
             throw new ArgumentNullException(
@@ -230,6 +244,22 @@ public sealed class ApplicationStartupCoordinator :
             };
         }
 
+        // An update the user answered "Not now" to is installed here, before any window,
+        // tray icon or hotkey exists, so CopyGIF can close again at once.
+        if (await TryInstallPendingUpdateAsync(
+                cancellationToken)
+            .ConfigureAwait(false))
+        {
+            return new ApplicationStartupResult
+            {
+                Status =
+                    ApplicationStartupStatus
+                        .UpdateInstallStarted,
+                SingleInstance = singleInstance,
+                Migration = migration
+            };
+        }
+
         AppSettings settings =
             await _settingsCoordinator
                 .LoadAsync(
@@ -310,6 +340,46 @@ public sealed class ApplicationStartupCoordinator :
                 .Throw();
 
             throw;
+        }
+    }
+
+    // Returns true when the installer was started and CopyGIF must close. Any failure is
+    // logged and start-up continues normally: a problem with an update must never keep
+    // CopyGIF from starting.
+    private async Task<bool> TryInstallPendingUpdateAsync(
+        CancellationToken cancellationToken)
+    {
+        if (_updateCoordinator is null ||
+            _applicationVersion is null ||
+            string.IsNullOrWhiteSpace(
+                _applicationVersion.Current))
+        {
+            return false;
+        }
+
+        try
+        {
+            PendingUpdateInstallResult result =
+                await _updateCoordinator
+                    .InstallPendingAsync(
+                        _applicationVersion.Current,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+            return result.ShouldExit;
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            RepairDiagnostics.RecordException(
+                "pending-update-install",
+                exception);
+
+            return false;
         }
     }
 

@@ -81,8 +81,9 @@ public sealed class GifCardViewModel :
         _reducedMotion =
             reducedMotion;
 
-        // KLIPY cards must wait for a validated local thumbnail before XAML
-        // receives a source URI. GIPHY previews use approved direct media hosts.
+        // Cards of a provider that does not load directly must wait for a validated local
+        // thumbnail before XAML receives a source URI. A provider that loads previews directly
+        // uses its approved media hosts.
         _thumbnailSource = ProviderMediaPolicy.UsesDirectPreview(item.ProviderId) &&
             ProviderMediaPolicy.IsDirectMediaUri(item.ThumbnailUri)
             ? item.ThumbnailUri : null;
@@ -337,7 +338,7 @@ public sealed class GifCardViewModel :
         {
             RepairDiagnostics.Record("thumbnail-resolve", ProviderId, exception.GetType().Name);
             Message = UserMessage.Warning("Preview unavailable. Select Retry preview to try again.");
-            // A remote KLIPY URL cannot be decoded by the local-only card.
+            // A remote URL cannot be decoded by the local-only card.
             ThumbnailSource = null;
 
             if (!IsPreviewing)

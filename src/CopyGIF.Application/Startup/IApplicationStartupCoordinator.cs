@@ -27,7 +27,13 @@ public enum ApplicationStartupStatus
     Ready,
     RedirectedToPrimary,
     MigrationFailed,
-    HotkeyRejected
+    HotkeyRejected,
+
+    /// <summary>
+    /// A deferred update was handed to the installer. CopyGIF must close at once; the
+    /// installer starts the updated CopyGIF when it finishes.
+    /// </summary>
+    UpdateInstallStarted
 }
 
 public sealed record ApplicationStartupResult
@@ -51,5 +57,7 @@ public sealed record ApplicationStartupResult
 
     public bool ShouldExit =>
         Status ==
-        ApplicationStartupStatus.RedirectedToPrimary;
+            ApplicationStartupStatus.RedirectedToPrimary ||
+        Status ==
+            ApplicationStartupStatus.UpdateInstallStarted;
 }

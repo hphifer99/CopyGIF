@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Reflection;
 using CommunityToolkit.Mvvm.Input;
 using CopyGIF.Application;
 using CopyGIF.Application.Media;
@@ -132,6 +131,11 @@ public sealed class CopyGifHost :
                         true
                 });
 
+        // The provider rules (direct media hosts, library permission, display names) follow the
+        // registered provider descriptors, so a provider added later needs no change elsewhere.
+        ProviderMediaPolicy.Configure(
+            serviceProvider.GetServices<ProviderDescriptor>());
+
         try
         {
             IApplicationPaths paths =
@@ -204,6 +208,8 @@ public sealed class CopyGifHost :
         services.RemoveAll<IClipboardService>();
         services.AddSingleton<IClipboardService, WinUiClipboardService>();
         ReplaceCopyCoordinator(services);
+        services.AddSingleton<IApplicationVersion>(
+            new EntryAssemblyVersion());
         services.AddSingleton<UpdateViewModel>();
         services.AddSingleton<AppUpdateScheduler>();
 
@@ -630,7 +636,9 @@ public sealed class CopyGifHost :
                     "Connect GIF provider",
 
                 StepDescription =
-                    "Choose KLIPY or GIPHY and add its API key to start searching and copying GIFs.",
+                    viewModel.Providers.Count > 1
+                        ? "Choose a GIF provider and add its API key to start searching and copying GIFs."
+                        : "Add your GIF provider's API key to start searching and copying GIFs.",
 
                 StepContent =
                     viewModel,
@@ -698,7 +706,9 @@ public sealed class CopyGifHost :
                     catch (Exception exception)
                     {
                         window.StatusMessage =
-                            exception.Message;
+                            UserFailureMessages.Describe(
+                                "onboarding-finish",
+                                exception);
 
                         window.StatusSeverity =
                             InfoBarSeverity.Error;
@@ -1108,15 +1118,8 @@ public sealed class CopyGifHost :
                 $"Application resource '{key}' is not a DataTemplate.");
     }
 
-    private static string GetCurrentVersion()
-    {
-        return Assembly
-                .GetEntryAssembly()?
-                .GetName()
-                .Version?
-                .ToString() ??
-            "0.0.0";
-    }
+    private static string GetCurrentVersion() =>
+        new EntryAssemblyVersion().Current;
 
     private void ThrowIfDisposed()
     {

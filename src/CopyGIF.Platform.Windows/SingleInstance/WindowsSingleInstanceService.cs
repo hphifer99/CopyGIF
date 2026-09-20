@@ -13,9 +13,14 @@ public sealed class WindowsSingleInstanceService :
     private const int ConnectionAttempts = 20;
     private const int ConnectionTimeoutMilliseconds = 100;
     private static readonly TimeSpan PipeMessageTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan DefaultInitialRetryDelay = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan DefaultMaximumRetryDelay = TimeSpan.FromSeconds(30);
 
     private readonly string _mutexName;
     private readonly string _pipeName;
+    private readonly TimeSpan _initialRetryDelay;
+    private readonly TimeSpan _maximumRetryDelay;
+    private int _pipeCreationFailures;
     private readonly SemaphoreSlim _initializationGate =
         new(1, 1);
 
@@ -32,9 +37,32 @@ public sealed class WindowsSingleInstanceService :
 
     internal WindowsSingleInstanceService(
         string instanceId)
+        : this(
+            instanceId,
+            DefaultInitialRetryDelay,
+            DefaultMaximumRetryDelay)
+    {
+    }
+
+    // The retry delays are injectable so tests can observe the back-off without waiting.
+    internal WindowsSingleInstanceService(
+        string instanceId,
+        TimeSpan initialRetryDelay,
+        TimeSpan maximumRetryDelay)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(
             instanceId);
+
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(
+            initialRetryDelay,
+            TimeSpan.Zero);
+
+        ArgumentOutOfRangeException.ThrowIfLessThan(
+            maximumRetryDelay,
+            initialRetryDelay);
+
+        _initialRetryDelay = initialRetryDelay;
+        _maximumRetryDelay = maximumRetryDelay;
 
         _mutexName =
             $"Local\\{instanceId}.Instance";
@@ -45,6 +73,12 @@ public sealed class WindowsSingleInstanceService :
 
     public event EventHandler<ActivationRequestedEventArgs>?
         ActivationRequested;
+
+    // How many times creating the listening pipe has failed since the service started.
+    // Only tests read this; it shows that a busy pipe is retried with a delay, not in a spin.
+    internal int PipeCreationFailureCount =>
+        Volatile.Read(
+            ref _pipeCreationFailures);
 
     public async Task<SingleInstanceResult> InitializeAsync(
         IReadOnlyList<string> arguments,
@@ -137,6 +171,14 @@ public sealed class WindowsSingleInstanceService :
                 catch (OperationCanceledException)
                 {
                 }
+                catch (Exception exception)
+                {
+                    // The listener handles its own failures, so this is a last line of defence:
+                    // shutting down must never throw because the listener ended badly.
+                    RepairDiagnostics.RecordException(
+                        "single-instance-dispose",
+                        exception);
+                }
             }
 
             _listenerCancellation?.Dispose();
@@ -161,60 +203,174 @@ public sealed class WindowsSingleInstanceService :
     private async Task ListenForActivationAsync(
         CancellationToken cancellationToken)
     {
+        TimeSpan retryDelay =
+            _initialRetryDelay;
+
+        int consecutiveFailures = 0;
+
         while (!cancellationToken.IsCancellationRequested)
         {
+            NamedPipeServerStream server;
+
             try
             {
-                await using NamedPipeServerStream server =
-                    new(
-                        _pipeName,
-                        PipeDirection.InOut,
-                        maxNumberOfServerInstances: 1,
-                        PipeTransmissionMode.Byte,
-                        PipeOptions.Asynchronous |
-                        PipeOptions.CurrentUserOnly);
+                server =
+                    CreateServer();
+            }
+            catch (Exception exception)
+            {
+                // The pipe is busy (for example another session of the same user already owns
+                // it) or could not be created. Wait, with a growing delay, and try again. The
+                // listener must never spin, and it must never end without leaving a trace.
+                Interlocked.Increment(
+                    ref _pipeCreationFailures);
 
-                await server.WaitForConnectionAsync(
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                consecutiveFailures++;
 
-                using CancellationTokenSource messageDeadline =
-                    CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                messageDeadline.CancelAfter(PipeMessageTimeout);
+                if (IsPowerOfTwo(consecutiveFailures))
+                {
+                    RepairDiagnostics.RecordException(
+                        "single-instance-pipe",
+                        exception);
+                }
 
-                IReadOnlyList<string> arguments =
-                    await SingleInstanceProtocol
-                        .ReadArgumentsAsync(
+                if (!await TryDelayAsync(
+                            retryDelay,
+                            cancellationToken)
+                        .ConfigureAwait(false))
+                {
+                    break;
+                }
+
+                retryDelay =
+                    NextRetryDelay(
+                        retryDelay);
+
+                continue;
+            }
+
+            consecutiveFailures = 0;
+            retryDelay = _initialRetryDelay;
+
+            await using (server.ConfigureAwait(false))
+            {
+                try
+                {
+                    await HandleConnectionAsync(
                             server,
-                            messageDeadline.Token)
+                            cancellationToken)
                         .ConfigureAwait(false);
-
-                await SingleInstanceProtocol
-                        .WriteAcknowledgementAsync(
-                            server,
-                            messageDeadline.Token)
-                    .ConfigureAwait(false);
-
-                RaiseActivationRequested(
-                    arguments);
-            }
-            catch (OperationCanceledException)
-                when (cancellationToken
-                    .IsCancellationRequested)
-            {
-                break;
-            }
-            catch (IOException)
-            {
-            }
-            catch (InvalidDataException)
-            {
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                RepairDiagnostics.Record("single-instance-pipe", "local", "read-timeout");
+                }
+                catch (OperationCanceledException)
+                    when (cancellationToken
+                        .IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (OperationCanceledException)
+                {
+                    RepairDiagnostics.Record(
+                        "single-instance-pipe",
+                        "local",
+                        "read-timeout");
+                }
+                catch (Exception exception)
+                {
+                    // An IOException or InvalidDataException means the other process went away
+                    // or sent something that is not a valid request. Anything else is
+                    // unexpected. In every case keep listening: ending the listener silently
+                    // would make every later launch fail to reach this instance.
+                    RepairDiagnostics.RecordException(
+                        "single-instance-pipe",
+                        exception);
+                }
             }
         }
+    }
+
+    private NamedPipeServerStream CreateServer()
+    {
+        return
+            new(
+                _pipeName,
+                PipeDirection.InOut,
+                maxNumberOfServerInstances: 1,
+                PipeTransmissionMode.Byte,
+                PipeOptions.Asynchronous |
+                PipeOptions.CurrentUserOnly);
+    }
+
+    private async Task HandleConnectionAsync(
+        NamedPipeServerStream server,
+        CancellationToken cancellationToken)
+    {
+        await server.WaitForConnectionAsync(
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        using CancellationTokenSource messageDeadline =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        messageDeadline.CancelAfter(PipeMessageTimeout);
+
+        IReadOnlyList<string> arguments =
+            await SingleInstanceProtocol
+                .ReadArgumentsAsync(
+                    server,
+                    messageDeadline.Token)
+                .ConfigureAwait(false);
+
+        await SingleInstanceProtocol
+                .WriteAcknowledgementAsync(
+                    server,
+                    messageDeadline.Token)
+            .ConfigureAwait(false);
+
+        RaiseActivationRequested(
+            arguments);
+    }
+
+    // Returns false when cancellation ended the wait.
+    private static async Task<bool> TryDelayAsync(
+        TimeSpan delay,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(
+                    delay,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return true;
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken
+                .IsCancellationRequested)
+        {
+            return false;
+        }
+    }
+
+    private TimeSpan NextRetryDelay(
+        TimeSpan current)
+    {
+        TimeSpan doubled =
+            TimeSpan.FromTicks(
+                Math.Min(
+                    current.Ticks * 2,
+                    _maximumRetryDelay.Ticks));
+
+        return doubled;
+    }
+
+    // Diagnostics are written for the 1st, 2nd, 4th, 8th... failure in a row so a pipe
+    // that stays busy for hours does not fill the log.
+    private static bool IsPowerOfTwo(
+        int value)
+    {
+        return
+            value > 0 &&
+            (value & (value - 1)) == 0;
     }
 
     private async Task RedirectToPrimaryAsync(
@@ -311,8 +467,12 @@ public sealed class WindowsSingleInstanceService :
             {
                 handler(this, eventArgs);
             }
-            catch (Exception)
+            catch (Exception exception)
             {
+                // A faulty subscriber must not stop the others or the listener.
+                RepairDiagnostics.RecordException(
+                    "single-instance-activation-handler",
+                    exception);
             }
         }
     }

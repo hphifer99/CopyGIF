@@ -1163,6 +1163,11 @@ public sealed class WindowManager :
         LastOperationException =
             exception;
 
+        // The user sees a generic failure message, so leave a trace for the repair log.
+        RepairDiagnostics.RecordException(
+            "window-operation-failed",
+            exception);
+
         OperationFailed?.Invoke(
             this,
             EventArgs.Empty);

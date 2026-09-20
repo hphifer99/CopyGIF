@@ -34,6 +34,9 @@ public sealed class KlipyCredentialManager :
     public string DisplayName =>
         "KLIPY";
 
+    public string SecretName =>
+        SecretNames.KlipyApiKey;
+
     public async Task<bool>
         HasCredentialAsync(
             CancellationToken cancellationToken =

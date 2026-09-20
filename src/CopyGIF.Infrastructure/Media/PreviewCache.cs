@@ -42,6 +42,13 @@ public sealed class PreviewCache :
     private readonly SemaphoreSlim _gate =
         new(1, 1);
 
+    // Temporary files that a StoreAsync call is still streaming into. The shared
+    // gate is no longer held while a network body is read, so cleanup must be able
+    // to tell an in-progress download from an orphan left behind by a crash.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte>
+        _inFlightTemporaryFiles =
+            new(StringComparer.OrdinalIgnoreCase);
+
     private DateTimeOffset _lastCleanupUtc = DateTimeOffset.MinValue;
     private long _bytesSinceCleanup;
 
@@ -188,16 +195,13 @@ public sealed class PreviewCache :
 
         ThrowIfDisposed();
 
-        await _gate.WaitAsync(
-                cancellationToken)
-            .ConfigureAwait(false);
-
         CacheLocation location =
             GetLocation(
                 sourceUri,
                 kind);
 
         string? temporaryPath = null;
+        string? inFlightPath = null;
 
         try
         {
@@ -219,6 +223,11 @@ public sealed class PreviewCache :
                         $"{Guid.NewGuid():N}" +
                         TemporaryExtension));
 
+            inFlightPath = Path.GetFullPath(temporaryPath);
+            _inFlightTemporaryFiles[inFlightPath] = 0;
+
+            // The network body is streamed to the temporary file WITHOUT the shared
+            // gate, so one slow download cannot delay cache hits or other stores.
             long sizeBytes =
                 await WriteBoundedAsync(
                         content,
@@ -228,49 +237,61 @@ public sealed class PreviewCache :
                         cancellationToken)
                     .ConfigureAwait(false);
 
-            _pathGuard.EnsureSafeFilePath(
-                location.OwnedRoot,
-                finalPath);
+            // The gate is taken only to publish the finished file and do accounting.
+            await _gate.WaitAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
 
-            File.Move(
-                temporaryPath,
-                finalPath,
-                overwrite: true);
-
-            temporaryPath = null;
-
-            DateTimeOffset storedAtUtc =
-                _clock.UtcNow;
-
-            File.SetCreationTimeUtc(
-                finalPath,
-                storedAtUtc.UtcDateTime);
-
-            File.SetLastWriteTimeUtc(
-                finalPath,
-                storedAtUtc.UtcDateTime);
-
-            _bytesSinceCleanup += sizeBytes;
-            long budget = kind == PreviewCacheKind.Thumbnail
-                ? _limits.MaximumThumbnailCacheBytes : _limits.MaximumPreviewCacheBytes;
-            if (_lastCleanupUtc == DateTimeOffset.MinValue ||
-                storedAtUtc - _lastCleanupUtc >= TimeSpan.FromMinutes(10) ||
-                _bytesSinceCleanup >= Math.Max(1, Math.Min(budget / 8, 16L * 1024 * 1024)))
+            try
             {
-                await CleanupCoreAsync(cancellationToken).ConfigureAwait(false);
-                _lastCleanupUtc = storedAtUtc;
-                _bytesSinceCleanup = 0;
+                _pathGuard.EnsureSafeFilePath(
+                    location.OwnedRoot,
+                    finalPath);
+
+                File.Move(
+                    temporaryPath,
+                    finalPath,
+                    overwrite: true);
+
+                temporaryPath = null;
+
+                DateTimeOffset storedAtUtc =
+                    _clock.UtcNow;
+
+                File.SetCreationTimeUtc(
+                    finalPath,
+                    storedAtUtc.UtcDateTime);
+
+                File.SetLastWriteTimeUtc(
+                    finalPath,
+                    storedAtUtc.UtcDateTime);
+
+                _bytesSinceCleanup += sizeBytes;
+                long budget = kind == PreviewCacheKind.Thumbnail
+                    ? _limits.MaximumThumbnailCacheBytes : _limits.MaximumPreviewCacheBytes;
+                if (_lastCleanupUtc == DateTimeOffset.MinValue ||
+                    storedAtUtc - _lastCleanupUtc >= TimeSpan.FromMinutes(10) ||
+                    _bytesSinceCleanup >= Math.Max(1, Math.Min(budget / 8, 16L * 1024 * 1024)))
+                {
+                    await CleanupCoreAsync(cancellationToken).ConfigureAwait(false);
+                    _lastCleanupUtc = storedAtUtc;
+                    _bytesSinceCleanup = 0;
+                }
+
+                return new PreviewCacheEntry
+                {
+                    SourceUri = sourceUri,
+                    Kind = kind,
+                    FilePath = finalPath,
+                    SizeBytes = sizeBytes,
+                    CreatedAtUtc = storedAtUtc,
+                    LastAccessedAtUtc = storedAtUtc
+                };
             }
-
-            return new PreviewCacheEntry
+            finally
             {
-                SourceUri = sourceUri,
-                Kind = kind,
-                FilePath = finalPath,
-                SizeBytes = sizeBytes,
-                CreatedAtUtc = storedAtUtc,
-                LastAccessedAtUtc = storedAtUtc
-            };
+                _gate.Release();
+            }
         }
         catch (OperationCanceledException)
         {
@@ -302,7 +323,12 @@ public sealed class PreviewCache :
         }
         finally
         {
-            _gate.Release();
+            if (inFlightPath is not null)
+            {
+                _inFlightTemporaryFiles.TryRemove(
+                    inFlightPath,
+                    out _);
+            }
         }
     }
 
@@ -546,6 +572,13 @@ public sealed class PreviewCache :
 
             if ((attributes &
                  FileAttributes.ReparsePoint) != 0)
+            {
+                continue;
+            }
+
+            // A store that is still streaming owns this file; only orphans are removed.
+            if (_inFlightTemporaryFiles.ContainsKey(
+                    Path.GetFullPath(path)))
             {
                 continue;
             }

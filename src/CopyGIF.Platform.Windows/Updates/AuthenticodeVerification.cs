@@ -8,13 +8,25 @@ internal enum AuthenticodeVerificationStatus
 {
     Trusted,
     InvalidSignature,
-    UntrustedPublisher
+    UntrustedPublisher,
+
+    // Windows could not reach, and had no cached answer from, the certificate authority to
+    // confirm the certificate was not revoked. The signature itself was not found to be bad.
+    RevocationUnavailable
 }
 
 internal interface IAuthenticodeVerifier
 {
     AuthenticodeVerificationStatus Verify(
         string filePath);
+
+    // The default keeps every existing implementer working. The real Windows verifier
+    // overrides it to skip the online revocation lookup when asked.
+    AuthenticodeVerificationStatus Verify(
+        string filePath,
+        bool checkRevocationOnline) =>
+        Verify(
+            filePath);
 }
 
 internal interface IUpdatePublisherTrustPolicy

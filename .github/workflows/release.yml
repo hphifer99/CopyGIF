@@ -45,6 +45,20 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'SDK installation failed.' }
           "$env:RUNNER_TEMP\copygif-dotnet" >> $env:GITHUB_PATH
           "DOTNET_ROOT=$env:RUNNER_TEMP\copygif-dotnet" >> $env:GITHUB_ENV
+      - name: Restore, build and test before signing
+        shell: pwsh
+        run: |
+          dotnet restore .\CopyGIF.slnx -p:Platform=x64
+          if ($LASTEXITCODE -ne 0) { throw 'Restore failed.' }
+          dotnet build .\CopyGIF.slnx -c Release -p:Platform=x64 --no-restore
+          if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
+          $testProjects = Get-ChildItem -Path .\tests -Filter *.Tests.csproj -Recurse | Sort-Object FullName
+          if ($testProjects.Count -eq 0) { throw 'No test projects were found.' }
+          foreach ($project in $testProjects) {
+              Write-Host "Testing $($project.FullName)"
+              dotnet test $project.FullName -c Release -p:Platform=x64 --no-build
+              if ($LASTEXITCODE -ne 0) { throw "Tests failed in $($project.Name). Nothing was signed or published." }
+          }
       - name: Build and sign
         shell: pwsh
         env:
@@ -79,6 +93,6 @@ jobs:
               gh release upload $env:RELEASE_TAG $msi .\artifacts\CopyGIF-update.json .\artifacts\CopyGIF-win-x64.sha256 --clobber
           } else {
               gh release create $env:RELEASE_TAG $msi .\artifacts\CopyGIF-update.json .\artifacts\CopyGIF-win-x64.sha256 `
-                  --verify-tag --draft --generate-notes --title "CopyGif $env:RELEASE_VERSION"
+                  --verify-tag --draft --generate-notes --title "CopyGIF $env:RELEASE_VERSION"
           }
           if ($LASTEXITCODE -ne 0) { throw 'Creating the draft release failed.' }

@@ -1,6 +1,8 @@
 using CopyGIF.Application.Onboarding;
 using CopyGIF.Application.Settings;
 using CopyGIF.Application.Startup;
+using CopyGIF.Application.Updates;
+using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 using CopyGIF.Core.Settings;
 using CopyGIF.Testing;
@@ -597,6 +599,258 @@ public sealed class ApplicationStartupCoordinatorTests
                 .InitializationArguments);
     }
 
+    // ---- A deferred update is installed before anything else starts ----
+
+    [TestMethod]
+    public async Task InitializeAsync_DeferredUpdateStarted_StopsBeforeAnyWindowTrayOrHotkey()
+    {
+        FakePendingUpdateCoordinator updates =
+            new(
+                PendingUpdateInstallStatus.Started);
+
+        Harness harness =
+            new(
+                updateCoordinator: updates,
+                applicationVersion: "2.0.0.0");
+
+        ApplicationStartupResult result =
+            await harness.Coordinator.InitializeAsync(
+                []);
+
+        Assert.AreEqual(
+            ApplicationStartupStatus.UpdateInstallStarted,
+            result.Status);
+
+        Assert.IsTrue(
+            result.ShouldExit);
+
+        Assert.IsFalse(
+            result.IsReady);
+
+        Assert.AreEqual(
+            "2.0.0.0",
+            updates.LastVersion);
+
+        Assert.AreEqual(
+            0,
+            harness.SettingsCoordinator.LoadCallCount);
+
+        Assert.AreEqual(
+            0,
+            harness.TrayService.InitializeCallCount);
+
+        Assert.HasCount(
+            0,
+            harness.HotkeyService.RegistrationAttempts);
+    }
+
+    [TestMethod]
+    public async Task InitializeAsync_DeferredUpdateStarted_StillRunsTheMigrationFirst()
+    {
+        FakePendingUpdateCoordinator updates =
+            new(
+                PendingUpdateInstallStatus.Started);
+
+        Harness harness =
+            new(
+                updateCoordinator: updates,
+                applicationVersion: "2.0.0.0");
+
+        await harness.Coordinator.InitializeAsync(
+            []);
+
+        Assert.AreEqual(
+            1,
+            harness.MigrationCoordinator.CallCount);
+    }
+
+    [TestMethod]
+    public async Task InitializeAsync_SecondaryInstance_NeverLooksAtDeferredUpdates()
+    {
+        FakePendingUpdateCoordinator updates =
+            new(
+                PendingUpdateInstallStatus.Started);
+
+        Harness harness =
+            new(
+                updateCoordinator: updates,
+                applicationVersion: "2.0.0.0");
+
+        harness.SingleInstanceService.Result =
+            new SingleInstanceResult
+            {
+                Status =
+                    SingleInstanceStatus
+                        .RedirectedToPrimary
+            };
+
+        ApplicationStartupResult result =
+            await harness.Coordinator.InitializeAsync(
+                []);
+
+        Assert.AreEqual(
+            ApplicationStartupStatus.RedirectedToPrimary,
+            result.Status);
+
+        Assert.AreEqual(
+            0,
+            updates.CallCount,
+            "only the primary instance may install an update");
+    }
+
+    [TestMethod]
+    [DataRow(PendingUpdateInstallStatus.NothingPending)]
+    [DataRow(PendingUpdateInstallStatus.AlreadyCurrent)]
+    [DataRow(PendingUpdateInstallStatus.NotApplicable)]
+    [DataRow(PendingUpdateInstallStatus.PackageUnavailable)]
+    [DataRow(PendingUpdateInstallStatus.VerificationFailed)]
+    public async Task InitializeAsync_DeferredUpdateNotStarted_StartsNormally(
+        PendingUpdateInstallStatus status)
+    {
+        FakePendingUpdateCoordinator updates =
+            new(
+                status);
+
+        Harness harness =
+            new(
+                updateCoordinator: updates,
+                applicationVersion: "2.0.0.0");
+
+        ApplicationStartupResult result =
+            await harness.Coordinator.InitializeAsync(
+                []);
+
+        Assert.AreEqual(
+            ApplicationStartupStatus.Ready,
+            result.Status);
+
+        Assert.AreEqual(
+            1,
+            updates.CallCount);
+    }
+
+    [TestMethod]
+    public async Task InitializeAsync_DeferredUpdateThrows_StartsNormally()
+    {
+        // A problem with an update must never keep CopyGIF from starting.
+        FakePendingUpdateCoordinator updates =
+            new(
+                PendingUpdateInstallStatus.Started)
+            {
+                Failure =
+                    new InvalidOperationException(
+                        "Windows Installer could not be started.")
+            };
+
+        Harness harness =
+            new(
+                updateCoordinator: updates,
+                applicationVersion: "2.0.0.0");
+
+        ApplicationStartupResult result =
+            await harness.Coordinator.InitializeAsync(
+                []);
+
+        Assert.AreEqual(
+            ApplicationStartupStatus.Ready,
+            result.Status);
+
+        Assert.AreEqual(
+            1,
+            harness.TrayService.InitializeCallCount);
+    }
+
+    [TestMethod]
+    public async Task InitializeAsync_NoUpdateCoordinatorOrVersion_StartsNormally()
+    {
+        Harness harness =
+            new();
+
+        ApplicationStartupResult result =
+            await harness.Coordinator.InitializeAsync(
+                []);
+
+        Assert.AreEqual(
+            ApplicationStartupStatus.Ready,
+            result.Status);
+    }
+
+    private sealed class FakeApplicationVersion(
+        string version) :
+        IApplicationVersion
+    {
+        public string Current => version;
+    }
+
+    private sealed class FakePendingUpdateCoordinator(
+        PendingUpdateInstallStatus status) :
+        IUpdateCoordinator
+    {
+        public int CallCount { get; private set; }
+
+        public string? LastVersion { get; private set; }
+
+        public Exception? Failure { get; init; }
+
+        public Task<PendingUpdateInstallResult> InstallPendingAsync(
+            string currentVersion,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            LastVersion = currentVersion;
+
+            if (Failure is not null)
+            {
+                throw Failure;
+            }
+
+            return Task.FromResult(
+                new PendingUpdateInstallResult
+                {
+                    Status = status
+                });
+        }
+
+        public Task<UpdateCheckResult> CheckAsync(
+            string currentVersion,
+            bool force = false,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<UpdatePreparationResult> PrepareAsync(
+            UpdateCandidate candidate,
+            IProgress<UpdateDownloadProgress>? progress = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<UpdateInstallationResult> InstallAsync(
+            DownloadedUpdatePackage package,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<UpdateInstallationResult> InstallAsync(
+            DownloadedUpdatePackage package,
+            UpdateInstallOptions options,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task SkipVersionAsync(
+            string version,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<bool> DeferInstallToNextLaunchAsync(
+            DownloadedUpdatePackage package,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AutomaticUpdateResult> RunAutomaticAsync(
+            string currentVersion,
+            IProgress<UpdateDownloadProgress>? progress = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
     private static AppSettings CreateSettings(
         string hotkey =
             AppSettings.DefaultHotkey,
@@ -642,7 +896,9 @@ public sealed class ApplicationStartupCoordinatorTests
     {
         public Harness(
             AppSettings? settings = null,
-            OnboardingState? onboarding = null)
+            OnboardingState? onboarding = null,
+            IUpdateCoordinator? updateCoordinator = null,
+            string? applicationVersion = null)
         {
             SettingsCoordinator.Settings =
                 settings ??
@@ -663,7 +919,12 @@ public sealed class ApplicationStartupCoordinatorTests
                     OnboardingCoordinator,
                     HotkeyService,
                     StartupService,
-                    TrayService);
+                    TrayService,
+                    updateCoordinator,
+                    applicationVersion is null
+                        ? null
+                        : new FakeApplicationVersion(
+                            applicationVersion));
         }
 
         public FakeSingleInstanceService
@@ -780,6 +1041,8 @@ public sealed class ApplicationStartupCoordinatorTests
     private sealed class FakeOnboardingCoordinator :
         IOnboardingCoordinator
     {
+        public IReadOnlyList<OnboardingProviderOption> Providers { get; } = [];
+
         public OnboardingState State
         {
             get;

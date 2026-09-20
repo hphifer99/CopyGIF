@@ -1,4 +1,5 @@
 using CopyGIF.Core.Contracts;
+using CopyGIF.Core.Models;
 using CopyGIF.Core.Settings;
 
 namespace CopyGIF.Application.Settings;
@@ -8,10 +9,18 @@ public sealed class SettingsEditSession(
     ISettingsCoordinator coordinator,
     ISecretStore secrets,
     IEnumerable<IGifProviderCredentialManager> credentialManagers,
-    EffectiveSettings effective)
+    EffectiveSettings effective,
+    IProviderCatalog providerCatalog)
 {
     private readonly Dictionary<string, IGifProviderCredentialManager> _managers =
         credentialManagers.ToDictionary(manager => manager.ProviderId, StringComparer.OrdinalIgnoreCase);
+    // Every provider that has an API key to manage, in registration order. Settings builds its
+    // API key section from this list, so a newly registered provider appears there by itself.
+    public IReadOnlyList<ProviderDescriptor> Providers { get; } =
+        providerCatalog.Providers
+            .Where(provider => provider.RequiresCredential &&
+                credentialManagers.Any(manager => string.Equals(manager.ProviderId, provider.Id, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
     private readonly Dictionary<string, string?> _credentials = new(StringComparer.OrdinalIgnoreCase);
     public AppSettings Baseline { get; private set; } = new();
     public AppSettings Draft { get; private set; } = new();
@@ -21,7 +30,7 @@ public sealed class SettingsEditSession(
 
     public async Task BeginAsync(CancellationToken cancellationToken = default)
     {
-        Baseline = await coordinator.LoadAsync(cancellationToken).ConfigureAwait(false);
+        Baseline = await coordinator.LoadForEditingAsync(cancellationToken).ConfigureAwait(false);
         Draft = Baseline;
         _credentials.Clear();
         effective.Preview(Draft);
@@ -63,7 +72,7 @@ public sealed class SettingsEditSession(
         {
             var issues = AppSettingsValidator.Validate(Draft);
             if (issues.Count != 0)
-                throw new InvalidOperationException(string.Join(Environment.NewLine, issues.Select(i => $"{i.Path}: {i.Message}")));
+                throw new UserFacingException(string.Join(Environment.NewLine, issues.Select(i => $"{i.Path}: {i.Message}")));
             // Validate all changed keys before writing any of them.
             foreach (var (id, value) in _credentials)
             {
@@ -71,7 +80,7 @@ public sealed class SettingsEditSession(
                 originals[id] = old;
                 if (value is null || string.Equals(old, value, StringComparison.Ordinal)) continue;
                 var validation = await _managers[id].ValidateCredentialAsync(value, cancellationToken).ConfigureAwait(false);
-                if (!validation.IsValid) throw new InvalidOperationException($"{_managers[id].DisplayName}: {validation.Message}");
+                if (!validation.IsValid) throw new UserFacingException($"{_managers[id].DisplayName}: {validation.Message}");
             }
             foreach (var (id, value) in _credentials)
             {
@@ -90,7 +99,7 @@ public sealed class SettingsEditSession(
                 }
             }, cancellationToken).ConfigureAwait(false);
             if (!result.Succeeded)
-                throw new InvalidOperationException(result.ErrorMessage ?? "Windows rejected the requested hotkey.");
+                throw new UserFacingException(result.ErrorMessage ?? "Windows rejected the requested hotkey.");
             Baseline = Draft = result.EffectiveSettings;
             _credentials.Clear();
             effective.Preview(Draft);
@@ -127,10 +136,8 @@ public sealed class SettingsEditSession(
 
     public void Close() => effective.EndPreview();
 
-    private static string SecretName(string providerId) => providerId.ToLowerInvariant() switch
-    {
-        "klipy" => SecretNames.KlipyApiKey,
-        "giphy" => SecretNames.GiphyApiKey,
-        _ => throw new ArgumentException("Unknown provider.", nameof(providerId))
-    };
+    private string SecretName(string providerId) =>
+        _managers.TryGetValue(providerId, out IGifProviderCredentialManager? manager)
+            ? manager.SecretName
+            : throw new ArgumentException("Unknown provider.", nameof(providerId));
 }

@@ -665,6 +665,25 @@ public sealed class FakeStartupService :
         Task>? SetEnabledHandler
     { get; set; }
 
+    /// <summary>
+    /// When set, replaces the registration state that Settings uses for display. Returning
+    /// null models a run that has no startup registration target.
+    /// </summary>
+    public Func<
+        CancellationToken,
+        Task<bool?>>? RegistrationStateHandler
+    { get; set; }
+
+    public async Task<bool?> GetRegistrationStateAsync(
+        CancellationToken cancellationToken = default) =>
+        RegistrationStateHandler is null
+            ? await IsEnabledAsync(
+                    cancellationToken)
+                .ConfigureAwait(false)
+            : await RegistrationStateHandler(
+                    cancellationToken)
+                .ConfigureAwait(false);
+
     public IReadOnlyList<bool> RequestedStates =>
         _requestedStates.ToArray();
 
@@ -877,6 +896,98 @@ public sealed class FakeUpdatePackageService :
     public IReadOnlyList<DownloadedUpdatePackage> DeletedPackages =>
         _deletedPackages.ToArray();
 
+    private readonly List<string>
+        _pruneRequests = [];
+
+    public Func<
+        string,
+        CancellationToken,
+        Task>? PruneHandler
+    { get; set; }
+
+    public IReadOnlyList<string> PruneRequests =>
+        _pruneRequests.ToArray();
+
+    public Task PruneAsync(
+        string currentVersion,
+        CancellationToken cancellationToken = default)
+    {
+        _pruneRequests.Add(
+            currentVersion);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return PruneHandler is null
+            ? Task.CompletedTask
+            : PruneHandler(
+                currentVersion,
+                cancellationToken);
+    }
+
+    private readonly List<UpdateManifest>
+        _findExistingRequests = [];
+
+    public Func<
+        UpdateManifest,
+        CancellationToken,
+        Task<DownloadedUpdatePackage?>>?
+        FindExistingHandler
+    { get; set; }
+
+    public IReadOnlyList<UpdateManifest> FindExistingRequests =>
+        _findExistingRequests.ToArray();
+
+    // Without a handler the package is reported as present, shaped like a fresh download.
+    public Task<DownloadedUpdatePackage?> FindExistingAsync(
+        UpdateManifest manifest,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(
+            manifest);
+
+        _findExistingRequests.Add(
+            manifest);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (FindExistingHandler is not null)
+        {
+            return FindExistingHandler(
+                manifest,
+                cancellationToken);
+        }
+
+        return Task.FromResult<DownloadedUpdatePackage?>(
+            CreateDefaultPackage(
+                manifest));
+    }
+
+    private static DownloadedUpdatePackage CreateDefaultPackage(
+        UpdateManifest manifest) =>
+        new()
+        {
+            Manifest = manifest,
+
+            FilePath =
+                Path.Combine(
+                    Path.GetTempPath(),
+                    "CopyGIF.Testing",
+                    manifest.AssetName),
+
+            SizeBytes = manifest.SizeBytes,
+            Sha256 = manifest.Sha256,
+
+            DownloadedAtUtc =
+                new DateTimeOffset(
+                    2026,
+                    1,
+                    1,
+                    0,
+                    0,
+                    0,
+                    TimeSpan.Zero)
+        };
+
     public Task<DownloadedUpdatePackage> DownloadAsync(
         UpdateManifest manifest,
         IProgress<UpdateDownloadProgress>? progress = null,
@@ -983,15 +1094,62 @@ public sealed class FakeUpdateInstaller :
         InstallationRequests =>
             _installationRequests.ToArray();
 
+    private readonly List<UpdateInstallOptions>
+        _installationOptions = [];
+
+    // The options used for each installation, in call order. The two-argument overload
+    // is recorded as UpdateInstallOptions.Interactive.
+    public IReadOnlyList<UpdateInstallOptions>
+        InstallationOptions =>
+            _installationOptions.ToArray();
+
+    public Task InstallAsync(
+        DownloadedUpdatePackage package,
+        UpdateInstallOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(
+            options);
+
+        return InstallCoreAsync(
+            package,
+            options,
+            cancellationToken);
+    }
+
+    private readonly List<UpdateVerificationOptions>
+        _verificationOptions = [];
+
+    // The verification options used for each verification, in call order. The overload
+    // without options is recorded as UpdateVerificationOptions.Full.
+    public IReadOnlyList<UpdateVerificationOptions>
+        VerificationOptions =>
+            _verificationOptions.ToArray();
+
     public Task<UpdatePackageVerificationResult> VerifyAsync(
         DownloadedUpdatePackage package,
+        CancellationToken cancellationToken = default) =>
+        VerifyAsync(
+            package,
+            UpdateVerificationOptions.Full,
+            cancellationToken);
+
+    public Task<UpdatePackageVerificationResult> VerifyAsync(
+        DownloadedUpdatePackage package,
+        UpdateVerificationOptions options,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(
             package);
 
+        ArgumentNullException.ThrowIfNull(
+            options);
+
         _verificationRequests.Add(
             package);
+
+        _verificationOptions.Add(
+            options);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -1003,15 +1161,27 @@ public sealed class FakeUpdateInstaller :
                 cancellationToken);
     }
 
-    public async Task InstallAsync(
+    public Task InstallAsync(
         DownloadedUpdatePackage package,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        InstallCoreAsync(
+            package,
+            UpdateInstallOptions.Interactive,
+            cancellationToken);
+
+    private async Task InstallCoreAsync(
+        DownloadedUpdatePackage package,
+        UpdateInstallOptions options,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(
             package);
 
         _installationRequests.Add(
             package);
+
+        _installationOptions.Add(
+            options);
 
         cancellationToken.ThrowIfCancellationRequested();
 

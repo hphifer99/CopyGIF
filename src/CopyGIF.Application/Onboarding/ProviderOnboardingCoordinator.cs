@@ -14,7 +14,7 @@ public sealed class ProviderOnboardingCoordinator(ISettingsCoordinator settings,
         IGifProviderCredentialManager manager = managers.Single(m => m.ProviderId == providerId);
         var validation = await manager.ValidateCredentialAsync(credential, token).ConfigureAwait(false);
         if (!validation.IsValid) return validation;
-        string name = providerId == "giphy" ? SecretNames.GiphyApiKey : SecretNames.KlipyApiKey;
+        string name = manager.SecretName;
         bool firstSetup = !File.Exists(paths.SettingsPath);
         string? previous = await secrets.GetAsync(name, token).ConfigureAwait(false);
         try
@@ -25,7 +25,7 @@ public sealed class ProviderOnboardingCoordinator(ISettingsCoordinator settings,
                 Providers = latest.Providers with { ActiveProviderId = providerId }
             }, token).ConfigureAwait(false);
             if (!saved.Succeeded)
-                throw new InvalidOperationException(saved.ErrorMessage ?? "Provider settings could not be saved.");
+                throw new UserFacingException(saved.ErrorMessage ?? "Provider settings could not be saved.");
             if (firstSetup && saved.EffectiveSettings.Startup.StartWithWindows)
             {
                 try { await startup.SetEnabledAsync(true, token).ConfigureAwait(false); }

@@ -412,6 +412,88 @@ public sealed class PreviewCacheTests
                     .ThumbnailCacheDirectory));
     }
 
+    [TestMethod]
+    public async Task StoreAsync_SlowDownload_DoesNotBlockCacheHitsOrCleanup()
+    {
+        TestContext context =
+            CreateContext();
+
+        Uri fastUri =
+            CreateUri(
+                "fast.jpg");
+
+        await StoreAsync(
+            context.Cache,
+            fastUri,
+            PreviewCacheKind.Thumbnail,
+            CreateJpeg(
+                16));
+
+        Uri slowUri =
+            CreateUri(
+                "slow.jpg");
+
+        using BlockingStream slowContent =
+            new(
+                CreateJpeg(
+                    16));
+
+        Task<PreviewCacheEntry> slowStore =
+            context.Cache
+                .StoreAsync(
+                    slowUri,
+                    PreviewCacheKind.Thumbnail,
+                    slowContent);
+
+        await slowContent.ReadBlocked
+            .WaitAsync(
+                TimeSpan.FromSeconds(10));
+
+        // A cache hit for a different item must not wait for the stalled download.
+        Task<PreviewCacheEntry?> hit =
+            context.Cache
+                .TryGetAsync(
+                    fastUri,
+                    PreviewCacheKind.Thumbnail);
+
+        Assert.AreSame(
+            hit,
+            await Task.WhenAny(
+                hit,
+                Task.Delay(
+                    TimeSpan.FromSeconds(10))));
+
+        Assert.IsNotNull(
+            await hit);
+
+        // Cleanup must leave the download that is still streaming alone.
+        await context.Cache
+            .CleanupAsync();
+
+        Assert.HasCount(
+            1,
+            Directory.GetFiles(
+                context.Paths
+                    .ThumbnailCacheDirectory,
+                "*.tmp"));
+
+        slowContent.Release();
+
+        PreviewCacheEntry stored =
+            await slowStore;
+
+        Assert.IsTrue(
+            File.Exists(
+                stored.FilePath));
+
+        Assert.HasCount(
+            0,
+            Directory.GetFiles(
+                context.Paths
+                    .ThumbnailCacheDirectory,
+                "*.tmp"));
+    }
+
     private TestContext CreateContext(
         PreviewCacheLimits? limits = null)
     {
@@ -500,6 +582,123 @@ public sealed class PreviewCacheTests
             0,
             0x3B
         ];
+    }
+
+    private sealed class BlockingStream :
+        Stream
+    {
+        private readonly byte[] _bytes;
+
+        private readonly TaskCompletionSource _release =
+            new(
+                TaskCreationOptions
+                    .RunContinuationsAsynchronously);
+
+        private readonly TaskCompletionSource _readBlocked =
+            new(
+                TaskCreationOptions
+                    .RunContinuationsAsynchronously);
+
+        private int _position;
+
+        private bool _headerDelivered;
+
+        public BlockingStream(
+            byte[] bytes)
+        {
+            _bytes = bytes;
+        }
+
+        public Task ReadBlocked =>
+            _readBlocked.Task;
+
+        public void Release()
+        {
+            _release.TrySetResult();
+        }
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length =>
+            throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override async ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            // Deliver the whole valid header first, then stall until released.
+            if (!_headerDelivered)
+            {
+                _headerDelivered = true;
+
+                int count =
+                    Math.Min(
+                        buffer.Length,
+                        _bytes.Length);
+
+                _bytes.AsMemory(
+                        0,
+                        count)
+                    .CopyTo(
+                        buffer);
+
+                _position = count;
+
+                return count;
+            }
+
+            _readBlocked.TrySetResult();
+
+            await _release.Task
+                .WaitAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return 0;
+        }
+
+        public override int Read(
+            byte[] buffer,
+            int offset,
+            int count)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(
+            long offset,
+            SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(
+            long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(
+            byte[] buffer,
+            int offset,
+            int count)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed record TestContext(

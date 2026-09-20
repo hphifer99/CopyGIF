@@ -82,3 +82,10 @@ jobs:
               exit $LASTEXITCODE
             }
           }
+
+      - name: Unsigned packaging dry run (publish and MSI)
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'copygif-dryrun'
+          .\scripts\Build-Release.ps1 -Version 0.0.1 -Unsigned -OutputDirectory $out
+          if ($LASTEXITCODE -ne 0 -and $null -ne $LASTEXITCODE) { exit $LASTEXITCODE }

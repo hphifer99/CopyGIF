@@ -37,6 +37,54 @@ public sealed class WindowsStartupServiceTests
     }
 
     [TestMethod]
+    public async Task GetRegistrationStateAsync_MsiInstall_ReturnsRealRegistryState()
+    {
+        FakeStartupController store =
+            new(isEnabled: true);
+
+        FakeStartupController msi =
+            new(isEnabled: false);
+
+        WindowsStartupService service =
+            CreateService(
+                InstallChannel.Msi,
+                store,
+                msi);
+
+        bool? state =
+            await service.GetRegistrationStateAsync();
+
+        Assert.AreEqual(
+            false,
+            state);
+    }
+
+    [TestMethod]
+    public async Task GetRegistrationStateAsync_NoInstallChannel_ReturnsNull()
+    {
+        FakeStartupController store =
+            new(isEnabled: true);
+
+        FakeStartupController msi =
+            new(isEnabled: true);
+
+        WindowsStartupService service =
+            CreateService(
+                InstallChannel.None,
+                store,
+                msi);
+
+        bool? state =
+            await service.GetRegistrationStateAsync();
+
+        Assert.IsNull(state);
+
+        Assert.AreEqual(
+            0,
+            store.ReadCallCount + msi.ReadCallCount);
+    }
+
+    [TestMethod]
     public async Task SetEnabledAsync_MsiInstall_UsesMsiController()
     {
         FakeStartupController store =

@@ -139,7 +139,7 @@ public sealed class ApiSettingsViewModel :
                 value);
     }
 
-    public Uri CredentialHelpUri =>
+    public Uri? CredentialHelpUri =>
         _onboardingCoordinator
             .CredentialHelpUri;
 

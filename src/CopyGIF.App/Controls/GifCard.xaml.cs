@@ -491,13 +491,23 @@ UserControl
     private async void SelectButton_Click(object sender, RoutedEventArgs args)
     {
         CopyGIF.Core.Models.RepairDiagnostics.Record("card-click", ProviderName, "received");
-        if (SelectCommand is CommunityToolkit.Mvvm.Input.IAsyncRelayCommand command && command.CanExecute(SelectCommandParameter))
+        try
         {
-            await command.ExecuteAsync(SelectCommandParameter);
+            if (SelectCommand is CommunityToolkit.Mvvm.Input.IAsyncRelayCommand command && command.CanExecute(SelectCommandParameter))
+            {
+                await command.ExecuteAsync(SelectCommandParameter);
+            }
+            else
+            {
+                CopyGIF.Core.Models.RepairDiagnostics.Record("card-click", ProviderName, "command-unavailable");
+            }
         }
-        else
+        catch (OperationCanceledException) { }
+        catch (Exception exception)
         {
-            CopyGIF.Core.Models.RepairDiagnostics.Record("card-click", ProviderName, "command-unavailable");
+            // The view model already reports copy failures; this only stops an unexpected
+            // exception from escaping an async void handler and ending the process.
+            CopyGIF.Core.Models.RepairDiagnostics.RecordException("card-click-failed", exception);
         }
     }
 
@@ -893,9 +903,8 @@ UserControl
 
     private void UpdateAccessibleText()
     {
-        string providerDisplayName = string.Equals(ProviderName?.Trim(), "klipy", StringComparison.OrdinalIgnoreCase)
-            ? "KLIPY"
-            : ProviderName?.Trim() ?? string.Empty;
+        // The display name comes from the provider's descriptor, so no provider is named here.
+        string providerDisplayName = CopyGIF.Core.Policies.ProviderMediaPolicy.DisplayNameFor(ProviderName);
         ProviderTextBlock.Text = providerDisplayName;
         string accessibleTitle =
         string.IsNullOrWhiteSpace(

@@ -4,7 +4,11 @@ namespace CopyGIF.Application.Onboarding;
 
 public interface IOnboardingCoordinator
 {
-    Uri CredentialHelpUri { get; }
+    /// <summary>Every provider a person can pick in setup, in registration order.</summary>
+    IReadOnlyList<OnboardingProviderOption> Providers { get; }
+
+    /// <summary>The API key page of the default provider, or null when it has none.</summary>
+    Uri? CredentialHelpUri { get; }
 
     Task<OnboardingState> GetStateAsync(
         CancellationToken cancellationToken = default);
@@ -25,5 +29,14 @@ public sealed record OnboardingState
 
     public required string ProviderDisplayName { get; init; }
 
-    public required Uri CredentialHelpUri { get; init; }
+    public Uri? CredentialHelpUri { get; init; }
+
+    public string? CredentialInstructions { get; init; }
 }
+
+/// <summary>One choice in the setup provider list.</summary>
+public sealed record OnboardingProviderOption(
+    string Id,
+    string DisplayName,
+    Uri? CredentialHelpUri,
+    string? CredentialInstructions);

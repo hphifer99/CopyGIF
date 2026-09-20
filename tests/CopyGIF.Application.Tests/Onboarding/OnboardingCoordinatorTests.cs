@@ -169,7 +169,11 @@ public sealed class OnboardingCoordinatorTests
                             ProviderCapabilities.Search |
                             ProviderCapabilities.CredentialValidation,
 
-                        RequiresCredential = true
+                        RequiresCredential = true,
+
+                        CredentialHelpUri =
+                            new Uri(
+                                "https://partner.klipy.com/api-keys")
                     }
                 ]);
 
@@ -185,6 +189,7 @@ public sealed class OnboardingCoordinatorTests
         return new OnboardingCoordinator(
             credentialCoordinator,
             uriLauncher ??
-                new FakeUriLauncherService());
+                new FakeUriLauncherService(),
+            catalog);
     }
 }

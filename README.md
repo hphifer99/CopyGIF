@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/CopyGIF.App/Assets/Square150x150Logo.scale-200.png" alt="CopyGIF app icon" width="180">
+  <img src="src\CopyGIF.App\Assets\CopyGIF-Logo-Lockup.png" alt="CopyGIF app icon">
 </p>
 
 # CopyGIF
@@ -24,7 +24,7 @@ CopyGIF is a Windows GIF picker. Press a global keyboard shortcut, search with K
 
 ## Install
 
-The public GitHub release build is a signed MSI installer. When a CopyGIF 2.x release is published, download its MSI from [GitHub Releases](https://github.com/hphifer99/CopyGIF/releases). You can verify its SHA-256 hash against the accompanying `CopyGIF-win-x64.sha256` file. The Microsoft Store package is a separate distribution channel.
+The public GitHub release build is a signed MSI installer. When a CopyGIF 2.x release is published, download its MSI from [GitHub Releases](https://github.com/hphifer99/CopyGIF/releases). You can verify its SHA-256 hash against the accompanying `CopyGIF-win-x64.sha256` file. The MSI installs for the current user only (into `%LOCALAPPDATA%\Programs\CopyGIF`) and never asks for administrator rights. The Microsoft Store package is a separate distribution channel.
 
 To remove an MSI installation, use Windows **Installed apps**. Uninstalling the app does not remove your data in `%LOCALAPPDATA%\CopyGIF`.
 
@@ -58,4 +58,4 @@ Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md). Do 
 
 ## License and attribution
 
-CopyGIF source code is licensed under the [MIT License](LICENSE.txt). The selected GIF provider and its media have separate terms. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for provider information and the GIPHY attribution mark.
+CopyGIF source code is licensed under the [MIT License](LICENSE.txt). The selected GIF provider and its media have separate terms. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for the components installed with CopyGIF, provider information and the GIPHY attribution mark.

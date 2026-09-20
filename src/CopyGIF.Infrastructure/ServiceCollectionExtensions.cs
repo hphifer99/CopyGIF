@@ -100,32 +100,11 @@ public static class ServiceCollectionExtensions
             IMigrationCoordinator,
             V1MigrationCoordinator>();
 
+        // Every provider is registered with a descriptor that carries all of its settings. To add
+        // a provider, register its descriptor here (or beside its own code) together with its
+        // IGifProvider and IGifProviderCredentialManager. Nothing else needs to change.
         services.AddSingleton(
-            new ProviderDescriptor
-            {
-                Id =
-                    KlipyGifProvider.ProviderId,
-
-                DisplayName =
-                    "KLIPY",
-
-                Capabilities =
-                    ProviderCapabilities.Search |
-                    ProviderCapabilities.Trending |
-                    ProviderCapabilities.Pagination |
-                    ProviderCapabilities.CredentialValidation |
-                    ProviderCapabilities.ShareRegistration,
-
-                RequiresCredential =
-                    true,
-
-                AttributionText =
-                    "Powered by KLIPY",
-
-                AttributionUri =
-                    new Uri(
-                        "https://klipy.com/")
-            });
+            BuiltInProviders.Klipy);
 
         services.AddSingleton<
             IHostAddressResolver,
@@ -137,10 +116,14 @@ public static class ServiceCollectionExtensions
                     serviceProvider
                         .GetRequiredService<
                             IHostAddressResolver>(),
-                    [
-                        "static.klipy.com", "media.giphy.com", "media0.giphy.com",
-                        "media1.giphy.com", "media2.giphy.com", "media3.giphy.com", "media4.giphy.com"
-                    ]));
+                    // The approved media hosts are the union of the hosts every registered provider
+                    // lists in its descriptor.
+                    serviceProvider
+                        .GetServices<
+                            ProviderDescriptor>()
+                        .SelectMany(
+                            descriptor =>
+                                descriptor.MediaHosts)));
 
         services
             .AddHttpClient<KlipyGifProvider>(
@@ -154,6 +137,9 @@ public static class ServiceCollectionExtensions
                         TimeSpan.FromSeconds(
                             20);
                 })
+            // KLIPY puts the API key in the request path, so keep request URLs out of any
+            // logging provider that might be registered later (same hardening as GIPHY).
+            .RemoveAllLoggers()
             .ConfigurePrimaryHttpMessageHandler(
                 () =>
                     new SocketsHttpHandler
@@ -290,13 +276,8 @@ public static class ServiceCollectionExtensions
                     .GetRequiredService<
                         HttpUpdatePackageService>());
 
-        services.AddSingleton(new ProviderDescriptor
-        {
-            Id = GiphyGifProvider.ProviderId, DisplayName = "GIPHY", RequiresCredential = true,
-            Capabilities = ProviderCapabilities.Search | ProviderCapabilities.Trending |
-                ProviderCapabilities.Pagination | ProviderCapabilities.CredentialValidation,
-            AttributionText = "Powered By GIPHY", AttributionUri = new Uri("https://giphy.com/")
-        });
+        services.AddSingleton(
+            BuiltInProviders.Giphy);
         services.AddHttpClient<GiphyGifProvider>(client => client.Timeout = TimeSpan.FromSeconds(25))
             .RemoveAllLoggers()
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler

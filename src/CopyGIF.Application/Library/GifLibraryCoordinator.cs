@@ -357,153 +357,213 @@ public sealed class GifLibraryCoordinator :
                 "The copied GIF identity does not match the selected GIF.");
         }
 
-        await _gate
-            .WaitAsync(
-                cancellationToken)
-            .ConfigureAwait(false);
+        AppSettings settings =
+            await LoadSettingsAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        // The second download (Save quality differs from Copy quality) can take as long as the
+        // network needs, so it happens here, before the library-wide lock is taken. Favorites and
+        // Recents reads and edits from other callers are not held up behind it.
+        Uri savedUri = item.Renditions.Select(settings.Library.SaveQuality, item.GifUri);
+        DownloadedGif? ownedDownload = null;
+        bool entrySaved = false;
+
+        if (settings.Library.StoreRecentsLocally && copiedGif.Purpose == GifDownloadPurpose.Clipboard &&
+            item.Renditions.Select(settings.Library.GifQuality, item.GifUri) != savedUri)
+        {
+            copiedGif = await _gifDownloader.DownloadAsync(item with { GifUri = savedUri },
+                GifDownloadPurpose.Recent, cancellationToken).ConfigureAwait(false);
+            ownedDownload = copiedGif;
+        }
 
         try
         {
-            AppSettings settings =
-                await LoadSettingsAsync(
-                        cancellationToken)
-                    .ConfigureAwait(false);
-
-            LibrarySnapshot current =
-                await _libraryStore
-                    .LoadAsync(cancellationToken)
-                    .ConfigureAwait(false);
-
-            Uri savedUri = item.Renditions.Select(settings.Library.SaveQuality, item.GifUri);
-            if (settings.Library.StoreRecentsLocally && copiedGif.Purpose == GifDownloadPurpose.Clipboard &&
-                item.Renditions.Select(settings.Library.GifQuality, item.GifUri) != savedUri)
-            {
-                copiedGif = await _gifDownloader.DownloadAsync(item with { GifUri = savedUri },
-                    GifDownloadPurpose.Recent, cancellationToken).ConfigureAwait(false);
-            }
-
-            bool retainedClipboardFile = settings.Library.StoreRecentsLocally &&
-                copiedGif.Purpose == GifDownloadPurpose.Clipboard &&
-                _gifDownloader is IReusableGifDownloader;
-            if (retainedClipboardFile &&
-                _gifDownloader is IReusableGifDownloader reusable)
-            {
-                copiedGif = await reusable.RetainAsync(item, copiedGif,
-                    GifDownloadPurpose.Recent, cancellationToken).ConfigureAwait(false);
-            }
-
-            if (settings.Library.StoreRecentsLocally &&
-                copiedGif.Purpose != GifDownloadPurpose.Recent)
-            {
-                throw new InvalidDataException(
-                    "A locally retained Recent must use a Recent download.");
-            }
-
-            LibraryEntry? existing =
-                current.Recents
-                    .FirstOrDefault(
-                        entry =>
-                            HasIdentity(
-                                entry,
-                                item.StableIdentity));
-
-            int copyCount =
-                existing is null
-                    ? 1
-                    : IncrementSaturating(
-                        existing.CopyCount);
-
-            DateTimeOffset copiedAtUtc =
-                _clock.UtcNow;
-
-            DownloadedGif? retainedGif =
-                settings.Library.StoreRecentsLocally
-                    ? copiedGif
-                    : null;
-
-            LibraryEntry recent =
-                CreateEntry(
-                    item,
-                    retainedGif,
-                    existing?.AddedAtUtc ??
-                        copiedAtUtc,
-                    copiedAtUtc,
-                    copyCount);
-
-            LibraryEntry[] ordered =
-                current.Recents
-                    .Where(
-                        entry =>
-                            !HasIdentity(
-                                entry,
-                                item.StableIdentity))
-                    .Prepend(
-                        recent)
-                    .ToArray();
-
-            LibraryEntry[] retained =
-                ordered
-                    .Take(
-                        settings.Library.RecentLimit)
-                    .ToArray();
-
-            LibraryEntry[] evicted =
-                ordered
-                    .Skip(
-                        settings.Library.RecentLimit)
-                    .ToArray();
-
-            LibrarySnapshot updated =
-                current with
-                {
-                    SchemaVersion =
-                        LibrarySnapshot.CurrentSchemaVersion,
-
-                    Recents = retained
-                };
+            await _gate
+                .WaitAsync(
+                    cancellationToken)
+                .ConfigureAwait(false);
 
             try
             {
-                await _libraryStore.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+                LibrarySnapshot current =
+                    await _libraryStore
+                        .LoadAsync(cancellationToken)
+                        .ConfigureAwait(false);
+
+                bool retainedClipboardFile = settings.Library.StoreRecentsLocally &&
+                    copiedGif.Purpose == GifDownloadPurpose.Clipboard &&
+                    _gifDownloader is IReusableGifDownloader;
+                if (retainedClipboardFile &&
+                    _gifDownloader is IReusableGifDownloader reusable)
+                {
+                    copiedGif = await reusable.RetainAsync(item, copiedGif,
+                        GifDownloadPurpose.Recent, cancellationToken).ConfigureAwait(false);
+                }
+
+                if (settings.Library.StoreRecentsLocally &&
+                    copiedGif.Purpose != GifDownloadPurpose.Recent)
+                {
+                    throw new InvalidDataException(
+                        "A locally retained Recent must use a Recent download.");
+                }
+
+                LibraryEntry? existing =
+                    current.Recents
+                        .FirstOrDefault(
+                            entry =>
+                                HasIdentity(
+                                    entry,
+                                    item.StableIdentity));
+
+                int copyCount =
+                    existing is null
+                        ? 1
+                        : IncrementSaturating(
+                            existing.CopyCount);
+
+                DateTimeOffset copiedAtUtc =
+                    _clock.UtcNow;
+
+                DownloadedGif? retainedGif =
+                    settings.Library.StoreRecentsLocally
+                        ? copiedGif
+                        : null;
+
+                LibraryEntry recent =
+                    CreateEntry(
+                        item,
+                        retainedGif,
+                        existing?.AddedAtUtc ??
+                            copiedAtUtc,
+                        copiedAtUtc,
+                        copyCount);
+
+                LibraryEntry[] ordered =
+                    current.Recents
+                        .Where(
+                            entry =>
+                                !HasIdentity(
+                                    entry,
+                                    item.StableIdentity))
+                        .Prepend(
+                            recent)
+                        .ToArray();
+
+                LibraryEntry[] retained =
+                    ordered
+                        .Take(
+                            settings.Library.RecentLimit)
+                        .ToArray();
+
+                LibraryEntry[] evicted =
+                    ordered
+                        .Skip(
+                            settings.Library.RecentLimit)
+                        .ToArray();
+
+                LibrarySnapshot updated =
+                    current with
+                    {
+                        SchemaVersion =
+                            LibrarySnapshot.CurrentSchemaVersion,
+
+                        Recents = retained
+                    };
+
+                try
+                {
+                    await _libraryStore.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+                    entrySaved = true;
+                }
+                catch
+                {
+                    if (retainedClipboardFile)
+                        await TryDeletePathsAsync(settings, [copiedGif.FilePath]).ConfigureAwait(false);
+                    throw;
+                }
+
+                List<string> cleanupPaths =
+                    GetLocalPaths(
+                            evicted)
+                        .ToList();
+
+                if (existing?.LocalFilePath is not null &&
+                    !_pathComparer.Equals(
+                        existing.LocalFilePath,
+                        recent.LocalFilePath))
+                {
+                    cleanupPaths.Add(
+                        existing.LocalFilePath);
+                }
+
+                if (!settings.Library.StoreRecentsLocally &&
+                    copiedGif.Purpose == GifDownloadPurpose.Recent)
+                {
+                    cleanupPaths.Add(
+                        copiedGif.FilePath);
+                }
+
+                await TryDeletePathsAsync(
+                        settings,
+                        cleanupPaths)
+                    .ConfigureAwait(false);
+
+                return updated;
             }
-            catch
+            finally
             {
-                if (retainedClipboardFile)
-                    await TryDeletePathsAsync(settings, [copiedGif.FilePath]).ConfigureAwait(false);
-                throw;
+                _gate.Release();
             }
-
-            List<string> cleanupPaths =
-                GetLocalPaths(
-                        evicted)
-                    .ToList();
-
-            if (existing?.LocalFilePath is not null &&
-                !_pathComparer.Equals(
-                    existing.LocalFilePath,
-                    recent.LocalFilePath))
-            {
-                cleanupPaths.Add(
-                    existing.LocalFilePath);
-            }
-
-            if (!settings.Library.StoreRecentsLocally &&
-                copiedGif.Purpose == GifDownloadPurpose.Recent)
-            {
-                cleanupPaths.Add(
-                    copiedGif.FilePath);
-            }
-
-            await TryDeletePathsAsync(
-                    settings,
-                    cleanupPaths)
-                .ConfigureAwait(false);
-
-            return updated;
         }
-        finally
+        catch
         {
-            _gate.Release();
+            // Nothing owns the file that was downloaded outside the lock unless the entry was
+            // saved, so a cancelled or failed record must not leave it behind.
+            if (ownedDownload is not null && !entrySaved)
+            {
+                await TryDeleteUnreferencedFileAsync(settings, ownedDownload.FilePath).ConfigureAwait(false);
+            }
+
+            throw;
+        }
+    }
+
+    // Deletes a file this coordinator downloaded, unless a saved entry already points at the same
+    // path (the same GIF downloaded earlier is stored under the same name). Best effort only: a
+    // problem here must never hide the failure that led to the cleanup.
+    private async Task TryDeleteUnreferencedFileAsync(
+        AppSettings settings,
+        string filePath)
+    {
+        try
+        {
+            LibrarySnapshot stored =
+                await _libraryStore
+                    .LoadAsync(CancellationToken.None)
+                    .ConfigureAwait(false);
+
+            bool referenced =
+                stored.Favorites
+                    .Concat(stored.Recents)
+                    .Any(
+                        entry =>
+                            entry.LocalFilePath is not null &&
+                            _pathComparer.Equals(
+                                entry.LocalFilePath,
+                                filePath));
+
+            if (!referenced)
+            {
+                await TryDeletePathsAsync(
+                        settings,
+                        [filePath])
+                    .ConfigureAwait(false);
+            }
+        }
+        catch (Exception)
+        {
+            // Leave the file for the next library clean-up.
         }
     }
 

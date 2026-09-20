@@ -8,6 +8,17 @@ public interface ISettingsCoordinator
     Task<AppSettings> LoadAsync(
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Loads settings for display in the Settings window. Unlike <see cref="LoadAsync"/>, the
+    /// "Start with Windows" value reflects what Windows actually has registered, so a startup
+    /// entry removed outside the app (for example in Task Manager) is shown as off.
+    /// The default simply returns the saved settings.
+    /// </summary>
+    Task<AppSettings> LoadForEditingAsync(
+        CancellationToken cancellationToken = default) =>
+        LoadAsync(
+            cancellationToken);
+
     Task<SettingsSaveResult> SaveAsync(
         AppSettings settings,
         CancellationToken cancellationToken = default);

@@ -89,7 +89,7 @@ internal static class LocalBitmapLoader
         catch (Exception exception) when (exception is HttpRequestException or IOException or
             OperationCanceledException or COMException or ArgumentException)
         {
-            CopyGIF.Core.Models.RepairDiagnostics.Record("direct-bitmap", "giphy", exception.GetType().Name);
+            CopyGIF.Core.Models.RepairDiagnostics.Record("direct-bitmap", "local", exception.GetType().Name);
             return false;
         }
     }

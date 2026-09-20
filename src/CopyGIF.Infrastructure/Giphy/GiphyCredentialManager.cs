@@ -34,6 +34,9 @@ public sealed class GiphyCredentialManager :
     public string DisplayName =>
         "GIPHY";
 
+    public string SecretName =>
+        SecretNames.GiphyApiKey;
+
     public async Task<bool>
         HasCredentialAsync(
             CancellationToken cancellationToken =

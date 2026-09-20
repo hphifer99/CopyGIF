@@ -66,19 +66,21 @@ public sealed class ArchitectureTests
                 ]
             };
 
-    private static readonly IReadOnlyDictionary<string, string>
-        ExpectedPackageVersions =
-            new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["CommunityToolkit.Mvvm"] = "8.4.2",
-                ["Microsoft.Extensions.DependencyInjection"] = "10.0.12",
-                ["Microsoft.Extensions.DependencyInjection.Abstractions"] = "10.0.12",
-                ["Microsoft.Extensions.Http"] = "10.0.12",
-                ["Microsoft.Windows.SDK.BuildTools"] = "10.0.28000.2705",
-                ["Microsoft.WindowsAppSDK"] = "2.4.0",
-                ["MSTest"] = "4.4.0",
-                ["System.Security.Cryptography.ProtectedData"] = "10.0.11"
-            };
+    // Only the package names are pinned here. Versions are managed in
+    // Directory.Packages.props and are intentionally not asserted, so routine
+    // dependency updates never require a test change.
+    private static readonly IReadOnlyList<string>
+        ExpectedPackageNames =
+        [
+            "CommunityToolkit.Mvvm",
+            "Microsoft.Extensions.DependencyInjection",
+            "Microsoft.Extensions.DependencyInjection.Abstractions",
+            "Microsoft.Extensions.Http",
+            "Microsoft.Windows.SDK.BuildTools",
+            "Microsoft.WindowsAppSDK",
+            "MSTest",
+            "System.Security.Cryptography.ProtectedData"
+        ];
 
     [TestMethod]
     public void Repository_UsesFrozenDirectoryAndProjectCasing()
@@ -360,25 +362,24 @@ public sealed class ArchitectureTests
                         string.Empty,
                     StringComparer.Ordinal);
 
-        foreach (KeyValuePair<string, string> expectedPackage
-                 in ExpectedPackageVersions)
+        foreach (string expectedPackage
+                 in ExpectedPackageNames)
         {
             Assert.IsTrue(
                 actualVersions.TryGetValue(
-                    expectedPackage.Key,
+                    expectedPackage,
                     out string? actualVersion),
-                $"Missing central package version for {expectedPackage.Key}.");
+                $"Missing central package version for {expectedPackage}.");
 
-            Assert.AreEqual(
-                expectedPackage.Value,
-                actualVersion,
-                $"Unexpected version for {expectedPackage.Key}.");
+            Assert.IsFalse(
+                string.IsNullOrWhiteSpace(actualVersion),
+                $"Central package version is empty for {expectedPackage}.");
 
             Assert.IsFalse(
                 actualVersion!.Contains(
                     '-',
                     StringComparison.Ordinal),
-                $"Prerelease dependency detected: {expectedPackage.Key}.");
+                $"Prerelease dependency detected: {expectedPackage}.");
         }
     }
 

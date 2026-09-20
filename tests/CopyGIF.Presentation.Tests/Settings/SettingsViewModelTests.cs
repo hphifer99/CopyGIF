@@ -433,6 +433,8 @@ public sealed class SettingsViewModelTests
     private sealed class FakeOnboardingCoordinator :
         IOnboardingCoordinator
     {
+        public IReadOnlyList<OnboardingProviderOption> Providers { get; } = [];
+
         public Uri CredentialHelpUri
         { get; } =
             new(

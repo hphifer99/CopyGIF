@@ -1,73 +1,157 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CopyGIF.Application.Settings;
+using CopyGIF.Core.Models;
+using CopyGIF.Core.Settings;
 
 namespace CopyGIF.Presentation.Settings;
 
 public sealed record ProviderChoice(string Id, string Name);
 
-public sealed class ProviderKeysViewModel(SettingsEditSession session) : ObservableObject
+/// <summary>
+/// The API key section of Settings. It has one entry for every registered provider that needs a
+/// key, so a newly registered provider gets its own key box, status text and help link without any
+/// change to this class or to the page that shows it.
+/// </summary>
+public sealed class ProviderKeysViewModel : ObservableObject
 {
-    private string _activeProviderId = "klipy";
-    private string _klipyCredential = string.Empty;
-    private string _giphyCredential = string.Empty;
-    private bool _deleteKlipyKey;
-    private bool _deleteGiphyKey;
-    private bool _hasKlipyKey;
-    private bool _hasGiphyKey;
+    private readonly SettingsEditSession _session;
+    private string _activeProviderId = AppSettings.DefaultProviderId;
     private bool _refreshing;
-    public IReadOnlyList<ProviderChoice> Providers { get; } =
-        [new("klipy", "KLIPY"), new("giphy", "GIPHY")];
-    public string ActiveProviderId { get => _activeProviderId; set => SetProperty(ref _activeProviderId, value); }
-    public string KlipyCredential
+
+    public ProviderKeysViewModel(SettingsEditSession session)
     {
-        get => _klipyCredential;
-        set { if (SetProperty(ref _klipyCredential, value ?? string.Empty)) Stage("klipy", value, DeleteKlipyKey); }
+        ArgumentNullException.ThrowIfNull(session);
+
+        _session = session;
+        Keys = Array.AsReadOnly(
+            session.Providers
+                .Select(provider => new ProviderKeyEntry(this, provider))
+                .ToArray());
+        Providers = Array.AsReadOnly(
+            session.Providers
+                .Select(provider => new ProviderChoice(provider.Id, provider.DisplayName))
+                .ToArray());
     }
-    public string GiphyCredential
+
+    /// <summary>The choices for the active provider.</summary>
+    public IReadOnlyList<ProviderChoice> Providers { get; }
+
+    /// <summary>One entry per provider, in registration order.</summary>
+    public IReadOnlyList<ProviderKeyEntry> Keys { get; }
+
+    public string ActiveProviderId
     {
-        get => _giphyCredential;
-        set { if (SetProperty(ref _giphyCredential, value ?? string.Empty)) Stage("giphy", value, DeleteGiphyKey); }
+        get => _activeProviderId;
+        set => SetProperty(ref _activeProviderId, value);
     }
-    public bool DeleteKlipyKey
-    {
-        get => _deleteKlipyKey;
-        set { if (SetProperty(ref _deleteKlipyKey, value)) Stage("klipy", KlipyCredential, value); }
-    }
-    public bool DeleteGiphyKey
-    {
-        get => _deleteGiphyKey;
-        set { if (SetProperty(ref _deleteGiphyKey, value)) Stage("giphy", GiphyCredential, value); }
-    }
-    public string KlipyPlaceholder => _hasKlipyKey && !DeleteKlipyKey ? "●●●●●●●●●●●●" : "Enter API key";
-    public string GiphyPlaceholder => _hasGiphyKey && !DeleteGiphyKey ? "●●●●●●●●●●●●" : "Enter API key";
-    public string KlipyStatus => _hasKlipyKey ? "A KLIPY key is saved." : "No KLIPY key is saved.";
-    public string GiphyStatus => _hasGiphyKey ? "A GIPHY key is saved." : "No GIPHY key is saved.";
+
+    public ProviderKeyEntry? Find(string providerId) =>
+        Keys.FirstOrDefault(entry => string.Equals(entry.Id, providerId, StringComparison.OrdinalIgnoreCase));
 
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         _refreshing = true;
         try
         {
-            ActiveProviderId = session.Baseline.Providers.ActiveProviderId;
-            KlipyCredential = GiphyCredential = string.Empty;
-            DeleteKlipyKey = DeleteGiphyKey = false;
-            _hasKlipyKey = await session.HasCredentialAsync("klipy", cancellationToken);
-            _hasGiphyKey = await session.HasCredentialAsync("giphy", cancellationToken);
-            OnPropertyChanged(nameof(KlipyStatus));
-            OnPropertyChanged(nameof(KlipyPlaceholder));
-            OnPropertyChanged(nameof(GiphyStatus));
-            OnPropertyChanged(nameof(GiphyPlaceholder));
+            ActiveProviderId = _session.Baseline.Providers.ActiveProviderId;
+            foreach (ProviderKeyEntry entry in Keys)
+            {
+                entry.Credential = string.Empty;
+                entry.DeleteKey = false;
+                entry.HasSavedKey = await _session.HasCredentialAsync(entry.Id, cancellationToken);
+            }
         }
         finally { _refreshing = false; }
     }
 
-    private void Stage(string id, string? value, bool delete)
+    internal void Stage(ProviderKeyEntry entry)
     {
-        OnPropertyChanged(nameof(KlipyPlaceholder));
-        OnPropertyChanged(nameof(GiphyPlaceholder));
+        // The Settings window watches this view model as a whole to notice edits, so an edit to
+        // any one key is announced here as well.
+        OnPropertyChanged(nameof(Keys));
         if (_refreshing) return;
-        if (delete) session.StageCredential(id, null);
-        else if (!string.IsNullOrWhiteSpace(value)) session.StageCredential(id, value);
-        else session.UnstageCredential(id);
+        if (entry.DeleteKey) _session.StageCredential(entry.Id, null);
+        else if (!string.IsNullOrWhiteSpace(entry.Credential)) _session.StageCredential(entry.Id, entry.Credential);
+        else _session.UnstageCredential(entry.Id);
     }
+}
+
+/// <summary>The key box, status and help link of one provider.</summary>
+public sealed class ProviderKeyEntry : ObservableObject
+{
+    private readonly ProviderKeysViewModel _owner;
+    private string _credential = string.Empty;
+    private bool _deleteKey;
+    private bool _hasSavedKey;
+
+    internal ProviderKeyEntry(ProviderKeysViewModel owner, ProviderDescriptor provider)
+    {
+        _owner = owner;
+        Id = provider.Id;
+        DisplayName = provider.DisplayName;
+        HelpUri = provider.CredentialHelpUri;
+        Instructions = provider.CredentialInstructions;
+    }
+
+    public string Id { get; }
+
+    public string DisplayName { get; }
+
+    public Uri? HelpUri { get; }
+
+    public string? Instructions { get; }
+
+    public bool HasHelpUri => HelpUri is not null;
+
+    public bool HasInstructions => !string.IsNullOrWhiteSpace(Instructions);
+
+    public string KeyHeader => $"{DisplayName} API key";
+
+    public string RemoveLabel => $"Remove saved {DisplayName} key on Apply";
+
+    public string HelpLabel => $"Open {DisplayName} API key help";
+
+    /// <summary>A replacement key typed by the person. Empty means no change.</summary>
+    public string Credential
+    {
+        get => _credential;
+        set
+        {
+            if (SetProperty(ref _credential, value ?? string.Empty))
+            {
+                OnPropertyChanged(nameof(Placeholder));
+                _owner.Stage(this);
+            }
+        }
+    }
+
+    public bool DeleteKey
+    {
+        get => _deleteKey;
+        set
+        {
+            if (SetProperty(ref _deleteKey, value))
+            {
+                OnPropertyChanged(nameof(Placeholder));
+                _owner.Stage(this);
+            }
+        }
+    }
+
+    public bool HasSavedKey
+    {
+        get => _hasSavedKey;
+        internal set
+        {
+            if (SetProperty(ref _hasSavedKey, value))
+            {
+                OnPropertyChanged(nameof(Placeholder));
+                OnPropertyChanged(nameof(Status));
+            }
+        }
+    }
+
+    public string Placeholder => HasSavedKey && !DeleteKey ? "●●●●●●●●●●●●" : "Enter API key";
+
+    public string Status => HasSavedKey ? $"A {DisplayName} key is saved." : $"No {DisplayName} key is saved.";
 }

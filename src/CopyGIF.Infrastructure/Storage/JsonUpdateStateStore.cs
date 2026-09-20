@@ -1,6 +1,7 @@
 using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 using CopyGIF.Core.Policies;
+using CopyGIF.Infrastructure.Updates;
 
 namespace CopyGIF.Infrastructure.Storage;
 
@@ -92,10 +93,45 @@ public sealed class JsonUpdateStateStore :
                    state.LastAvailableVersion) &&
                IsValidOptionalVersion(
                    state.LastDownloadedVersion) &&
+               IsValidOptionalVersion(
+                   state.SkippedVersion) &&
                IsUtcOrNull(
                    state.LastDownloadedAtUtc) &&
                (state.LastDownloadedVersion is null) ==
-               (state.LastDownloadedAtUtc is null);
+               (state.LastDownloadedAtUtc is null) &&
+               IsValidPendingInstall(
+                   state.PendingInstall);
+    }
+
+    private static bool IsValidPendingInstall(
+        PendingUpdateInstall? pending)
+    {
+        if (pending is null)
+        {
+            return true;
+        }
+
+        if (pending.Manifest is null ||
+            !IsUtcOrNull(
+                pending.DeferredAtUtc))
+        {
+            return false;
+        }
+
+        try
+        {
+            UpdateManifestParser.Validate(
+                pending.Manifest,
+                expectedChannel: "stable");
+
+            return true;
+        }
+        catch (Exception exception)
+            when (exception is InvalidDataException or
+                  ArgumentException)
+        {
+            return false;
+        }
     }
 
     private static bool IsUtcOrNull(

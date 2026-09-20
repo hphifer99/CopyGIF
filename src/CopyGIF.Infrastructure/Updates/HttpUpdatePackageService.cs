@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Globalization;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
 using CopyGIF.Infrastructure.Storage;
@@ -14,6 +16,17 @@ public sealed class HttpUpdatePackageService :
 
     private const int CopyBufferSize =
         128 * 1024;
+
+    // A partial download older than this is an orphan from a crash or a killed process.
+    private static readonly TimeSpan StaleTemporaryFileAge =
+        TimeSpan.FromHours(1);
+
+    private static readonly Regex InstallerNamePattern =
+        new(
+            @"^CopyGIF-(?<major>\d{1,9})\.(?<minor>\d{1,9})\.(?<patch>\d{1,9})-win-x64\.msi$",
+            RegexOptions.IgnoreCase |
+            RegexOptions.CultureInvariant,
+            TimeSpan.FromSeconds(1));
 
     private readonly HttpClient _httpClient;
 
@@ -81,6 +94,22 @@ public sealed class HttpUpdatePackageService :
                     ownedRoot,
                     manifest.AssetName));
 
+        // A package that was already downloaded for this exact manifest is reused
+        // when its size and SHA-256 still match, so a pending update that the user
+        // has not installed yet is not downloaded again on every check.
+        DownloadedUpdatePackage? existing =
+            await TryReuseExistingPackageAsync(
+                    manifest,
+                    finalPath,
+                    progress,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        if (existing is not null)
+        {
+            return existing;
+        }
+
         string temporaryPath =
             _pathGuard.EnsureSafeFilePath(
                 ownedRoot,
@@ -122,6 +151,136 @@ public sealed class HttpUpdatePackageService :
         }
     }
 
+    public async Task<DownloadedUpdatePackage?>
+        FindExistingAsync(
+            UpdateManifest manifest,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(
+            manifest);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            UpdateManifestParser.Validate(
+                manifest,
+                expectedChannel: "stable");
+
+            string ownedRoot =
+                Path.GetFullPath(
+                    _paths.UpdatesDirectory);
+
+            if (!Directory.Exists(
+                    ownedRoot))
+            {
+                return null;
+            }
+
+            _pathGuard.EnsureSafeDirectory(
+                ownedRoot,
+                ownedRoot);
+
+            string finalPath =
+                _pathGuard.EnsureSafeFilePath(
+                    ownedRoot,
+                    Path.Combine(
+                        ownedRoot,
+                        manifest.AssetName));
+
+            return await TryReuseExistingPackageAsync(
+                    manifest,
+                    finalPath,
+                    progress: null,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+            when (exception is InvalidDataException or
+                  MediaDownloadException or
+                  IOException or
+                  UnauthorizedAccessException)
+        {
+            // A manifest that no longer validates, or a path that is not safe, means there
+            // is nothing trustworthy to find.
+            return null;
+        }
+    }
+
+    private async Task<DownloadedUpdatePackage?>
+        TryReuseExistingPackageAsync(
+            UpdateManifest manifest,
+            string finalPath,
+            IProgress<UpdateDownloadProgress>? progress,
+            CancellationToken cancellationToken)
+    {
+        try
+        {
+            FileInfo file =
+                new(finalPath);
+
+            if (!file.Exists ||
+                file.Length != manifest.SizeBytes ||
+                !UpdateManifestParser.TryParseSha256(
+                    manifest.Sha256,
+                    out byte[] expectedHash))
+            {
+                return null;
+            }
+
+            byte[] actualHash;
+
+            await using (FileStream stream =
+                new(
+                    finalPath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    bufferSize: CopyBufferSize,
+                    useAsync: true))
+            {
+                actualHash =
+                    await SHA256.HashDataAsync(
+                            stream,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+            }
+
+            if (!CryptographicOperations.FixedTimeEquals(
+                    expectedHash,
+                    actualHash))
+            {
+                return null;
+            }
+
+            progress?.Report(
+                new UpdateDownloadProgress
+                {
+                    BytesReceived = manifest.SizeBytes,
+                    TotalBytes = manifest.SizeBytes
+                });
+
+            return new DownloadedUpdatePackage
+            {
+                Manifest = manifest,
+                FilePath = finalPath,
+                SizeBytes = manifest.SizeBytes,
+                Sha256 =
+                    Convert.ToHexString(
+                            actualHash)
+                        .ToLowerInvariant(),
+                DownloadedAtUtc = _clock.UtcNow
+            };
+        }
+        catch (Exception exception)
+            when (exception is IOException or
+                  UnauthorizedAccessException)
+        {
+            // An unreadable or locked file is simply downloaded again.
+            return null;
+        }
+    }
+
     public Task DeleteAsync(
         DownloadedUpdatePackage package,
         CancellationToken cancellationToken = default)
@@ -145,6 +304,193 @@ public sealed class HttpUpdatePackageService :
             filePath);
 
         return Task.CompletedTask;
+    }
+
+    public Task PruneAsync(
+        string currentVersion,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            currentVersion);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!TryParseNumericVersion(
+                currentVersion,
+                out Version? installed))
+        {
+            return Task.CompletedTask;
+        }
+
+        string ownedRoot =
+            Path.GetFullPath(
+                _paths.UpdatesDirectory);
+
+        if (!Directory.Exists(
+                ownedRoot))
+        {
+            return Task.CompletedTask;
+        }
+
+        _pathGuard.EnsureSafeDirectory(
+            ownedRoot,
+            ownedRoot);
+
+        DateTime staleBeforeUtc =
+            (_clock.UtcNow - StaleTemporaryFileAge)
+            .UtcDateTime;
+
+        foreach (string path
+                 in Directory.EnumerateFiles(
+                     ownedRoot,
+                     "*",
+                     SearchOption.TopDirectoryOnly))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                if ((File.GetAttributes(
+                         path) &
+                     FileAttributes.ReparsePoint) != 0)
+                {
+                    continue;
+                }
+
+                string name =
+                    Path.GetFileName(
+                        path);
+
+                bool remove;
+
+                Match match =
+                    InstallerNamePattern.Match(
+                        name);
+
+                if (match.Success)
+                {
+                    // Only packages for the running version or older are removed.
+                    // A newer package is a pending update and must stay.
+                    remove =
+                        TryParseInstallerVersion(
+                            match,
+                            out Version? packageVersion) &&
+                        packageVersion <= installed;
+                }
+                else
+                {
+                    remove =
+                        name.StartsWith(
+                            '.') &&
+                        name.EndsWith(
+                            ".tmp",
+                            StringComparison.OrdinalIgnoreCase) &&
+                        File.GetLastWriteTimeUtc(
+                            path) <= staleBeforeUtc;
+                }
+
+                if (remove)
+                {
+                    string safePath =
+                        _pathGuard.EnsureSafeFilePath(
+                            ownedRoot,
+                            path);
+
+                    _pathGuard.DeleteOwnedFileIfPresent(
+                        ownedRoot,
+                        safePath);
+                }
+            }
+            catch (Exception exception)
+                when (exception is IOException or
+                      UnauthorizedAccessException or
+                      MediaDownloadException)
+            {
+                // A locked or protected file is left for a later pass.
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static bool TryParseInstallerVersion(
+        Match match,
+        out Version? version)
+    {
+        version = null;
+
+        if (!int.TryParse(
+                match.Groups["major"].Value,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out int major) ||
+            !int.TryParse(
+                match.Groups["minor"].Value,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out int minor) ||
+            !int.TryParse(
+                match.Groups["patch"].Value,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out int patch))
+        {
+            return false;
+        }
+
+        version =
+            new Version(
+                major,
+                minor,
+                patch);
+
+        return true;
+    }
+
+    private static bool TryParseNumericVersion(
+        string value,
+        out Version? version)
+    {
+        // Prerelease and build suffixes are ignored: only the numeric core is compared.
+        string core =
+            value.Trim()
+                .Split(
+                    ['-', '+'],
+                    2)[0];
+
+        string[] parts =
+            core.Split(
+                '.');
+
+        version = null;
+
+        if (parts.Length != 3 ||
+            !int.TryParse(
+                parts[0],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out int major) ||
+            !int.TryParse(
+                parts[1],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out int minor) ||
+            !int.TryParse(
+                parts[2],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out int patch))
+        {
+            return false;
+        }
+
+        version =
+            new Version(
+                major,
+                minor,
+                patch);
+
+        return true;
     }
 
     private async Task<DownloadResult>

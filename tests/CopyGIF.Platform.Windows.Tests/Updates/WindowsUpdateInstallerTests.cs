@@ -244,7 +244,8 @@ public sealed class WindowsUpdateInstallerTests
                 new FakeAuthenticodeVerifier(
                     AuthenticodeVerificationStatus
                         .InvalidSignature),
-                launcher);
+                launcher,
+                TimeSpan.Zero);
 
         await Assert.ThrowsExactlyAsync<
             InvalidOperationException>(
@@ -269,7 +270,8 @@ public sealed class WindowsUpdateInstallerTests
                 new FakeAuthenticodeVerifier(
                     AuthenticodeVerificationStatus
                         .Trusted),
-                launcher);
+                launcher,
+                TimeSpan.Zero);
 
         await installer.InstallAsync(
             package);
@@ -284,13 +286,334 @@ public sealed class WindowsUpdateInstallerTests
             launcher.LastPackagePath);
     }
 
+    [TestMethod]
+    public async Task InstallAsync_WithRestartOptions_PassesTheOptionsToTheLauncher()
+    {
+        DownloadedUpdatePackage package =
+            await CreatePackageAsync();
+
+        FakePackageLauncher launcher = new();
+
+        WindowsUpdateInstaller installer =
+            new(
+                new FakeAuthenticodeVerifier(
+                    AuthenticodeVerificationStatus
+                        .Trusted),
+                launcher,
+                TimeSpan.Zero);
+
+        UpdateInstallOptions options =
+            new()
+            {
+                Silent = true,
+                RestartApplication = true
+            };
+
+        await installer.InstallAsync(
+            package,
+            options);
+
+        Assert.AreEqual(
+            1,
+            launcher.LaunchCount);
+
+        Assert.AreSame(
+            options,
+            launcher.LastOptions);
+    }
+
+    [TestMethod]
+    public async Task InstallAsync_WithoutOptions_UsesTheInteractiveDefault()
+    {
+        DownloadedUpdatePackage package =
+            await CreatePackageAsync();
+
+        FakePackageLauncher launcher = new();
+
+        WindowsUpdateInstaller installer =
+            new(
+                new FakeAuthenticodeVerifier(
+                    AuthenticodeVerificationStatus
+                        .Trusted),
+                launcher,
+                TimeSpan.Zero);
+
+        await installer.InstallAsync(
+            package);
+
+        Assert.AreSame(
+            UpdateInstallOptions.Interactive,
+            launcher.LastOptions);
+    }
+
+    [TestMethod]
+    public async Task InstallAsync_InvalidPackageWithRestartOptions_DoesNotLaunch()
+    {
+        DownloadedUpdatePackage package =
+            await CreatePackageAsync();
+
+        FakePackageLauncher launcher = new();
+
+        WindowsUpdateInstaller installer =
+            new(
+                new FakeAuthenticodeVerifier(
+                    AuthenticodeVerificationStatus
+                        .UntrustedPublisher),
+                launcher,
+                TimeSpan.Zero);
+
+        await Assert.ThrowsExactlyAsync<
+            InvalidOperationException>(
+                () => installer.InstallAsync(
+                    package,
+                    new UpdateInstallOptions
+                    {
+                        Silent = true,
+                        RestartApplication = true
+                    }));
+
+        Assert.AreEqual(
+            0,
+            launcher.LaunchCount);
+    }
+
+    [TestMethod]
+    public async Task VerifyAsync_RevocationUnavailable_ReturnsRevocationCheckUnavailable()
+    {
+        DownloadedUpdatePackage package =
+            await CreatePackageAsync();
+
+        WindowsUpdateInstaller installer =
+            CreateInstaller(
+                AuthenticodeVerificationStatus
+                    .RevocationUnavailable);
+
+        UpdatePackageVerificationResult result =
+            await installer.VerifyAsync(
+                package);
+
+        Assert.IsFalse(result.IsValid);
+
+        Assert.AreEqual(
+            UpdatePackageVerificationFailure
+                .RevocationCheckUnavailable,
+            result.Failure);
+    }
+
+    [TestMethod]
+    public async Task VerifyAsync_Default_ChecksRevocationOnline()
+    {
+        DownloadedUpdatePackage package =
+            await CreatePackageAsync();
+
+        FakeAuthenticodeVerifier verifier =
+            new(
+                AuthenticodeVerificationStatus
+                    .Trusted);
+
+        WindowsUpdateInstaller installer =
+            new(
+                verifier,
+                new FakePackageLauncher(),
+                TimeSpan.Zero);
+
+        await installer.VerifyAsync(
+            package);
+
+        Assert.AreEqual(
+            true,
+            verifier.LastCheckRevocationOnline);
+    }
+
+    [TestMethod]
+    public async Task VerifyAsync_WithoutOnlineRevocation_TellsTheVerifier()
+    {
+        DownloadedUpdatePackage package =
+            await CreatePackageAsync();
+
+        FakeAuthenticodeVerifier verifier =
+            new(
+                AuthenticodeVerificationStatus
+                    .Trusted);
+
+        WindowsUpdateInstaller installer =
+            new(
+                verifier,
+                new FakePackageLauncher(),
+                TimeSpan.Zero);
+
+        UpdatePackageVerificationResult result =
+            await installer.VerifyAsync(
+                package,
+                new UpdateVerificationOptions
+                {
+                    CheckRevocationOnline = false
+                });
+
+        Assert.IsTrue(result.IsValid);
+
+        Assert.AreEqual(
+            false,
+            verifier.LastCheckRevocationOnline);
+    }
+
+    [TestMethod]
+    public async Task InstallAsync_WithoutOnlineRevocation_TellsTheVerifierAndStillLaunches()
+    {
+        DownloadedUpdatePackage package =
+            await CreatePackageAsync();
+
+        FakeAuthenticodeVerifier verifier =
+            new(
+                AuthenticodeVerificationStatus
+                    .Trusted);
+
+        FakePackageLauncher launcher = new();
+
+        WindowsUpdateInstaller installer =
+            new(
+                verifier,
+                launcher,
+                TimeSpan.Zero);
+
+        await installer.InstallAsync(
+            package,
+            new UpdateInstallOptions
+            {
+                Silent = true,
+                RestartApplication = true,
+                RequiresElevation = false,
+                CheckRevocationOnline = false
+            });
+
+        Assert.AreEqual(
+            false,
+            verifier.LastCheckRevocationOnline);
+
+        Assert.AreEqual(
+            1,
+            launcher.LaunchCount);
+    }
+
+    [TestMethod]
+    public async Task InstallAsync_Elevated_KeepsTheVerifiedFileLockedForTheSettleTime()
+    {
+        DownloadedUpdatePackage package =
+            await CreatePackageAsync();
+
+        TimeSpan settle =
+            TimeSpan.FromMilliseconds(600);
+
+        WindowsUpdateInstaller installer =
+            new(
+                new FakeAuthenticodeVerifier(
+                    AuthenticodeVerificationStatus
+                        .Trusted),
+                new FakePackageLauncher(),
+                settle);
+
+        System.Diagnostics.Stopwatch clock =
+            System.Diagnostics.Stopwatch.StartNew();
+
+        Task install =
+            installer.InstallAsync(
+                package,
+                new UpdateInstallOptions
+                {
+                    RequiresElevation = true
+                });
+
+        // The launcher fake returns at once, so the install is still in its settle wait.
+        await Task.Delay(
+            100);
+
+        Assert.IsFalse(
+            install.IsCompleted);
+
+        // Another writer must not get at the verified package during that wait.
+        Assert.ThrowsExactly<IOException>(
+            () =>
+            {
+                using FileStream writer =
+                    new(
+                        package.FilePath,
+                        FileMode.Open,
+                        FileAccess.Write,
+                        FileShare.None);
+            });
+
+        await install;
+
+        Assert.IsTrue(
+            clock.Elapsed >=
+            settle - TimeSpan.FromMilliseconds(50));
+    }
+
+    [TestMethod]
+    public async Task InstallAsync_PerUser_DoesNotWaitAfterTheLaunch()
+    {
+        DownloadedUpdatePackage package =
+            await CreatePackageAsync();
+
+        WindowsUpdateInstaller installer =
+            new(
+                new FakeAuthenticodeVerifier(
+                    AuthenticodeVerificationStatus
+                        .Trusted),
+                new FakePackageLauncher(),
+                TimeSpan.FromSeconds(30));
+
+        System.Diagnostics.Stopwatch clock =
+            System.Diagnostics.Stopwatch.StartNew();
+
+        await installer.InstallAsync(
+            package,
+            new UpdateInstallOptions
+            {
+                RequiresElevation = false
+            });
+
+        Assert.IsTrue(
+            clock.Elapsed <
+            TimeSpan.FromSeconds(10));
+    }
+
+    [TestMethod]
+    public async Task InstallAsync_ElevatedAndCancelledDuringTheSettleWait_StillCompletes()
+    {
+        DownloadedUpdatePackage package =
+            await CreatePackageAsync();
+
+        WindowsUpdateInstaller installer =
+            new(
+                new FakeAuthenticodeVerifier(
+                    AuthenticodeVerificationStatus
+                        .Trusted),
+                new FakePackageLauncher(),
+                TimeSpan.FromSeconds(30));
+
+        using CancellationTokenSource cancellation =
+            new(
+                TimeSpan.FromMilliseconds(100));
+
+        // The installer is already running, so cancelling only ends the extra wait.
+        await installer.InstallAsync(
+            package,
+            new UpdateInstallOptions
+            {
+                RequiresElevation = true
+            },
+            cancellation.Token);
+    }
+
     private static WindowsUpdateInstaller CreateInstaller(
         AuthenticodeVerificationStatus status)
     {
         return new WindowsUpdateInstaller(
             new FakeAuthenticodeVerifier(
                 status),
-            new FakePackageLauncher());
+            new FakePackageLauncher(),
+            TimeSpan.Zero);
     }
 
     private async Task<DownloadedUpdatePackage>
@@ -348,9 +671,24 @@ public sealed class WindowsUpdateInstallerTests
         AuthenticodeVerificationStatus status) :
         IAuthenticodeVerifier
     {
+        public bool? LastCheckRevocationOnline
+        { get; private set; }
+
         public AuthenticodeVerificationStatus Verify(
             string filePath)
         {
+            LastCheckRevocationOnline = true;
+
+            return status;
+        }
+
+        public AuthenticodeVerificationStatus Verify(
+            string filePath,
+            bool checkRevocationOnline)
+        {
+            LastCheckRevocationOnline =
+                checkRevocationOnline;
+
             return status;
         }
     }
@@ -363,8 +701,20 @@ public sealed class WindowsUpdateInstallerTests
         public string? LastPackagePath
         { get; private set; }
 
+        public UpdateInstallOptions? LastOptions
+        { get; private set; }
+
         public Task LaunchAsync(
             string packagePath,
+            CancellationToken cancellationToken) =>
+            LaunchAsync(
+                packagePath,
+                UpdateInstallOptions.Interactive,
+                cancellationToken);
+
+        public Task LaunchAsync(
+            string packagePath,
+            UpdateInstallOptions options,
             CancellationToken cancellationToken)
         {
             cancellationToken
@@ -372,6 +722,7 @@ public sealed class WindowsUpdateInstallerTests
 
             LaunchCount++;
             LastPackagePath = packagePath;
+            LastOptions = options;
 
             return Task.CompletedTask;
         }

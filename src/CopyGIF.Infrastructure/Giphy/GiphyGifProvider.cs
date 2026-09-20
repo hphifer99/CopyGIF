@@ -161,7 +161,10 @@ public sealed class GiphyGifProvider(HttpClient httpClient, ISecretStore secrets
         {
             if (!Uri.TryCreate(rendition.GetProperty("url").GetString(), UriKind.Absolute, out var uri) ||
                 !ProviderMediaPolicy.IsDirectMediaUri(uri))
+            {
+                ProviderMediaPolicy.RecordRejectedHost(ProviderId, uri);
                 throw Failure(GifProviderFailure.InvalidResponse, "GIPHY returned an unsupported media address.");
+            }
             return uri;
         }
         Uri? OptionalGif(string name)

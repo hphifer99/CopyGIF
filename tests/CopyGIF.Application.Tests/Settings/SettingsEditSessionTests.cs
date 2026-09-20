@@ -57,7 +57,7 @@ public sealed class SettingsEditSessionTests
         await h.Session.BeginAsync();
         h.Session.StageCredential("klipy", "first-key");
         h.Session.StageCredential("giphy", "bad-key");
-        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => h.Session.ApplyAsync());
+        await Assert.ThrowsExactlyAsync<UserFacingException>(() => h.Session.ApplyAsync());
         Assert.IsNull(await h.Secrets.GetAsync(SecretNames.KlipyApiKey));
         Assert.AreEqual(0, h.Coordinator.Saves);
     }
@@ -89,6 +89,74 @@ public sealed class SettingsEditSessionTests
         Assert.IsNull(await h.Secrets.GetAsync(SecretNames.GiphyApiKey));
     }
 
+    private static readonly ProviderDescriptor ThirdProvider = new()
+    {
+        Id = "third",
+        DisplayName = "Third Gifs"
+    };
+
+    private static readonly ProviderDescriptor KeylessProvider = new()
+    {
+        Id = "free",
+        DisplayName = "Free Gifs",
+        RequiresCredential = false
+    };
+
+    [TestMethod]
+    public void ProvidersListsOnlyProvidersThatNeedAKeyAndHaveACredentialManager()
+    {
+        var session = new SettingsEditSession(
+            new Coordinator(), new Secrets(),
+            [new FakeGifProviderCredentialManager(), new FakeGifProviderCredentialManager("third", "Third Gifs"),
+             new FakeGifProviderCredentialManager("free", "Free Gifs")],
+            new EffectiveSettings(new FakeSettingsStore()),
+            new FakeProviderCatalog(BuiltInProviders.Klipy, BuiltInProviders.Giphy, ThirdProvider, KeylessProvider));
+
+        // GIPHY has no credential manager here and Free Gifs needs no key. Order is the catalog order.
+        CollectionAssert.AreEqual(
+            new[] { "klipy", "third" },
+            session.Providers.Select(provider => provider.Id).ToArray());
+    }
+
+    [TestMethod]
+    public async Task AThirdProviderKeyIsKeptUnderThatProvidersOwnSecretName()
+    {
+        var secrets = new Secrets();
+        var session = new SettingsEditSession(
+            new Coordinator(), secrets,
+            [new FakeGifProviderCredentialManager(), new FakeGifProviderCredentialManager("third", "Third Gifs", "custom.third.key")],
+            new EffectiveSettings(new FakeSettingsStore()),
+            new FakeProviderCatalog(BuiltInProviders.Klipy, ThirdProvider));
+        await session.BeginAsync();
+
+        session.StageCredential("third", "third-key");
+        await session.ApplyAsync();
+
+        Assert.AreEqual("third-key", await secrets.GetAsync("custom.third.key"));
+        Assert.IsNull(await secrets.GetAsync("providers.third.apiKey"));
+        Assert.IsNull(await secrets.GetAsync(SecretNames.KlipyApiKey));
+    }
+
+    [TestMethod]
+    public async Task AFailedSaveRestoresAThirdProvidersKeyUnderItsOwnSecretName()
+    {
+        var secrets = new Secrets();
+        await secrets.SetAsync("custom.third.key", "original-third");
+        var coordinator = new Coordinator { FailSave = true };
+        var session = new SettingsEditSession(
+            coordinator, secrets,
+            [new FakeGifProviderCredentialManager(), new FakeGifProviderCredentialManager("third", "Third Gifs", "custom.third.key")],
+            new EffectiveSettings(new FakeSettingsStore()),
+            new FakeProviderCatalog(BuiltInProviders.Klipy, ThirdProvider));
+        await session.BeginAsync();
+
+        session.StageCredential("third", "new-third");
+        await Assert.ThrowsExactlyAsync<IOException>(() => session.ApplyAsync());
+
+        Assert.AreEqual("original-third", await secrets.GetAsync("custom.third.key"));
+        Assert.IsNull(await secrets.GetAsync("providers.third.apiKey"));
+    }
+
     private sealed class Harness
     {
         public Coordinator Coordinator { get; } = new();
@@ -96,7 +164,7 @@ public sealed class SettingsEditSessionTests
         public FakeGifProviderCredentialManager Giphy { get; } = new("giphy", "GIPHY");
         public EffectiveSettings Effective { get; } = new(new FakeSettingsStore());
         public SettingsEditSession Session { get; }
-        public Harness() => Session = new(Coordinator, Secrets, [new FakeGifProviderCredentialManager(), Giphy], Effective);
+        public Harness() => Session = new(Coordinator, Secrets, [new FakeGifProviderCredentialManager(), Giphy], Effective, new FakeProviderCatalog());
     }
     private sealed class Coordinator : ISettingsCoordinator
     {

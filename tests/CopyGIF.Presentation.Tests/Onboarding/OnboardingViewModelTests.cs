@@ -336,6 +336,21 @@ public sealed class OnboardingViewModelTests
     private sealed class FakeOnboardingCoordinator :
         IOnboardingCoordinator
     {
+        public IReadOnlyList<OnboardingProviderOption> Providers
+        { get; init; } =
+            [
+                new OnboardingProviderOption(
+                    "klipy",
+                    "KLIPY",
+                    new Uri("https://partner.klipy.com/api-keys"),
+                    null),
+                new OnboardingProviderOption(
+                    "giphy",
+                    "GIPHY",
+                    new Uri("https://developers.giphy.com/dashboard/"),
+                    "For GIPHY, choose API instead of SDK.")
+            ];
+
         public Uri CredentialHelpUri
         { get; } =
             new(

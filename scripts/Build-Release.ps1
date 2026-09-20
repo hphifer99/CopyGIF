@@ -3,6 +3,9 @@ param(
     [Parameter(Mandatory)][ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version,
     [string]$OutputDirectory,
     [string]$SigningThumbprint,
+    # CI dry run: publish and build the MSI without signing. The output is named
+    # so it cannot be mistaken for a release asset and no update manifest is written.
+    [switch]$Unsigned,
     [string]$TimestampServer = 'http://timestamp.digicert.com'
 )
 Set-StrictMode -Version Latest
@@ -16,15 +19,18 @@ $publishDirectory = Join-Path $workDirectory 'publish'
 $toolsDirectory = Join-Path $workDirectory 'tools'
 New-Item -ItemType Directory -Path $publishDirectory -Force | Out-Null
 $project = Join-Path $repositoryRoot 'src\CopyGIF.App\CopyGIF.App.csproj'
-$assetName = "CopyGIF-$Version-win-x64.msi"
+if ($Unsigned -and -not [string]::IsNullOrWhiteSpace($SigningThumbprint)) { throw 'Use either -Unsigned or -SigningThumbprint, not both.' }
+$assetName = if ($Unsigned) { "CopyGIF-$Version-win-x64-UNSIGNED-DRYRUN.msi" } else { "CopyGIF-$Version-win-x64.msi" }
 $msiPath = Join-Path $OutputDirectory $assetName
 if (Test-Path -LiteralPath $msiPath) { throw "An artifact already exists at $msiPath. Choose a new output directory." }
-if ([string]::IsNullOrWhiteSpace($SigningThumbprint)) {
-    throw 'A code-signing certificate in Cert:\CurrentUser\My is required. Supply -SigningThumbprint. An unsigned build cannot participate in trusted updates.'
+if (-not $Unsigned) {
+    if ([string]::IsNullOrWhiteSpace($SigningThumbprint)) {
+        throw 'A code-signing certificate in Cert:\CurrentUser\My is required. Supply -SigningThumbprint. An unsigned build cannot participate in trusted updates. Use -Unsigned only for a CI dry run.'
+    }
+    $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+        Sort-Object { [version]$_.Directory.Parent.Name } -Descending | Select-Object -First 1
+    if ($null -eq $signTool) { throw 'Install the Windows SDK signing tools in Visual Studio Installer.' }
 }
-$signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
-    Sort-Object { [version]$_.Directory.Parent.Name } -Descending | Select-Object -First 1
-if ($null -eq $signTool) { throw 'Install the Windows SDK signing tools in Visual Studio Installer.' }
 function Invoke-Checked([scriptblock]$Command) {
     & $Command
     if ($LASTEXITCODE -ne 0) { throw "An external build command failed with exit code $LASTEXITCODE." }
@@ -39,14 +45,22 @@ try {
     foreach ($name in @('LICENSE.txt','PRIVACY.md','THIRD-PARTY-NOTICES.md')) {
         Copy-Item -LiteralPath (Join-Path $repositoryRoot $name) -Destination $publishDirectory
     }
-    $exe = Join-Path $publishDirectory 'CopyGif.exe'
-    if (-not (Test-Path -LiteralPath $exe)) { throw 'The WinUI publish did not produce CopyGif.exe.' }
-    Invoke-Checked { & $signTool.FullName sign /sha1 $SigningThumbprint /fd SHA256 /tr $TimestampServer /td SHA256 $exe }
-    Invoke-Checked { & $signTool.FullName verify /pa $exe }
+    $exe = Join-Path $publishDirectory 'CopyGIF.exe'
+    if (-not (Test-Path -LiteralPath $exe)) { throw 'The WinUI publish did not produce CopyGIF.exe.' }
+    if (-not $Unsigned) {
+        Invoke-Checked { & $signTool.FullName sign /sha1 $SigningThumbprint /fd SHA256 /tr $TimestampServer /td SHA256 $exe }
+        Invoke-Checked { & $signTool.FullName verify /pa $exe }
+    }
     Invoke-Checked { dotnet tool install wix --version 6.0.0 --allow-roll-forward --tool-path $toolsDirectory }
     $wix = Join-Path $toolsDirectory 'wix.exe'
-    Invoke-Checked { & $wix build (Join-Path $repositoryRoot 'installer\CopyGIF.wxs') -arch x64 `
+    Invoke-Checked { & $wix build (Join-Path $repositoryRoot 'Installer\CopyGIF.wxs') -arch x64 `
+        -sice ICE38 -sice ICE64 -sice ICE91 `
         -d "Version=$Version" -d "PublishDir=$publishDirectory" -o $msiPath }
+    if ($Unsigned) {
+        if (-not (Test-Path -LiteralPath $msiPath)) { throw 'The dry run did not produce an MSI.' }
+        Write-Output "Dry run OK: built unsigned $msiPath. Not a release asset; no manifest was written."
+        return
+    }
     Invoke-Checked { & $signTool.FullName sign /sha1 $SigningThumbprint /fd SHA256 /tr $TimestampServer /td SHA256 $msiPath }
     Invoke-Checked { & $signTool.FullName verify /pa $msiPath }
     $exeSignature = Get-AuthenticodeSignature -LiteralPath $exe

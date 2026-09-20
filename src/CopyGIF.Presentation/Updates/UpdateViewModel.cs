@@ -106,6 +106,28 @@ public sealed class UpdateViewModel :
     public IRelayCommand CancelCommand
     { get; }
 
+    /// <summary>
+    /// Raised after a verified installer has been handed off with the restart option.
+    /// The host must close CopyGIF so the installer can replace its files. For a per-user
+    /// installation the installer package starts CopyGIF again when it finishes.
+    /// </summary>
+    public event EventHandler? ApplicationExitRequested;
+
+    /// <summary>Foreground install: show installer progress, then restart CopyGIF.</summary>
+    public static UpdateInstallOptions RestartInstallOptions { get; } =
+        new()
+        {
+            RestartApplication = true
+        };
+
+    /// <summary>Background install: no installer window, then restart CopyGIF.</summary>
+    public static UpdateInstallOptions SilentRestartInstallOptions { get; } =
+        new()
+        {
+            Silent = true,
+            RestartApplication = true
+        };
+
     public string CurrentVersion
     {
         get => _currentVersion;
@@ -576,7 +598,34 @@ public sealed class UpdateViewModel :
         }
     }
 
-    private async Task InstallAsync(
+    private Task InstallAsync(
+        CancellationToken cancellationToken) =>
+        InstallCoreAsync(
+            RestartInstallOptions,
+            cancellationToken);
+
+    /// <summary>
+    /// Installs the prepared package without a wizard. Intended for the background path,
+    /// where CopyGIF is hidden in the tray. Does nothing while another update operation runs.
+    /// </summary>
+    public Task InstallInBackgroundAsync(
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+
+        if (IsBusy ||
+            !CanInstall())
+        {
+            return Task.CompletedTask;
+        }
+
+        return InstallCoreAsync(
+            SilentRestartInstallOptions,
+            cancellationToken);
+    }
+
+    private async Task InstallCoreAsync(
+        UpdateInstallOptions options,
         CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
@@ -606,6 +655,7 @@ public sealed class UpdateViewModel :
                 await _updateCoordinator
                     .InstallAsync(
                         package,
+                        options,
                         linkedCancellation.Token);
 
             switch (result.Status)
@@ -620,7 +670,18 @@ public sealed class UpdateViewModel :
 
                     Message =
                         UserMessage.Success(
-                            "The verified CopyGIF update installer was started.");
+                            !options.RestartApplication
+                                ? "The verified CopyGIF update installer was started."
+                                : InstallScope == CoreInstallScope.CurrentUser
+                                    ? "The verified CopyGIF update is installing. CopyGIF will close and start again."
+                                    : "The verified CopyGIF update is installing. CopyGIF will close. Open it again when the update has finished.");
+
+                    if (options.RestartApplication)
+                    {
+                        ApplicationExitRequested?.Invoke(
+                            this,
+                            EventArgs.Empty);
+                    }
 
                     break;
 
@@ -635,6 +696,14 @@ public sealed class UpdateViewModel :
                     Message =
                         UserMessage.Information(
                             "Updates for this installation are managed by Microsoft Store.");
+
+                    break;
+
+                case UpdateInstallationStatus.VerificationDeferred:
+                    // The package is fine and stays available. It just could not be confirmed
+                    // right now, so the user can try again.
+                    ApplyVerificationFailure(
+                        result.Verification);
 
                     break;
 
@@ -984,6 +1053,19 @@ public sealed class UpdateViewModel :
 
                 break;
 
+            case AutomaticUpdateAction.RetryLater:
+                PreparedPackage =
+                    null;
+
+                ApplyVerificationFailure(
+                    result.Preparation?.Verification ??
+                    UpdatePackageVerificationResult.Invalid(
+                        UpdatePackageVerificationFailure
+                            .RevocationCheckUnavailable,
+                        "The update could not be confirmed right now."));
+
+                break;
+
             case AutomaticUpdateAction.VerificationFailed:
                 PreparedPackage =
                     null;
@@ -1059,11 +1141,21 @@ public sealed class UpdateViewModel :
             AsyncOperationState.Failed(
                 message);
 
+        string code =
+            GetVerificationFailureCode(
+                verification.Failure);
+
+        // Not being able to reach the certificate authority is not a fault of the package.
         Message =
-            UserMessage.Error(
-                message,
-                GetVerificationFailureCode(
-                    verification.Failure));
+            verification.Failure ==
+            UpdatePackageVerificationFailure
+                .RevocationCheckUnavailable
+                ? UserMessage.Warning(
+                    message,
+                    code)
+                : UserMessage.Error(
+                    message,
+                    code);
     }
 
     private static string GetVerificationFailureMessage(
@@ -1088,6 +1180,9 @@ public sealed class UpdateViewModel :
 
             UpdatePackageVerificationFailure.UnsupportedPackage =>
                 "The downloaded update package is not a supported CopyGIF installer.",
+
+            UpdatePackageVerificationFailure.RevocationCheckUnavailable =>
+                "CopyGIF could not reach the servers that confirm the update's signature is still valid. It will try again later.",
 
             _ when !string.IsNullOrWhiteSpace(
                 verification.Message) =>
@@ -1120,6 +1215,9 @@ public sealed class UpdateViewModel :
 
             UpdatePackageVerificationFailure.UnsupportedPackage =>
                 "update_package_unsupported",
+
+            UpdatePackageVerificationFailure.RevocationCheckUnavailable =>
+                "update_revocation_unavailable",
 
             _ =>
                 "update_verification_failed"

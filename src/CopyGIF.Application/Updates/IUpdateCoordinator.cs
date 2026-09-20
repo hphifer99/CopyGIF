@@ -19,6 +19,41 @@ public interface IUpdateCoordinator
         DownloadedUpdatePackage package,
         CancellationToken cancellationToken = default);
 
+    Task<UpdateInstallationResult> InstallAsync(
+        DownloadedUpdatePackage package,
+        UpdateInstallOptions options,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Remembers that the user does not want this version. Automatic checks then stop
+    /// downloading and prompting for exactly this version. A newer version, a required
+    /// update, and an explicit manual check are not affected.
+    /// </summary>
+    Task SkipVersionAsync(
+        string version,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Remembers that the user answered "Not now" to a prepared update, so CopyGIF installs it
+    /// automatically the next time it starts. Returns false when that is not possible for this
+    /// installation (only a per-user MSI installation can install without an administrator
+    /// prompt), in which case nothing is remembered.
+    /// </summary>
+    Task<bool> DeferInstallToNextLaunchAsync(
+        DownloadedUpdatePackage package,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Called once while CopyGIF starts, before any window exists. If the user deferred an
+    /// update earlier, this checks the package again without waiting for the network and hands
+    /// it to the installer, and the caller must then close CopyGIF at once. There is at most
+    /// one automatic attempt per deferred update: the record is cleared before anything else
+    /// can fail, so a broken package can never cause a start-up loop.
+    /// </summary>
+    Task<PendingUpdateInstallResult> InstallPendingAsync(
+        string currentVersion,
+        CancellationToken cancellationToken = default);
+
     Task<AutomaticUpdateResult> RunAutomaticAsync(
         string currentVersion,
         IProgress<UpdateDownloadProgress>? progress = null,
@@ -56,7 +91,11 @@ public sealed record UpdateCheckResult
 public enum UpdatePreparationStatus
 {
     Ready,
-    VerificationFailed
+    VerificationFailed,
+
+    // The package could not be confirmed right now because the certificate revocation servers
+    // were unreachable. The package is kept and checked again later.
+    VerificationDeferred
 }
 
 public sealed record UpdatePreparationResult
@@ -77,7 +116,10 @@ public enum UpdateInstallationStatus
 {
     Installed,
     ManagedExternally,
-    VerificationFailed
+    VerificationFailed,
+
+    // See UpdatePreparationStatus.VerificationDeferred. The package is kept.
+    VerificationDeferred
 }
 
 public sealed record UpdateInstallationResult
@@ -96,7 +138,11 @@ public enum AutomaticUpdateAction
     Notify,
     Prompt,
     Installed,
-    VerificationFailed
+    VerificationFailed,
+
+    // The package could not be confirmed right now (certificate revocation servers
+    // unreachable). Nothing is shown; the host tries again later.
+    RetryLater
 }
 
 public sealed record AutomaticUpdateResult
@@ -108,4 +154,35 @@ public sealed record AutomaticUpdateResult
     public UpdatePreparationResult? Preparation { get; init; }
 
     public UpdateInstallationResult? Installation { get; init; }
+}
+
+public enum PendingUpdateInstallStatus
+{
+    /// <summary>Nothing was deferred.</summary>
+    NothingPending,
+
+    /// <summary>The installer was started. The caller must close CopyGIF now.</summary>
+    Started,
+
+    /// <summary>CopyGIF is already at or past the deferred version.</summary>
+    AlreadyCurrent,
+
+    /// <summary>Automatic installation is not allowed now (updates off, notify only, wrong install type).</summary>
+    NotApplicable,
+
+    /// <summary>The package file is gone or no longer matches its manifest.</summary>
+    PackageUnavailable,
+
+    /// <summary>The package failed verification and was deleted.</summary>
+    VerificationFailed
+}
+
+public sealed record PendingUpdateInstallResult
+{
+    public required PendingUpdateInstallStatus Status { get; init; }
+
+    public string? Version { get; init; }
+
+    public bool ShouldExit =>
+        Status == PendingUpdateInstallStatus.Started;
 }

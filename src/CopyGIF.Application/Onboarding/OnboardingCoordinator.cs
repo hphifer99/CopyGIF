@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CopyGIF.Application.Credentials;
 using CopyGIF.Core.Contracts;
 using CopyGIF.Core.Models;
@@ -14,7 +15,7 @@ public sealed class OnboardingCoordinator :
     private readonly IUriLauncherService
         _uriLauncherService;
 
-    private readonly IReadOnlyList<OnboardingProviderOption>
+    private readonly ReadOnlyCollection<OnboardingProviderOption>
         _providers;
 
     public OnboardingCoordinator(
@@ -54,7 +55,9 @@ public sealed class OnboardingCoordinator :
                  option.Id,
                  AppSettings.DefaultProviderId,
                  StringComparison.OrdinalIgnoreCase)) ??
-         _providers.FirstOrDefault())?
+         (_providers.Count > 0
+             ? _providers[0]
+             : null))?
         .CredentialHelpUri;
 
     public async Task<OnboardingState> GetStateAsync(

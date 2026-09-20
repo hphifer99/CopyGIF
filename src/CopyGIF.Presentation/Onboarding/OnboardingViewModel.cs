@@ -61,9 +61,9 @@ public sealed class OnboardingViewModel :
         _selectedProviderId =
             onboardingCoordinator.Providers.FirstOrDefault(
                 option => string.Equals(option.Id, CopyGIF.Core.Settings.AppSettings.DefaultProviderId, StringComparison.OrdinalIgnoreCase))?.Id ??
-            onboardingCoordinator.Providers.FirstOrDefault()?.Id ??
-            string.Empty;
-
+            (onboardingCoordinator.Providers.Count > 0
+                ? onboardingCoordinator.Providers[0].Id
+                : string.Empty);
         LoadCommand =
             new AsyncRelayCommand(
                 LoadAsync,

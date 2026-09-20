@@ -8,68 +8,70 @@
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   IgnorableNamespaces="uap desktop rescap mp">
 
-  <Identity
-    Name="HaydenP.CopyGIF"
-    Publisher="CN=507D483D-4B01-4556-A7D9-819E20FC29D5"
-    Version="2.0.0.0" />
+	<Identity
+	  Name="HaydenP.CopyGIF"
+	  Publisher="CN=507D483D-4B01-4556-A7D9-819E20FC29D5"
+	  Version="2.0.1.0" />
 
-  <Properties>
-    <DisplayName>CopyGIF</DisplayName>
-    <PublisherDisplayName>Hayden P</PublisherDisplayName>
-    <Logo>Assets\StoreLogo.png</Logo>
-  </Properties>
+	<mp:PhoneIdentity
+	  PhoneProductId="36702c4b-e149-49f7-bd62-e29d5a7f7529"
+	  PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 
-  <Dependencies>
-    <TargetDeviceFamily
-      Name="Windows.Desktop"
-      MinVersion="10.0.17763.0"
-      MaxVersionTested="10.0.26200.0" />
-  </Dependencies>
+	<Properties>
+		<DisplayName>CopyGIF</DisplayName>
+		<PublisherDisplayName>Hayden P</PublisherDisplayName>
+		<Logo>Assets\StoreLogo.png</Logo>
+	</Properties>
 
-  <Resources>
-    <Resource Language="x-generate" />
-  </Resources>
+	<Resources>
+		<Resource Language="x-generate" />
+	</Resources>
 
-  <Applications>
-    <Application
-      Id="App"
-      Executable="$targetnametoken$.exe"
-      EntryPoint="$targetentrypoint$">
+	<Dependencies>
+		<TargetDeviceFamily
+		  Name="Windows.Desktop"
+		  MinVersion="10.0.17763.0"
+		  MaxVersionTested="10.0.26200.0" />
+	</Dependencies>
 
-      <uap:VisualElements
-        DisplayName="CopyGIF"
-        Description="CopyGIF"
-        BackgroundColor="transparent"
-        Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png">
+	<Capabilities>
+		<rescap:Capability Name="runFullTrust" />
+	</Capabilities>
 
-        <uap:DefaultTile
-          Wide310x150Logo="Assets\Wide310x150Logo.png" />
+	<Applications>
+		<Application
+		  Id="App"
+		  Executable="$targetnametoken$.exe"
+		  EntryPoint="$targetentrypoint$">
 
-        <uap:SplashScreen
-          Image="Assets\SplashScreen.png" />
+			<uap:VisualElements
+			  DisplayName="CopyGIF"
+			  Description="CopyGIF"
+			  BackgroundColor="transparent"
+			  Square150x150Logo="Assets\Square150x150Logo.png"
+			  Square44x44Logo="Assets\Square44x44Logo.png">
 
-      </uap:VisualElements>
+				<uap:DefaultTile
+				  Wide310x150Logo="Assets\Wide310x150Logo.png" />
 
-      <Extensions>
-        <desktop:Extension
-          Category="windows.startupTask"
-          Executable="$targetnametoken$.exe"
-          EntryPoint="Windows.FullTrustApplication">
-          <desktop:StartupTask
-            TaskId="CopyGIFStartup"
-            Enabled="false"
-            DisplayName="CopyGIF" />
-        </desktop:Extension>
-      </Extensions>
+				<uap:SplashScreen
+				  Image="Assets\SplashScreen.png" />
 
-    </Application>
-  </Applications>
+			</uap:VisualElements>
 
-  <Capabilities>
-    <rescap:Capability Name="runFullTrust" />
-  </Capabilities>
+			<Extensions>
+				<desktop:Extension
+				  Category="windows.startupTask"
+				  Executable="CopyGIF.exe"
+				  EntryPoint="Windows.FullTrustApplication">
+					<desktop:StartupTask
+					  TaskId="CopyGIFStartup"
+					  Enabled="false"
+					  DisplayName="CopyGIF" />
+				</desktop:Extension>
+			</Extensions>
 
-  <mp:PhoneIdentity PhoneProductId="36702c4b-e149-49f7-bd62-e29d5a7f7529"/>
+		</Application>
+	</Applications>
 
 </Package>

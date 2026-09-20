@@ -48,7 +48,7 @@ public sealed class SearchSettingsViewModel :
     private UserMessage? _message;
 
     private bool _disposed;
-    private GifContentRating _contentRating = GifContentRating.AllAvailable;
+    private GifContentRating _contentRating = GifContentRating.Pg;
 
     public IReadOnlyList<GifContentRating> ContentRatings { get; } = Enum.GetValues<GifContentRating>();
 

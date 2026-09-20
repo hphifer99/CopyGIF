@@ -10,7 +10,9 @@ public enum GifSearchKind
 
 public sealed record GifSearchRequest
 {
-    public GifContentRating ContentRating { get; init; } = GifContentRating.AllAvailable;
+    public GifContentRating ContentRating { get; init; } =
+        GifContentRating.Pg;
+
     public required string Query { get; init; }
 
     public GifSearchKind Kind { get; init; } =

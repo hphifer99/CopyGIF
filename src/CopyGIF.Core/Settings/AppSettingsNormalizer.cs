@@ -42,7 +42,9 @@ public static class AppSettingsNormalizer
 
             Search = search with
             {
-                ContentRating = NormalizeEnum(search.ContentRating, GifContentRating.AllAvailable),
+                ContentRating = NormalizeEnum(
+                    search.ContentRating,
+                    GifContentRating.Pg),
                 ResultsPerSearch = UseValueOrFallback(
                     search.ResultsPerSearch,
                     AppSettingsValidator.MinimumResultsPerSearch,

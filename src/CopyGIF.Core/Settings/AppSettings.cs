@@ -41,7 +41,7 @@ public sealed record AppSettings
 
 public sealed record SearchSettings
 {
-    public GifContentRating ContentRating { get; init; } = GifContentRating.AllAvailable;
+    public GifContentRating ContentRating { get; init; } = GifContentRating.Pg;
     public int ResultsPerSearch { get; init; } = 24;
 
     public int DebounceMilliseconds { get; init; } = 300;

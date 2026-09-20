@@ -1,20 +1,21 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap desktop rescap">
+  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
+  IgnorableNamespaces="uap desktop rescap mp">
 
   <Identity
-    Name="87793c2e-d33d-49cd-b5b0-5b6fd1cbf79f"
-    Publisher="CN=hphifer"
+    Name="HaydenP.CopyGIF"
+    Publisher="CN=507D483D-4B01-4556-A7D9-819E20FC29D5"
     Version="2.0.0.0" />
 
   <Properties>
     <DisplayName>CopyGIF</DisplayName>
-    <PublisherDisplayName>CopyGIF</PublisherDisplayName>
+    <PublisherDisplayName>Hayden P</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
@@ -68,5 +69,7 @@
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
   </Capabilities>
+
+  <mp:PhoneIdentity PhoneProductId="36702c4b-e149-49f7-bd62-e29d5a7f7529"/>
 
 </Package>

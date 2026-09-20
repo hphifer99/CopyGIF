@@ -114,7 +114,7 @@
             "pg13",
             "r"
           ],
-          "default": "allAvailable"
+          "default": "pg"
         }
       }
     },

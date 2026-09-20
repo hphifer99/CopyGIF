@@ -207,7 +207,7 @@
                                 ItemsSource="{Binding ContentRatings}"
                                 ItemTemplate="{StaticResource SettingChoiceTemplate}"
                                 SelectedItem="{Binding ContentRating, Mode=TwoWay}">
-                                <ComboBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Content filter" /><controls:InfoButton Subject="Content filter" Text="GIPHY uses this rating for search and trending. KLIPY uses the rating set for its API key. The default is All available." /></StackPanel></ComboBox.Header>
+                                <ComboBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Content filter" /><controls:InfoButton Subject="Content filter" Text="GIPHY uses this rating for search and trending. KLIPY uses the rating set for its API key. The default is PG." /></StackPanel></ComboBox.Header>
                             </ComboBox>
 
                             <NumberBox

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="CopyGIF" Manufacturer="CopyGIF" Version="$(var.Version)"
+           UpgradeCode="4594B572-93C3-4B03-A9C8-356C3012C87E" Scope="perUser" InstallerVersion="500">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of CopyGIF is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Property Id="ARPPRODUCTICON" Value="CopyGifIcon" />
+    <Icon Id="CopyGifIcon" SourceFile="$(var.PublishDir)\Assets\CopyGif.ico" />
+    <!-- Per-user install: %LOCALAPPDATA%\Programs\CopyGIF, no administrator prompt. CopyGIF needs
+         no machine-wide rights: settings, keys and the startup entry are already per-user. -->
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="UserProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="CopyGIF">
+          <Component Id="InstallMarker" Guid="A3A56A89-406F-439B-BFA9-D196C82BBC75" Bitness="always64">
+            <RegistryKey Root="HKCU" Key="Software\CopyGIF">
+              <RegistryValue Name="InstallChannel" Type="string" Value="$(var.InstallChannel)" KeyPath="yes" />
+              <RegistryValue Name="InstallDirectory" Type="string" Value="[INSTALLFOLDER]" />
+            </RegistryKey>
+            <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+          </Component>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut" Guid="D797D75A-81D6-4A73-A4D2-1C311BD354A6" Bitness="always64">
+        <Shortcut Id="CopyGifShortcut" Name="CopyGIF" Target="[INSTALLFOLDER]CopyGIF.exe"
+                  WorkingDirectory="INSTALLFOLDER" Icon="CopyGifIcon" />
+        <RegistryValue Root="HKCU" Key="Software\CopyGIF" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+    <!-- Starting CopyGIF again after an update. The update passes RESTARTCOPYGIF=1 on the
+         msiexec command line (a per-user update only). No script or helper program is used: the
+         installer itself starts CopyGIF once it has finished. The two OnExit actions start the
+         installed CopyGIF again when the update fails or is cancelled, so the user is not left
+         without it. Each action needs its own Id because a sequence table row is unique per Id. -->
+    <CustomAction Id="RestartCopyGif" Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]CopyGIF.exe&quot;" Return="asyncNoWait" />
+    <CustomAction Id="RestartCopyGifAfterFailure" Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]CopyGIF.exe&quot;" Return="asyncNoWait" />
+    <CustomAction Id="RestartCopyGifAfterCancel" Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]CopyGIF.exe&quot;" Return="asyncNoWait" />
+    <InstallExecuteSequence>
+      <Custom Action="RestartCopyGif" After="InstallFinalize" Condition="RESTARTCOPYGIF = 1 AND NOT REMOVE" />
+      <Custom Action="RestartCopyGifAfterFailure" OnExit="error" Condition="RESTARTCOPYGIF = 1" />
+      <Custom Action="RestartCopyGifAfterCancel" OnExit="cancel" Condition="RESTARTCOPYGIF = 1" />
+    </InstallExecuteSequence>
+    <Feature Id="MainFeature" Title="CopyGIF" Level="1">
+      <ComponentRef Id="InstallMarker" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentGroupRef Id="AppFiles" />
+    </Feature>
+  </Package>
+  <Fragment>
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.PublishDir)\**" />
+    </ComponentGroup>
+  </Fragment>
+</Wix>

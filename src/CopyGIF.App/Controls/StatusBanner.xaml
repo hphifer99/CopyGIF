@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="CopyGIF.App.Controls.StatusBanner"
+    x:Name="Root"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <InfoBar
+        x:Name="StatusInfoBar"
+        AutomationProperties.LiveSetting="Polite"
+        AutomationProperties.Name="CopyGIF status"
+        IsClosable="{Binding IsClosable, ElementName=Root}"
+        IsOpen="{Binding IsOpen, ElementName=Root, Mode=TwoWay}"
+        Message="{Binding Message, ElementName=Root}"
+        Severity="{Binding Severity, ElementName=Root}"
+        Title="{Binding Title, ElementName=Root}">
+
+        <InfoBar.ActionButton>
+            <Button
+                x:Name="StatusActionButton"
+                AutomationProperties.Name="{Binding ActionText, ElementName=Root}"
+                Command="{Binding ActionCommand, ElementName=Root}"
+                CommandParameter="{Binding ActionCommandParameter, ElementName=Root}"
+                Content="{Binding ActionText, ElementName=Root}" />
+        </InfoBar.ActionButton>
+
+    </InfoBar>
+
+</UserControl>

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/hphifer99/CopyGIF/schemas/update-manifest.schema.json",
+  "title": "CopyGIF Update Manifest",
+  "description": "Authenticated MSI update metadata published from the fixed CopyGIF release repository.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "version",
+    "channel",
+    "assetName",
+    "assetUri",
+    "sizeBytes",
+    "sha256",
+    "minimumSupportedVersion",
+    "releaseNotesUri",
+    "publishedAtUtc"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "channel": {
+      "type": "string",
+      "enum": [
+        "stable"
+      ]
+    },
+    "assetName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^CopyGIF.*x64\\.msi$"
+    },
+    "assetUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "sizeBytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1073741824
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "minimumSupportedVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "releaseNotesUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "publishedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

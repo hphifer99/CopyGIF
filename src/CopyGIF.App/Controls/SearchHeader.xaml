@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="CopyGIF.App.Controls.SearchHeader"
+    x:Name="Root"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid ColumnSpacing="8" MinHeight="40">
+
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="112" />
+        </Grid.ColumnDefinitions>
+
+        <AutoSuggestBox
+            x:Name="SearchBox"
+            Grid.Column="0"
+            VerticalAlignment="Stretch"
+            AutomationProperties.Name="Search GIFs"
+            ItemsSource="{Binding Suggestions, ElementName=Root}"
+            PlaceholderText="{Binding PlaceholderText, ElementName=Root}"
+            QuerySubmitted="SearchBox_QuerySubmitted"
+            SuggestionChosen="SearchBox_SuggestionChosen"
+            Text="{Binding Query, ElementName=Root, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+            TextChanged="SearchBox_TextChanged" />
+
+        <Button
+            x:Name="SearchButton"
+            Grid.Column="1"
+            HorizontalAlignment="Stretch"
+            AutomationProperties.Name="Search"
+            Command="{Binding SearchCommand, ElementName=Root}"
+            Content="Search"
+            Style="{StaticResource CopyGifPrimaryButtonStyle}" />
+
+        <Button
+            x:Name="CancelButton"
+            Grid.Column="1"
+            MinHeight="40"
+            HorizontalAlignment="Stretch"
+            AutomationProperties.Name="Cancel search"
+            Command="{Binding CancelCommand, ElementName=Root}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <ProgressRing
+                    x:Name="SearchProgressRing"
+                    Width="16"
+                    Height="16"
+                    AutomationProperties.Name="Search in progress"
+                    IsActive="{Binding IsBusy, ElementName=Root}" />
+                <TextBlock Text="Cancel" VerticalAlignment="Center" />
+            </StackPanel>
+        </Button>
+
+    </Grid>
+
+</UserControl>

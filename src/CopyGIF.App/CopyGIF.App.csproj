@@ -1,0 +1,125 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>$(CopyGifWindowsTargetFramework)</TargetFramework>
+    <TargetPlatformMinVersion>$(CopyGifWindowsMinimumVersion)</TargetPlatformMinVersion>
+    <SupportedOSPlatformVersion>$(CopyGifWindowsMinimumVersion)</SupportedOSPlatformVersion>
+
+    <AssemblyName>CopyGIF</AssemblyName>
+    <Title>CopyGIF</Title>
+    <Product>CopyGIF</Product>
+    <Description>CopyGIF</Description>
+    <Version>2.0.1</Version>
+    <AssemblyVersion>2.0.1.0</AssemblyVersion>
+    <FileVersion>2.0.1.0</FileVersion>
+    <ApplicationIcon>Assets\CopyGif.ico</ApplicationIcon>
+    <RootNamespace>CopyGIF.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <UseWinUI>true</UseWinUI>
+    <WinUISDKReferences>false</WinUISDKReferences>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <GenerateTemporaryStoreCertificate>True</GenerateTemporaryStoreCertificate>
+    <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
+    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
+    <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
+    <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
+    <GenerateTestArtifacts>True</GenerateTestArtifacts>
+    <AppxBundle>Never</AppxBundle>
+    <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Controls\GifCard.xaml" />
+    <None Remove="Controls\SearchHeader.xaml" />
+    <None Remove="Controls\StatusBanner.xaml" />
+    <None Remove="Resources\Colors.xaml" />
+    <None Remove="Resources\ControlStyles.xaml" />
+    <None Remove="Resources\Themes.xaml" />
+    <None Remove="Views\MainWindow.xaml" />
+    <None Remove="Views\OnboardingWindow.xaml" />
+    <None Remove="Views\Pages\FavoritesPage.xaml" />
+    <None Remove="Views\Pages\RecentsPage.xaml" />
+    <None Remove="Views\Pages\SearchPage.xaml" />
+    <None Remove="Views\SettingsWindow.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\PoweredByGiphy.png" />
+    <Content Include="Assets\CopyGif.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\SplashScreen.scale-200.png" />
+    <Content Include="Assets\LockScreenLogo.scale-200.png" />
+    <Content Include="Assets\Square150x150Logo.scale-200.png" />
+    <Content Include="Assets\Square44x44Logo.scale-200.png" />
+    <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
+    <Content Include="Assets\StoreLogo.png" />
+    <Content Include="Assets\Wide310x150Logo.scale-200.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)' != 'true' and '$(EnableMsixTooling)' == 'true'">
+    <ProjectCapability Include="Msix" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CopyGIF.Application\CopyGIF.Application.csproj" />
+    <ProjectReference Include="..\CopyGIF.Core\CopyGIF.Core.csproj" />
+    <ProjectReference Include="..\CopyGIF.Infrastructure\CopyGIF.Infrastructure.csproj" />
+    <ProjectReference Include="..\CopyGIF.Platform.Windows\CopyGIF.Platform.Windows.csproj" />
+    <ProjectReference Include="..\CopyGIF.Presentation\CopyGIF.Presentation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Page Update="Controls\GifCard.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Controls\SearchHeader.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Controls\StatusBanner.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Resources\Colors.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Resources\ControlStyles.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Resources\Themes.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Views\MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Views\OnboardingWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Views\Pages\FavoritesPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Views\Pages\RecentsPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Views\Pages\SearchPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Update="Views\SettingsWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)' != 'true' and '$(EnableMsixTooling)' == 'true'">
+    <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
+  </PropertyGroup>
+
+</Project>

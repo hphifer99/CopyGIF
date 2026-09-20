@@ -11,17 +11,17 @@ Please use this repository's **Security** tab to open a private GitHub security 
 Include, when possible:
 
 - the affected CopyGIF version or commit;
-- Windows and .NET Framework versions;
+- Windows version and .NET runtime version;
 - clear reproduction steps;
 - the expected and observed behavior;
 - the likely security impact; and
 - a minimal proof of concept that does not expose third-party data or credentials.
 
-Do not open a public issue for an unpatched vulnerability. Do not include a real KLIPY API key, personal data, or another person's content in a report.
+Do not open a public issue for an unpatched vulnerability. Do not include a real provider API key, personal data, or another person's content in a report.
 
 ## Scope notes
 
-CopyGIF is a local Windows client that contacts KLIPY over HTTPS and downloads untrusted media. Relevant reports include, but are not limited to:
+CopyGIF is a local Windows client that contacts the selected GIF provider over HTTPS and downloads untrusted media. Relevant reports include, but are not limited to:
 
 - unsafe file handling or path traversal;
 - credential disclosure;
@@ -30,4 +30,4 @@ CopyGIF is a local Windows client that contacts KLIPY over HTTPS and downloads u
 - unintended outbound data transmission; and
 - security boundary failures involving the clipboard, cache, registry, or local library.
 
-Availability failures in KLIPY itself, content-policy disputes, and vulnerabilities that exist only in an unsupported Windows version should normally be reported to the responsible vendor.
+Availability failures in an external GIF provider itself, content-policy disputes, and vulnerabilities that exist only in an unsupported Windows version should normally be reported to the responsible vendor.

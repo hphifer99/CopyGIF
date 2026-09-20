@@ -72,7 +72,7 @@ public sealed class GiphyGifProviderTests
         await provider.SearchAsync(new() { Kind = GifSearchKind.Trending, Query = "", ContentRating = GifContentRating.G });
         StringAssert.Contains(handler.Uri!.Query, "rating=g");
         await provider.SearchAsync(new() { Query = "cats" });
-        Assert.IsFalse(handler.Uri!.Query.Contains("rating=", StringComparison.Ordinal));
+        StringAssert.Contains(handler.Uri!.Query, "rating=pg");
     }
 
     [TestMethod]

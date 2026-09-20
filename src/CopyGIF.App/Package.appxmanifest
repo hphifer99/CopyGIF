@@ -11,7 +11,7 @@
 	<Identity
 	  Name="HaydenP.CopyGIF"
 	  Publisher="CN=507D483D-4B01-4556-A7D9-819E20FC29D5"
-	  Version="2.0.0.0" />
+	  Version="2.0.1.0" />
 
 	<mp:PhoneIdentity
 	  PhoneProductId="36702c4b-e149-49f7-bd62-e29d5a7f7529"

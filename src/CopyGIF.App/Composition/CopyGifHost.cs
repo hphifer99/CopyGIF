@@ -299,6 +299,14 @@ public sealed class CopyGifHost :
                     throw new InvalidDataException(
                         "Ready startup did not provide onboarding state.");
 
+            bool startHidden =
+                arguments.Any(
+                    argument =>
+                        string.Equals(
+                            argument,
+                            "--startup",
+                            StringComparison.OrdinalIgnoreCase));
+
             _runtimeState.ApplySettings(
                 settings);
 
@@ -306,13 +314,15 @@ public sealed class CopyGifHost :
                 .InitializeAsync(
                     settings,
                     onboarding,
+                    startHidden,
                     cancellationToken)
                 .ConfigureAwait(true);
 
             _serviceProvider.GetRequiredService<AppUpdateScheduler>().Start(GetCurrentVersion());
 
             if (result.HotkeyFailure != HotkeyRegistrationFailure.None &&
-                !onboarding.IsRequired)
+                !onboarding.IsRequired &&
+                !startHidden)
             {
                 await _windowManager
                     .ShowSettingsAsync(

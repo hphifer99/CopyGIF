@@ -201,6 +201,7 @@ public sealed class WindowManager :
     public Task InitializeAsync(
         AppSettings settings,
         OnboardingState onboarding,
+        bool startHidden = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(
@@ -235,7 +236,7 @@ public sealed class WindowManager :
                             operationToken)
                         .ConfigureAwait(true);
                 }
-                else
+                else if (!startHidden)
                 {
                     await ShowPickerCoreAsync(
                             operationToken)
@@ -925,7 +926,13 @@ public sealed class WindowManager :
         ActivationRequestedEventArgs eventArgs)
     {
         _ = sender;
-        _ = eventArgs;
+
+        if (eventArgs.Arguments.Contains(
+                "--startup",
+                StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
 
         QueueOperation(
             ShowPickerCoreAsync);

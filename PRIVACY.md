@@ -21,7 +21,11 @@ When you search for, view, or copy a GIF, CopyGIF may transmit the following inf
 - The requested content identifier or media URL.
 - Your public IP address and standard network request information, which are necessarily available to the service receiving the request.
 
-The provider may also associate requests with information it already maintains about your API key or provider account. CopyGIF uses these requests only to obtain search results, retrieve GIF metadata, validate provider credentials, and download the GIF you select.
+The provider may also associate requests with information it already maintains about your API key or provider account.
+
+When you copy a GIF from KLIPY, CopyGIF also uses KLIPY's share-registration endpoint. CopyGIF sends KLIPY the identifier of the selected GIF and, when available, the search term that led to that GIF. This allows KLIPY to record that a result was selected or shared.
+
+CopyGIF uses provider requests only to provide GIF search and retrieval features, validate provider credentials, download selected GIFs, and register KLIPY selections through KLIPY's share-registration API.
 
 CopyGIF does not send your provider API key, search terms, or selected GIFs to the CopyGIF developer.
 

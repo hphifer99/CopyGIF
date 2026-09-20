@@ -1,6 +1,7 @@
 using CopyGIF.Application.Startup;
 using CopyGIF.App.Composition;
 using CopyGIF.Core.Models;
+using Microsoft.Windows.AppLifecycle;
 using Microsoft.UI.Xaml;
 using XamlApplication = Microsoft.UI.Xaml.Application;
 
@@ -84,6 +85,15 @@ public partial class App :
 
         try
         {
+            // Packaged startup-task activations do not include the --startup argument
+            // used by the unpackaged registry startup path. Read the activation kind
+            // before any other component can consume it, then normalize both paths to
+            // the same internal argument.
+            AppActivationArguments? activationArguments =
+                AppInstance
+                    .GetCurrent()
+                    .GetActivatedEventArgs();
+
             _host ??=
                 CopyGifHost.Create();
 
@@ -96,10 +106,20 @@ public partial class App :
             string[] commandLine =
                 Environment.GetCommandLineArgs();
 
-            IReadOnlyList<string> arguments =
+            string[] arguments =
                 commandLine.Length > 1
                     ? commandLine[1..]
                     : [];
+
+            if (activationArguments?.Kind ==
+                    ExtendedActivationKind.StartupTask &&
+                !arguments.Contains(
+                    "--startup",
+                    StringComparer.OrdinalIgnoreCase))
+            {
+                arguments =
+                    [.. arguments, "--startup"];
+            }
 
             ApplicationStartupResult result =
                 await _host

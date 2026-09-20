@@ -12,7 +12,7 @@ public static class ProviderMediaPolicy
 {
     private sealed class Rules
     {
-        public required IReadOnlyDictionary<string, ProviderDescriptor> ById { get; init; }
+        public required Dictionary<string, ProviderDescriptor> ById { get; init; }
 
         public required HashSet<string> DirectHosts { get; init; }
     }
@@ -62,6 +62,21 @@ public static class ProviderMediaPolicy
         uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort &&
         string.IsNullOrEmpty(uri.UserInfo) && string.IsNullOrEmpty(uri.Fragment) &&
         _rules.DirectHosts.Contains(uri.IdnHost);
+
+    public static bool IsDirectMediaUri(string providerId, Uri? uri)
+    {
+        ProviderDescriptor? provider = TryGet(providerId);
+
+        return provider is { UsesDirectPreview: true } &&
+            uri is { IsAbsoluteUri: true } &&
+            uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort &&
+            string.IsNullOrEmpty(uri.UserInfo) && string.IsNullOrEmpty(uri.Fragment) &&
+            provider.MediaHosts.Any(host =>
+                string.Equals(
+                    host.Trim().TrimEnd('.'),
+                    uri.IdnHost,
+                    StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>
     /// Leaves a trace in the repair log that a media address was refused because its host is not

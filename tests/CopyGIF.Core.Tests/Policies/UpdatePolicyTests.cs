@@ -37,6 +37,12 @@ public sealed class UpdatePolicyTests
         InstallationContext unknownContext =
             new();
 
+        InstallationContext unsignedMsiContext = new()
+        {
+            Channel = InstallChannel.UnsignedMsi,
+            Scope = InstallScope.CurrentUser
+        };
+
         Assert.IsFalse(
             UpdatePolicy.UsesApplicationUpdater(
                 storeContext));
@@ -44,6 +50,10 @@ public sealed class UpdatePolicyTests
         Assert.IsFalse(
             UpdatePolicy.UsesApplicationUpdater(
                 unknownContext));
+
+        Assert.IsFalse(
+            UpdatePolicy.UsesApplicationUpdater(
+                unsignedMsiContext));
     }
 
     [TestMethod]

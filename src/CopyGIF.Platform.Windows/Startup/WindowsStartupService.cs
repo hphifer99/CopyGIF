@@ -62,7 +62,7 @@ public sealed class WindowsStartupService :
                         cancellationToken)
                     .ConfigureAwait(false),
 
-            InstallChannel.Msi =>
+            InstallChannel.Msi or InstallChannel.UnsignedMsi =>
                 await _msiController
                     .IsEnabledAsync(
                         cancellationToken)
@@ -115,6 +115,7 @@ public sealed class WindowsStartupService :
                 break;
 
             case InstallChannel.Msi:
+            case InstallChannel.UnsignedMsi:
                 await _msiController
                     .SetEnabledAsync(
                         enabled,

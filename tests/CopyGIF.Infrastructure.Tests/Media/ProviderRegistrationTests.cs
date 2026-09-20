@@ -220,7 +220,7 @@ public sealed class ProviderRegistrationTests
     [TestMethod]
     public void BuiltInProviders_GiphyDirectHostsAreExactlyItsMediaHosts()
     {
-        // The picker may only load a preview directly from a host the downloader would also allow.
+        // The app may only load a preview directly from a host the downloader would also allow.
         foreach (string host in BuiltInProviders.Giphy.MediaHosts)
         {
             Assert.IsTrue(

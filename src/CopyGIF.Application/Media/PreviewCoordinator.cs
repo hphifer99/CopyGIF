@@ -36,7 +36,7 @@ public sealed class PreviewCoordinator :
         ArgumentNullException.ThrowIfNull(item);
         if (ProviderMediaPolicy.UsesDirectPreview(item.ProviderId))
         {
-            if (!ProviderMediaPolicy.IsDirectMediaUri(item.ThumbnailUri)) throw new InvalidDataException("The preview address is not on an approved media host.");
+            if (!ProviderMediaPolicy.IsDirectMediaUri(item.ProviderId, item.ThumbnailUri)) throw new InvalidDataException("The preview address is not on an approved media host.");
             return item.ThumbnailUri;
         }
         try
@@ -85,7 +85,7 @@ public sealed class PreviewCoordinator :
 
         if (ProviderMediaPolicy.UsesDirectPreview(item.ProviderId))
         {
-            if (!ProviderMediaPolicy.IsDirectMediaUri(sourceUri)) throw new InvalidDataException("The preview address is not on an approved media host.");
+            if (!ProviderMediaPolicy.IsDirectMediaUri(item.ProviderId, sourceUri)) throw new InvalidDataException("The preview address is not on an approved media host.");
             return sourceUri;
         }
         return await ResolveSourceAsync(

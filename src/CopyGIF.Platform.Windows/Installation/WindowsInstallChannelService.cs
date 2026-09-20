@@ -55,27 +55,29 @@ public sealed class WindowsInstallChannelService :
                 });
         }
 
-        if (HasMsiMarker(
-                RegistryHive.LocalMachine))
+        if (TryGetMsiChannel(
+                RegistryHive.LocalMachine,
+                out InstallChannel machineChannel))
         {
             return Task.FromResult(
                 new InstallationContext
                 {
                     Channel =
-                        InstallChannel.Msi,
+                        machineChannel,
                     Scope =
                         InstallScope.AllUsers
                 });
         }
 
-        if (HasMsiMarker(
-                RegistryHive.CurrentUser))
+        if (TryGetMsiChannel(
+                RegistryHive.CurrentUser,
+                out InstallChannel userChannel))
         {
             return Task.FromResult(
                 new InstallationContext
                 {
                     Channel =
-                        InstallChannel.Msi,
+                        userChannel,
                     Scope =
                         InstallScope.CurrentUser
                 });
@@ -89,8 +91,9 @@ public sealed class WindowsInstallChannelService :
             });
     }
 
-    private bool HasMsiMarker(
-        RegistryHive hive)
+    private bool TryGetMsiChannel(
+        RegistryHive hive,
+        out InstallChannel channel)
     {
         object? value =
             _registryValueReader.ReadValue(
@@ -98,18 +101,48 @@ public sealed class WindowsInstallChannelService :
                 CopyGifRegistry.ProductSubKey,
                 CopyGifRegistry.InstallChannelValueName);
 
-        if (!string.Equals(value as string, CopyGifRegistry.MsiInstallChannelValue, StringComparison.OrdinalIgnoreCase)) return false;
+        channel = (value as string) switch
+        {
+            string text when string.Equals(
+                text,
+                CopyGifRegistry.MsiInstallChannelValue,
+                StringComparison.OrdinalIgnoreCase) => InstallChannel.Msi,
+            string text when string.Equals(
+                text,
+                CopyGifRegistry.UnsignedMsiInstallChannelValue,
+                StringComparison.OrdinalIgnoreCase) => InstallChannel.UnsignedMsi,
+            _ => InstallChannel.None
+        };
+
+        if (channel == InstallChannel.None)
+        {
+            return false;
+        }
+
         // A machine marker must not classify an unrelated unpackaged debug/portable build as installed.
         string? installedDirectory = _registryValueReader.ReadValue(hive,
             CopyGifRegistry.ProductSubKey, "InstallDirectory") as string;
-        if (string.IsNullOrWhiteSpace(installedDirectory) || string.IsNullOrWhiteSpace(Environment.ProcessPath)) return false;
+        if (string.IsNullOrWhiteSpace(installedDirectory) || string.IsNullOrWhiteSpace(Environment.ProcessPath))
+        {
+            channel = InstallChannel.None;
+            return false;
+        }
         try
         {
-            return string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(installedDirectory)),
+            bool matches = string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(installedDirectory)),
                 Path.GetDirectoryName(Environment.ProcessPath), StringComparison.OrdinalIgnoreCase);
+            if (!matches)
+            {
+                channel = InstallChannel.None;
+            }
+
+            return matches;
         }
         catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
-        { return false; }
+        {
+            channel = InstallChannel.None;
+            return false;
+        }
     }
 }
 

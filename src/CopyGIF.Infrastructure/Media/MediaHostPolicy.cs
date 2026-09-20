@@ -35,6 +35,9 @@ public sealed class MediaHostPolicy
     private readonly HashSet<string>
         _approvedHosts;
 
+    private readonly Dictionary<string, HashSet<string>>
+        _providerHosts;
+
     public MediaHostPolicy(
         IHostAddressResolver addressResolver,
         IEnumerable<string> approvedHosts)
@@ -54,6 +57,10 @@ public sealed class MediaHostPolicy
                         NormalizeHost),
                 StringComparer.OrdinalIgnoreCase);
 
+        _providerHosts =
+            new Dictionary<string, HashSet<string>>(
+                StringComparer.OrdinalIgnoreCase);
+
         if (_approvedHosts.Count == 0)
         {
             throw new ArgumentException(
@@ -62,9 +69,95 @@ public sealed class MediaHostPolicy
         }
     }
 
-    public async Task ValidateAsync(
+    public MediaHostPolicy(
+        IHostAddressResolver addressResolver,
+        IEnumerable<ProviderDescriptor> providers)
+    {
+        _addressResolver =
+            addressResolver ??
+            throw new ArgumentNullException(
+                nameof(addressResolver));
+
+        ArgumentNullException.ThrowIfNull(providers);
+
+        Dictionary<string, HashSet<string>> providerHosts =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (ProviderDescriptor provider in providers)
+        {
+            ArgumentNullException.ThrowIfNull(provider);
+            string providerId = provider.Id.Trim();
+            if (providerId.Length == 0)
+            {
+                throw new ArgumentException(
+                    "Provider identifiers cannot be empty.",
+                    nameof(providers));
+            }
+
+            providerHosts[providerId] = new HashSet<string>(
+                provider.MediaHosts.Select(NormalizeHost),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        _providerHosts = providerHosts;
+        _approvedHosts = new HashSet<string>(
+            providerHosts.Values.SelectMany(static hosts => hosts),
+            StringComparer.OrdinalIgnoreCase);
+
+        if (_approvedHosts.Count == 0)
+        {
+            throw new ArgumentException(
+                "At least one approved media host is required.",
+                nameof(providers));
+        }
+    }
+
+    public Task ValidateAsync(
+        string providerId,
         Uri uri,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(providerId);
+
+        string normalizedProviderId = providerId.Trim();
+
+        if (!_providerHosts.TryGetValue(normalizedProviderId, out HashSet<string>? hosts) &&
+            _providerHosts.Count == 0)
+        {
+            // The host-only constructor is retained for isolated callers and tests. Production
+            // composition supplies descriptors and therefore always uses provider-specific hosts.
+            hosts = _approvedHosts;
+        }
+
+        if (hosts is null)
+        {
+            throw new MediaDownloadException(
+                MediaDownloadFailure.UnapprovedHost,
+                "The GIF provider has no approved media hosts.");
+        }
+
+        return ValidateCoreAsync(
+            uri,
+            hosts,
+            normalizedProviderId,
+            cancellationToken);
+    }
+
+    public async Task ValidateAsync(
+        Uri uri,
+        CancellationToken cancellationToken = default) =>
+        await ValidateCoreAsync(
+                uri,
+                _approvedHosts,
+                "local",
+                cancellationToken)
+            .ConfigureAwait(false);
+
+    private async Task ValidateCoreAsync(
+        Uri uri,
+        HashSet<string> approvedHosts,
+        string providerId,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(
             uri);
@@ -86,11 +179,11 @@ public sealed class MediaHostPolicy
             NormalizeHost(
                 uri.IdnHost);
 
-        if (!_approvedHosts.Contains(
+        if (!approvedHosts.Contains(
                 host))
         {
             CopyGIF.Core.Policies.ProviderMediaPolicy.RecordRejectedHost(
-                "local",
+                providerId,
                 uri);
 
             throw new MediaDownloadException(

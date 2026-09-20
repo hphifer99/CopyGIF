@@ -74,7 +74,7 @@ public sealed class FolderPickerServiceTests
         public nint GetWindowHandle()
         {
             throw new AssertFailedException(
-                "The canceled picker must not request a window handle.");
+                "The canceled app must not request a window handle.");
         }
     }
 }

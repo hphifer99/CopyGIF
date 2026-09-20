@@ -14,13 +14,10 @@ public sealed class WindowsAuthenticodeVerifierTests
                 0));
     }
 
-    // CRYPT_E_REVOCATION_OFFLINE, CRYPT_E_NO_REVOCATION_CHECK, CERT_E_REVOCATION_FAILURE:
-    // Windows could not ask the certificate authority, which says nothing about the package.
+    // CRYPT_E_REVOCATION_OFFLINE specifically identifies an unavailable revocation server.
     [TestMethod]
     [DataRow(unchecked((int)0x80092013))]
-    [DataRow(unchecked((int)0x80092012))]
-    [DataRow(unchecked((int)0x800B010E))]
-    public void ClassifyTrustResult_RevocationCouldNotBeChecked_IsRevocationUnavailable(
+    public void ClassifyTrustResult_RevocationServerOffline_IsRevocationUnavailable(
         int trustResult)
     {
         Assert.AreEqual(
@@ -37,6 +34,8 @@ public sealed class WindowsAuthenticodeVerifierTests
     [DataRow(unchecked((int)0x800B0109))]
     [DataRow(unchecked((int)0x800B0101))]
     [DataRow(unchecked((int)0x800B010C))]
+    [DataRow(unchecked((int)0x80092012))]
+    [DataRow(unchecked((int)0x800B010E))]
     [DataRow(1)]
     [DataRow(-1)]
     public void ClassifyTrustResult_AnyOtherFailure_IsAnInvalidSignature(

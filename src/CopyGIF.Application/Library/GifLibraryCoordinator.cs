@@ -530,8 +530,7 @@ public sealed class GifLibraryCoordinator :
     }
 
     // Deletes a file this coordinator downloaded, unless a saved entry already points at the same
-    // path (the same GIF downloaded earlier is stored under the same name). Best effort only: a
-    // problem here must never hide the failure that led to the cleanup.
+    // path. Best effort only: a problem here must never hide the failure that led to the cleanup.
     private async Task TryDeleteUnreferencedFileAsync(
         AppSettings settings,
         string filePath)

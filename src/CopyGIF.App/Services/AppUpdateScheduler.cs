@@ -159,7 +159,7 @@ public sealed class AppUpdateScheduler : IAsyncDisposable
         }
     }
 
-    // Foreground means the picker or a settings window is on screen. A hidden tray app is background.
+    // Foreground means the app or a settings window is on screen. A hidden tray app is background.
     private bool IsApplicationInForeground() =>
         _windowManager.IsPickerVisible || _windowManager.SettingsWindow is not null;
 
@@ -214,9 +214,10 @@ public sealed class AppUpdateScheduler : IAsyncDisposable
         }
         catch (Exception exception)
         {
-            // For example another dialog is already open in that window. Remind later instead.
+            // For example another dialog is already open in that window. A failed dialog is not
+            // user consent to install at next launch, so fall back to a notification instead.
             RepairDiagnostics.Record("update-prompt", "local", exception.GetType().Name);
-            return UpdatePromptChoice.RemindLater;
+            return null;
         }
         return choice;
     }

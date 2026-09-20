@@ -6,7 +6,7 @@ This notice describes the data handled by the current CopyGIF Windows app. The G
 
 CopyGIF sends searches and requests for GIF results to the provider you select, KLIPY or GIPHY. It also downloads images from URLs supplied by the provider. Provider API requests include the API key you enter. The provider and media hosts may receive your public IP address, search terms, and request information. Review the privacy terms for your selected provider before using its API.
 
-If update checking is enabled, CopyGIF requests release information from GitHub. Installing an update downloads its MSI from GitHub Releases. Store installations use the Microsoft Store's update channel.
+Microsoft Store installations use the Store's update channel. Intentionally unsigned MSI installations from GitHub do not use CopyGIF's automatic updater. A signed MSI build can use GitHub release information and download a verified MSI when update checking is enabled.
 
 ## Local data
 

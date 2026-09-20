@@ -116,6 +116,37 @@ public sealed class WindowsStartupServiceTests
     }
 
     [TestMethod]
+    public async Task SetEnabledAsync_UnsignedMsiInstall_UsesMsiController()
+    {
+        FakeStartupController store =
+            new();
+
+        FakeStartupController msi =
+            new();
+
+        WindowsStartupService service =
+            CreateService(
+                InstallChannel.UnsignedMsi,
+                store,
+                msi);
+
+        await service.SetEnabledAsync(
+            enabled: true);
+
+        Assert.AreEqual(
+            0,
+            store.WriteCallCount);
+
+        Assert.AreEqual(
+            1,
+            msi.WriteCallCount);
+
+        Assert.AreEqual(
+            true,
+            msi.LastEnabledValue);
+    }
+
+    [TestMethod]
     public async Task SetEnabledAsync_UninstalledEnable_IsNoOp()
     {
         FakeStartupController msi = new();

@@ -14,6 +14,9 @@ internal static class CopyGifRegistry
     public const string MsiInstallChannelValue =
         "Msi";
 
+    public const string UnsignedMsiInstallChannelValue =
+        "UnsignedMsi";
+
     public const string RunSubKey =
         @"Software\Microsoft\Windows\CurrentVersion\Run";
 

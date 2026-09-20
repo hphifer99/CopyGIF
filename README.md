@@ -24,7 +24,7 @@ CopyGIF is a Windows GIF picker. Press a global keyboard shortcut, search with K
 
 ## Install
 
-The public GitHub release build is a signed MSI installer. When a CopyGIF 2.x release is published, download its MSI from [GitHub Releases](https://github.com/hphifer99/CopyGIF/releases). You can verify its SHA-256 hash against the accompanying `CopyGIF-win-x64.sha256` file. The MSI installs for the current user only (into `%LOCALAPPDATA%\Programs\CopyGIF`) and never asks for administrator rights. The Microsoft Store package is a separate distribution channel.
+The public GitHub release build is an intentionally unsigned MSI installer. When a CopyGIF 2.x release is published, download the `UNSIGNED` MSI from [GitHub Releases](https://github.com/hphifer99/CopyGIF/releases) and verify its SHA-256 hash against the accompanying `CopyGIF-win-x64.sha256` file. The MSI installs for the current user only (into `%LOCALAPPDATA%\Programs\CopyGIF`) and never asks for administrator rights. It does not use CopyGIF's automatic updater. For a Microsoft-signed installation and Store-managed updates, install CopyGIF from Microsoft Store.
 
 To remove an MSI installation, use Windows **Installed apps**. Uninstalling the app does not remove your data in `%LOCALAPPDATA%\CopyGIF`.
 
@@ -50,7 +50,7 @@ Install Visual Studio with .NET desktop development, Windows App SDK/WinUI suppo
 2. Select `x64` and build the solution.
 3. Run the solution's test projects to check your build.
 
-The GitHub Actions build checks the x64 solution and tests. GitHub Releases are created separately by the release workflow, which requires a signing certificate configured through GitHub Secrets.
+The GitHub Actions build checks the x64 solution, tests, and MSI packaging. GitHub Releases are created separately by the release workflow as intentionally unsigned MSI builds.
 
 ## Security
 

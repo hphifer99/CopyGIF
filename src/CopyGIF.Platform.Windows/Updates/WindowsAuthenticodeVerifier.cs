@@ -20,14 +20,11 @@ internal sealed class WindowsAuthenticodeVerifier :
     private const uint CacheOnlyUrlRetrieval =
         0x00001000;
 
-    // Results that mean "revocation could not be checked", not "the signature is bad".
-    // CRYPT_E_REVOCATION_OFFLINE, CRYPT_E_NO_REVOCATION_CHECK and CERT_E_REVOCATION_FAILURE.
+    // CRYPT_E_REVOCATION_OFFLINE specifically means the revocation server was unreachable.
+    // CRYPT_E_NO_REVOCATION_CHECK and CERT_E_REVOCATION_FAILURE can describe persistent chain
+    // or certificate problems, so they remain hard verification failures instead of retrying.
     private const int RevocationOffline =
         unchecked((int)0x80092013);
-    private const int NoRevocationCheck =
-        unchecked((int)0x80092012);
-    private const int RevocationFailure =
-        unchecked((int)0x800B010E);
 
     private static readonly Guid
         GenericVerificationPolicy =
@@ -68,10 +65,8 @@ internal sealed class WindowsAuthenticodeVerifier :
                 .Trusted;
         }
 
-        return trustResult is
-            RevocationOffline or
-            NoRevocationCheck or
-            RevocationFailure
+        return trustResult ==
+            RevocationOffline
             ? AuthenticodeVerificationStatus
                 .RevocationUnavailable
             : AuthenticodeVerificationStatus

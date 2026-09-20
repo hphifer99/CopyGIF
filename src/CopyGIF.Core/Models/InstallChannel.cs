@@ -5,6 +5,7 @@ public enum InstallChannel
     None,
     MicrosoftStore,
     Msi,
+    UnsignedMsi,
     DevelopmentPackage,
     SideloadedPackage
 }

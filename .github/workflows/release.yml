@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    name: Build signed WinUI MSI and draft release
+    name: Build unsigned WinUI MSI and draft release
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -57,28 +57,14 @@ jobs:
           foreach ($project in $testProjects) {
               Write-Host "Testing $($project.FullName)"
               dotnet test $project.FullName -c Release -p:Platform=x64 --no-build
-              if ($LASTEXITCODE -ne 0) { throw "Tests failed in $($project.Name). Nothing was signed or published." }
+              if ($LASTEXITCODE -ne 0) { throw "Tests failed in $($project.Name). Nothing was published." }
           }
-      - name: Build and sign
+      - name: Build intentionally unsigned GitHub MSI
         shell: pwsh
         env:
-          PFX_BASE64: ${{ secrets.COPYGIF_SIGNING_PFX_BASE64 }}
-          PFX_PASSWORD: ${{ secrets.COPYGIF_SIGNING_PASSWORD }}
           RELEASE_VERSION: ${{ steps.release_tag.outputs.version }}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:PFX_BASE64)) { throw 'Configure COPYGIF_SIGNING_PFX_BASE64 and COPYGIF_SIGNING_PASSWORD before releasing.' }
-          $pfxPath = Join-Path $env:RUNNER_TEMP 'copygif-signing.pfx'
-          $certificate = $null
-          try {
-              [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:PFX_BASE64))
-              $password = ConvertTo-SecureString $env:PFX_PASSWORD -AsPlainText -Force
-              $certificate = Import-PfxCertificate -FilePath $pfxPath -Password $password -CertStoreLocation Cert:\CurrentUser\My
-              .\scripts\Build-Release.ps1 -Version $env:RELEASE_VERSION -SigningThumbprint $certificate.Thumbprint
-          }
-          finally {
-              Remove-Item -LiteralPath $pfxPath -Force -ErrorAction SilentlyContinue
-              if ($null -ne $certificate) { Remove-Item -LiteralPath $certificate.PSPath -Force }
-          }
+          .\scripts\Build-Release.ps1 -Version $env:RELEASE_VERSION -UnsignedRelease
       - name: Create reviewable draft release
         shell: pwsh
         env:
@@ -86,13 +72,14 @@ jobs:
           RELEASE_TAG: ${{ steps.release_tag.outputs.tag }}
           RELEASE_VERSION: ${{ steps.release_tag.outputs.version }}
         run: |
-          $msi = ".\artifacts\CopyGIF-$env:RELEASE_VERSION-win-x64.msi"
+          $msi = ".\artifacts\CopyGIF-$env:RELEASE_VERSION-win-x64-UNSIGNED.msi"
+          $notice = 'The GitHub MSI is intentionally unsigned. For a Microsoft-signed installation and Store-managed updates, install CopyGIF from Microsoft Store.'
           $existing = gh release view $env:RELEASE_TAG --json isDraft 2>$null
           if ($LASTEXITCODE -eq 0) {
               if (-not ($existing | ConvertFrom-Json).isDraft) { throw 'This release is already public. Create a new version instead of replacing shipped assets.' }
-              gh release upload $env:RELEASE_TAG $msi .\artifacts\CopyGIF-update.json .\artifacts\CopyGIF-win-x64.sha256 --clobber
+              gh release upload $env:RELEASE_TAG $msi .\artifacts\CopyGIF-win-x64.sha256 --clobber
           } else {
-              gh release create $env:RELEASE_TAG $msi .\artifacts\CopyGIF-update.json .\artifacts\CopyGIF-win-x64.sha256 `
-                  --verify-tag --draft --generate-notes --title "CopyGIF $env:RELEASE_VERSION"
+              gh release create $env:RELEASE_TAG $msi .\artifacts\CopyGIF-win-x64.sha256 `
+                  --verify-tag --draft --generate-notes --notes $notice --title "CopyGIF $env:RELEASE_VERSION"
           }
           if ($LASTEXITCODE -ne 0) { throw 'Creating the draft release failed.' }

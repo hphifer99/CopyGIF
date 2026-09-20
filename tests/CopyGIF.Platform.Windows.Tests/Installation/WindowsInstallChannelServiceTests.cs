@@ -83,6 +83,31 @@ public sealed class WindowsInstallChannelServiceTests
     }
 
     [TestMethod]
+    public async Task GetCurrentAsync_UnsignedUserMsiMarker_ReturnsUnsignedMsi()
+    {
+        FakeRegistryValueReader registry =
+            new();
+
+        registry.SetValue(
+            RegistryHive.CurrentUser,
+            CopyGifRegistry.UnsignedMsiInstallChannelValue);
+
+        WindowsInstallChannelService service =
+            CreateUnpackagedService(registry);
+
+        InstallationContext result =
+            await service.GetCurrentAsync();
+
+        Assert.AreEqual(
+            InstallChannel.UnsignedMsi,
+            result.Channel);
+
+        Assert.AreEqual(
+            InstallScope.CurrentUser,
+            result.Scope);
+    }
+
+    [TestMethod]
     public async Task GetCurrentAsync_NoIdentityOrMarker_ReturnsNone()
     {
         WindowsInstallChannelService service =

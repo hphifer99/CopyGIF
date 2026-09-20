@@ -40,7 +40,7 @@ public sealed record ProviderDescriptor
     public IReadOnlyList<string> MediaHosts { get; init; } = [];
 
     /// <summary>
-    /// True when the picker may load this provider's previews straight from its media hosts
+    /// True when the app may load this provider's previews straight from its media hosts
     /// instead of going through the local preview cache.
     /// </summary>
     public bool UsesDirectPreview { get; init; }

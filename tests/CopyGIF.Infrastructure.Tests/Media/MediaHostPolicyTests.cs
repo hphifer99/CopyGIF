@@ -80,6 +80,45 @@ public sealed class MediaHostPolicyTests
     }
 
     [TestMethod]
+    public async Task ValidateAsync_ProviderCannotUseAnotherProvidersHost()
+    {
+        FakeHostAddressResolver resolver =
+            CreateResolver(
+                IPAddress.Parse(
+                    "93.184.216.34"));
+
+        MediaHostPolicy policy = new(
+            resolver,
+            [
+                new ProviderDescriptor
+                {
+                    Id = "first",
+                    DisplayName = "First",
+                    MediaHosts = ["static.klipy.com"]
+                },
+                new ProviderDescriptor
+                {
+                    Id = "second",
+                    DisplayName = "Second",
+                    MediaHosts = ["media.giphy.com"]
+                }
+            ]);
+
+        MediaDownloadException exception =
+            await Assert.ThrowsAsync<MediaDownloadException>(
+                () => policy.ValidateAsync(
+                    "first",
+                    new Uri("https://media.giphy.com/image.gif")));
+
+        Assert.AreEqual(
+            MediaDownloadFailure.UnapprovedHost,
+            exception.Failure);
+
+        Assert.IsEmpty(
+            resolver.ResolvedHosts);
+    }
+
+    [TestMethod]
     public async Task ValidateAsync_PrivateIpv4_IsRejected()
     {
         string[] privateAddresses =

@@ -518,6 +518,17 @@ public sealed class WindowManager :
         }
     }
 
+    private Task TogglePickerCoreAsync(
+        CancellationToken cancellationToken)
+    {
+        return _isPickerVisible
+            ? HidePickerCoreAsync(
+                persistBounds: true,
+                cancellationToken)
+            : ShowPickerCoreAsync(
+                cancellationToken);
+    }
+
     private async Task HidePickerCoreAsync(
         bool persistBounds,
         CancellationToken cancellationToken)
@@ -928,7 +939,7 @@ public sealed class WindowManager :
         _ = eventArgs;
 
         QueueOperation(
-            ShowPickerCoreAsync);
+            TogglePickerCoreAsync);
     }
 
     private void HandleOpenRequested(object? sender, EventArgs eventArgs)

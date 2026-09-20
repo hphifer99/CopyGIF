@@ -202,6 +202,43 @@ public sealed class SecureGifDownloaderTests
     }
 
     [TestMethod]
+    public async Task DownloadAsync_SameLibraryItemTwice_UsesDistinctFiles()
+    {
+        TestHttpMessageHandler handler =
+            new(
+                _ => GifResponse(
+                    CreateValidGif()));
+
+        using TestContext context =
+            CreateContext(
+                handler);
+
+        DownloadedGif first =
+            await context.Downloader
+                .DownloadAsync(
+                    CreateItem(),
+                    GifDownloadPurpose.Recent);
+
+        DownloadedGif second =
+            await context.Downloader
+                .DownloadAsync(
+                    CreateItem(),
+                    GifDownloadPurpose.Recent);
+
+        Assert.AreNotEqual(
+            first.FilePath,
+            second.FilePath);
+
+        Assert.IsTrue(
+            File.Exists(
+                first.FilePath));
+
+        Assert.IsTrue(
+            File.Exists(
+                second.FilePath));
+    }
+
+    [TestMethod]
     public async Task DownloadAsync_ApprovedRedirect_StoresFinalResponse()
     {
         int requestCount = 0;

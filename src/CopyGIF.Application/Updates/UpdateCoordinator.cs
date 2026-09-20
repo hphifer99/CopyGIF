@@ -419,9 +419,9 @@ public sealed class UpdateCoordinator :
                     pendingVersion);
             }
 
-            // The package was fully verified, revocation included, when it was downloaded.
-            // Starting CopyGIF must not wait for the network, so the final check here leaves
-            // out the online revocation lookup. Everything else is checked again.
+            // Revocation status can change after download, so the deferred package receives the
+            // same complete verification at installation time. If revocation cannot be checked,
+            // startup continues and the normal update scheduler can try again later.
             UpdateInstallationResult installResult =
                 await InstallCoreAsync(
                         package,
@@ -429,7 +429,7 @@ public sealed class UpdateCoordinator :
                         {
                             Silent = true,
                             RestartApplication = true,
-                            CheckRevocationOnline = false
+                            CheckRevocationOnline = true
                         },
                         cancellationToken)
                     .ConfigureAwait(false);

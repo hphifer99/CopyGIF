@@ -295,15 +295,15 @@ public sealed class UpdateDeferralTests
             options.RequiresElevation,
             "a per-user install never raises the administrator prompt");
 
-        Assert.IsFalse(
+        Assert.IsTrue(
             options.CheckRevocationOnline,
-            "starting CopyGIF must not wait for the network");
+            "a deferred package needs current revocation status before installation");
 
         Assert.IsTrue(
             rig.Installer.VerificationOptions.All(
                 verification =>
-                    !verification.CheckRevocationOnline),
-            "every check at start leaves out the online revocation lookup");
+                    verification.CheckRevocationOnline),
+            "every installation-time check includes online revocation lookup");
 
         Assert.IsNull(
             rig.State.Value.PendingInstall,

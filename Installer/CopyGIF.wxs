@@ -13,7 +13,7 @@
         <Directory Id="INSTALLFOLDER" Name="CopyGIF">
           <Component Id="InstallMarker" Guid="A3A56A89-406F-439B-BFA9-D196C82BBC75" Bitness="always64">
             <RegistryKey Root="HKCU" Key="Software\CopyGIF">
-              <RegistryValue Name="InstallChannel" Type="string" Value="Msi" KeyPath="yes" />
+              <RegistryValue Name="InstallChannel" Type="string" Value="$(var.InstallChannel)" KeyPath="yes" />
               <RegistryValue Name="InstallDirectory" Type="string" Value="[INSTALLFOLDER]" />
             </RegistryKey>
             <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />

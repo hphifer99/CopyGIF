@@ -116,14 +116,9 @@ public static class ServiceCollectionExtensions
                     serviceProvider
                         .GetRequiredService<
                             IHostAddressResolver>(),
-                    // The approved media hosts are the union of the hosts every registered provider
-                    // lists in its descriptor.
                     serviceProvider
                         .GetServices<
-                            ProviderDescriptor>()
-                        .SelectMany(
-                            descriptor =>
-                                descriptor.MediaHosts)));
+                            ProviderDescriptor>()));
 
         services
             .AddHttpClient<KlipyGifProvider>(

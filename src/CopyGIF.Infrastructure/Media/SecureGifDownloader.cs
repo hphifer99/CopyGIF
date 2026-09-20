@@ -110,7 +110,7 @@ public sealed class SecureGifDownloader :
 
         string fileName = purpose == GifDownloadPurpose.Clipboard
             ? $"clipboard-{Guid.NewGuid():N}.gif"
-            : CreateStableFileName(item.StableIdentity);
+            : CreateUniqueLibraryFileName(item.StableIdentity);
 
         string finalPath =
             _pathGuard.EnsureSafeFilePath(
@@ -130,6 +130,7 @@ public sealed class SecureGifDownloader :
         {
             DownloadResult result =
                 await DownloadToFileAsync(
+                        item.ProviderId,
                         item.GifUri,
                         temporaryPath,
                         cancellationToken)
@@ -359,6 +360,7 @@ public sealed class SecureGifDownloader :
 
     private async Task<DownloadResult>
         DownloadToFileAsync(
+            string providerId,
             Uri initialUri,
             string temporaryPath,
             CancellationToken cancellationToken)
@@ -370,6 +372,7 @@ public sealed class SecureGifDownloader :
         {
             await _hostPolicy
                 .ValidateAsync(
+                    providerId,
                     currentUri,
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -639,7 +642,7 @@ public sealed class SecureGifDownloader :
             HttpStatusCode.PermanentRedirect;
     }
 
-    private static string CreateStableFileName(
+    private static string CreateUniqueLibraryFileName(
         GifIdentity identity)
     {
         byte[] identityBytes =
@@ -653,6 +656,8 @@ public sealed class SecureGifDownloader :
         return Convert.ToHexString(
                 identityHash)
             .ToLowerInvariant() +
+            "-" +
+            Guid.NewGuid().ToString("N") +
             ".gif";
     }
 

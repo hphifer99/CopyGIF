@@ -917,6 +917,7 @@ public sealed class UpdateViewModel :
                 {
                     CoreInstallChannel.DevelopmentPackage => "This is a development package. Install a newer build from Visual Studio.",
                     CoreInstallChannel.SideloadedPackage => "This package was installed outside Microsoft Store. Install a newer package from its original source.",
+                    CoreInstallChannel.UnsignedMsi => "This GitHub MSI is intentionally unsigned and does not install updates automatically. Verify the published SHA-256 hash and install a newer GitHub release manually, or use Microsoft Store for signed managed updates.",
                     _ => "This unpackaged copy has no MSI installation. Use release history to get a newer version."
                 });
                 break;

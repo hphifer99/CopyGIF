@@ -123,20 +123,16 @@
                                 Style="{StaticResource CopyGifSectionTitleTextStyle}"
                                 Text="Activation" />
 
-                            <TextBox
+                            <controls:HotkeyRecorder
                                 AutomationProperties.Name="Global hotkey"
-
-                                PlaceholderText="Alt+G"
                                 Text="{Binding Hotkey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                                <TextBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Global hotkey" /><controls:InfoButton Subject="Global hotkey" Text="Opens GIF search from any app. An unavailable shortcut is reported." /></StackPanel></TextBox.Header>
-                            </TextBox>
+                                <controls:HotkeyRecorder.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Global hotkey" /><controls:InfoButton Subject="Global hotkey" Text="Press the shortcut you want to use. Escape cancels recording. Backspace or Delete clears it. An unavailable shortcut is reported when you apply settings." /></StackPanel></controls:HotkeyRecorder.Header>
+                            </controls:HotkeyRecorder>
 
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Start with Windows" /><controls:InfoButton Subject="Start with Windows" Text="Starts CopyGIF in the tray at sign-in. Windows Startup apps can also disable it." /></StackPanel>
                             <ToggleSwitch
                                 AutomationProperties.Name="Start CopyGIF with Windows"
-
-                                IsOn="{Binding StartWithWindows, Mode=TwoWay}">
-                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Start with Windows" /><controls:InfoButton Subject="Start with Windows" Text="Starts CopyGIF in the tray at sign-in. Windows Startup apps can also disable it." /></StackPanel></ToggleSwitch.Header>
-                            </ToggleSwitch>
+                                IsOn="{Binding StartWithWindows, Mode=TwoWay}" />
 
                         </StackPanel>
 
@@ -151,28 +147,20 @@
                                 Style="{StaticResource CopyGifSectionTitleTextStyle}"
                                 Text="Window behavior" />
 
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Hide when CopyGIF loses focus" /><controls:InfoButton Subject="Hide when CopyGIF loses focus" Text="Hides the app when another app gets focus. Your Settings draft is kept." /></StackPanel>
                             <ToggleSwitch
                                 AutomationProperties.Name="Hide when CopyGIF loses focus"
+                                IsOn="{Binding CloseWhenFocusLost, Mode=TwoWay}" />
 
-                                IsOn="{Binding CloseWhenFocusLost, Mode=TwoWay}">
-                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Hide when CopyGIF loses focus" /><controls:InfoButton Subject="Hide when CopyGIF loses focus" Text="Hides the picker when another app gets focus. Your Settings draft is kept." /></StackPanel></ToggleSwitch.Header>
-                            </ToggleSwitch>
-
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Hide after copy" /><controls:InfoButton Subject="Hide after copy" Text="Hides the app after a successful clipboard copy." /></StackPanel>
                             <ToggleSwitch
                                 AutomationProperties.Name="Hide CopyGIF after copying a GIF"
+                                IsOn="{Binding HideAfterCopy, Mode=TwoWay}" />
 
-                                IsOn="{Binding HideAfterCopy, Mode=TwoWay}">
-                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Hide after copy" /><controls:InfoButton Subject="Hide after copy" Text="Hides the picker after a successful clipboard copy." /></StackPanel></ToggleSwitch.Header>
-                            </ToggleSwitch>
-
-                            <ToggleSwitch
-                                AutomationProperties.Name="Close to system tray" IsOn="{Binding CloseToTray, Mode=TwoWay}">
-                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Close to system tray" /><controls:InfoButton Subject="Close to system tray" Text="Closing the picker keeps CopyGIF in the tray. Tray Exit quits the app." /></StackPanel></ToggleSwitch.Header>
-                            </ToggleSwitch>
-                            <ToggleSwitch
-                                AutomationProperties.Name="Center window when opened from tray" IsOn="{Binding CenterOnTrayOpen, Mode=TwoWay}">
-                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Center window when opened from tray" /><controls:InfoButton Subject="Center window when opened from tray" Text="Tray Open centers the picker on that screen." /></StackPanel></ToggleSwitch.Header>
-                            </ToggleSwitch>
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Close to system tray" /><controls:InfoButton Subject="Close to system tray" Text="Closing the app keeps CopyGIF in the tray. Tray Exit quits the app." /></StackPanel>
+                            <ToggleSwitch AutomationProperties.Name="Close to system tray" IsOn="{Binding CloseToTray, Mode=TwoWay}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Center window when opened from tray" /><controls:InfoButton Subject="Center window when opened from tray" Text="Tray Open centers the app on that screen." /></StackPanel>
+                            <ToggleSwitch AutomationProperties.Name="Center window when opened from tray" IsOn="{Binding CenterOnTrayOpen, Mode=TwoWay}" />
 
                             <ComboBox
                                 AutomationProperties.Name="Window placement mode"
@@ -183,12 +171,10 @@
                                 <ComboBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Window placement" /><controls:InfoButton Subject="Window placement" Text="Choose near the pointer, screen center, or the last position." /></StackPanel></ComboBox.Header>
                             </ComboBox>
 
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Remember window size" /><controls:InfoButton Subject="Remember window size" Text="Restores the last app width and height." /></StackPanel>
                             <ToggleSwitch
                                 AutomationProperties.Name="Remember window size"
-
-                                IsOn="{Binding RememberWindowSize, Mode=TwoWay}">
-                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Remember window size" /><controls:InfoButton Subject="Remember window size" Text="Restores the last picker width and height." /></StackPanel></ToggleSwitch.Header>
-                            </ToggleSwitch>
+                                IsOn="{Binding RememberWindowSize, Mode=TwoWay}" />
 
                         </StackPanel>
 
@@ -244,26 +230,20 @@
                                 <NumberBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Search delay after typing (ms)" /><controls:InfoButton Subject="Search delay after typing (ms)" Text="Waits after typing stops. Enter starts immediately." /></StackPanel></NumberBox.Header>
                             </NumberBox>
 
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Animate previews" /><controls:InfoButton Subject="Animate previews" Text="GIFs animate on hover when Windows permits animation." /></StackPanel>
                             <ToggleSwitch
                                 AutomationProperties.Name="Animate GIF previews"
+                                IsOn="{Binding AnimatePreviews, Mode=TwoWay}" />
 
-                                IsOn="{Binding AnimatePreviews, Mode=TwoWay}">
-                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Animate previews" /><controls:InfoButton Subject="Animate previews" Text="GIFs animate on hover when Windows permits animation." /></StackPanel></ToggleSwitch.Header>
-                            </ToggleSwitch>
-
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Automatically load more results" /><controls:InfoButton Subject="Automatically load more results" Text="Scrolling to the bottom can request another page." /></StackPanel>
                             <ToggleSwitch
                                 AutomationProperties.Name="Automatically load more GIF results"
+                                IsOn="{Binding AutoLoadMoreResults, Mode=TwoWay}" />
 
-                                IsOn="{Binding AutoLoadMoreResults, Mode=TwoWay}">
-                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Automatically load more results" /><controls:InfoButton Subject="Automatically load more results" Text="Scrolling to the bottom can request another page." /></StackPanel></ToggleSwitch.Header>
-                            </ToggleSwitch>
-
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Show Trending GIFs when search is empty" /><controls:InfoButton Subject="Show Trending GIFs when search is empty" Text="Shows trending GIFs when you clear the search." /></StackPanel>
                             <ToggleSwitch
                                 AutomationProperties.Name="Show Trending GIFs when search is empty"
-
-                                IsOn="{Binding ShowTrendingWhenEmpty, Mode=TwoWay}">
-                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Show Trending GIFs when search is empty" /><controls:InfoButton Subject="Show Trending GIFs when search is empty" Text="Shows trending GIFs when you clear the search." /></StackPanel></ToggleSwitch.Header>
-                            </ToggleSwitch>
+                                IsOn="{Binding ShowTrendingWhenEmpty, Mode=TwoWay}" />
 
                         </StackPanel>
 
@@ -278,19 +258,15 @@
                                 Style="{StaticResource CopyGifSectionTitleTextStyle}"
                                 Text="History and suggestions" />
 
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Save search history" /><controls:InfoButton Subject="Save search history" Text="Remembers submitted terms on this PC. Disabling it keeps existing terms." /></StackPanel>
                             <ToggleSwitch
                                 AutomationProperties.Name="Save search history"
+                                IsOn="{Binding SaveSearchHistory, Mode=TwoWay}" />
 
-                                IsOn="{Binding SaveSearchHistory, Mode=TwoWay}">
-                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Save search history" /><controls:InfoButton Subject="Save search history" Text="Remembers submitted terms on this PC. Disabling it keeps existing terms." /></StackPanel></ToggleSwitch.Header>
-                            </ToggleSwitch>
-
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Use history for suggestions" /><controls:InfoButton Subject="Use history for suggestions" Text="Offers matching saved terms as you type." /></StackPanel>
                             <ToggleSwitch
                                 AutomationProperties.Name="Use search history for suggestions"
-
-                                IsOn="{Binding UseHistorySuggestions, Mode=TwoWay}">
-                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Use history for suggestions" /><controls:InfoButton Subject="Use history for suggestions" Text="Offers matching saved terms as you type." /></StackPanel></ToggleSwitch.Header>
-                            </ToggleSwitch>
+                                IsOn="{Binding UseHistorySuggestions, Mode=TwoWay}" />
 
                             <NumberBox
                                 AutomationProperties.Name="Search history limit"
@@ -406,19 +382,15 @@
                                 <NumberBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Favorite GIF limit" /><controls:InfoButton Subject="Favorite GIF limit" Text="Maximum Favorites. Lowering it keeps existing entries." /></StackPanel></NumberBox.Header>
                             </NumberBox>
 
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Store Favorites locally" /><controls:InfoButton Subject="Store Favorites locally" Text="Saves new Favorites as files for either provider." /></StackPanel>
                             <ToggleSwitch
                                 AutomationProperties.Name="Store Favorite GIFs locally"
+                                IsOn="{Binding StoreFavoritesLocally, Mode=TwoWay}" />
 
-                                IsOn="{Binding StoreFavoritesLocally, Mode=TwoWay}">
-                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Store Favorites locally" /><controls:InfoButton Subject="Store Favorites locally" Text="Saves new Favorites as files for either provider." /></StackPanel></ToggleSwitch.Header>
-                            </ToggleSwitch>
-
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Store Recents locally" /><controls:InfoButton Subject="Store Recents locally" Text="Saves new Recents as files. Clipboard files are separate." /></StackPanel>
                             <ToggleSwitch
                                 AutomationProperties.Name="Store Recent GIFs locally"
-
-                                IsOn="{Binding StoreRecentsLocally, Mode=TwoWay}">
-                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Store Recents locally" /><controls:InfoButton Subject="Store Recents locally" Text="Saves new Recents as files. Clipboard files are separate." /></StackPanel></ToggleSwitch.Header>
-                            </ToggleSwitch>
+                                IsOn="{Binding StoreRecentsLocally, Mode=TwoWay}" />
 
                         </StackPanel>
 
@@ -566,32 +538,28 @@
                                 Style="{StaticResource CopyGifSectionTitleTextStyle}"
                                 Text="Update preferences" />
 
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Check automatically for updates" /><controls:InfoButton Subject="Check automatically for updates" Text="Checks while CopyGIF runs. Check now is always available." /></StackPanel>
                             <ToggleSwitch
                                 AutomationProperties.Name="Check for CopyGIF updates"
+                                IsOn="{Binding Settings.CheckForUpdates, Mode=TwoWay}" />
 
-                                IsOn="{Binding Settings.CheckForUpdates, Mode=TwoWay}">
-                                <ToggleSwitch.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Check automatically for updates" /><controls:InfoButton Subject="Check automatically for updates" Text="Checks while CopyGIF runs. Check now is always available." /></StackPanel></ToggleSwitch.Header>
-                            </ToggleSwitch>
-
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Check frequency" /><controls:InfoButton Subject="Check frequency" Text="How often an automatic check becomes due." /></StackPanel>
                             <ComboBox
                                 AutomationProperties.Name="Update check frequency"
 
                                 IsEnabled="{Binding Settings.CheckForUpdates}"
                                 ItemsSource="{Binding Settings.CheckFrequencies}"
                                 ItemTemplate="{StaticResource SettingChoiceTemplate}"
-                                SelectedItem="{Binding Settings.CheckFrequency, Mode=TwoWay}">
-                                <ComboBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Check frequency" /><controls:InfoButton Subject="Check frequency" Text="How often an automatic check becomes due." /></StackPanel></ComboBox.Header>
-                            </ComboBox>
+                                SelectedItem="{Binding Settings.CheckFrequency, Mode=TwoWay}" />
 
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Update mode" /><controls:InfoButton Subject="Update mode" Text="Choose notifications, download and prompt, or automatic install for supported MSI installations." /></StackPanel>
                             <ComboBox
                                 AutomationProperties.Name="Update installation mode"
 
                                 IsEnabled="{Binding Settings.CheckForUpdates}"
                                 ItemsSource="{Binding Settings.Modes}"
                                 ItemTemplate="{StaticResource SettingChoiceTemplate}"
-                                SelectedItem="{Binding Settings.Mode, Mode=TwoWay}">
-                                <ComboBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Update mode" /><controls:InfoButton Subject="Update mode" Text="Choose notifications, download and prompt, or automatic install for supported MSI installations." /></StackPanel></ComboBox.Header>
-                            </ComboBox>
+                                SelectedItem="{Binding Settings.Mode, Mode=TwoWay}" />
 
                         </StackPanel>
 

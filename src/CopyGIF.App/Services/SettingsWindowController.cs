@@ -3,21 +3,36 @@ using CommunityToolkit.Mvvm.Input;
 using CopyGIF.App.Composition;
 using CopyGIF.App.Views;
 using CopyGIF.Application.Settings;
+using CopyGIF.Core.Models;
+using CopyGIF.Core.Policies;
 using CopyGIF.Core.Settings;
 using CopyGIF.Platform.Windows.Shell;
 using CopyGIF.Presentation.Settings;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.System;
+using Windows.UI.ViewManagement;
 
 namespace CopyGIF.App.Services;
 
 /// <summary>Owns a draft for the lifetime of one Settings window, including while hidden.</summary>
 internal sealed class SettingsWindowController : IDisposable
 {
+    private const string AnimationNoticeMarkerFileName =
+        "animation-effects-notice-v1.flag";
+
+    private static readonly Uri AnimationSettingsUri =
+        new("ms-settings:easeofaccess-visualeffects");
+
     private readonly SettingsWindow _window;
     private readonly SettingsViewModel _model;
     private readonly SettingsEditSession _session;
     private readonly ProviderKeysViewModel _keys;
     private readonly ShellRuntimeState _runtime;
+    private readonly UISettings _uiSettings =
+        new();
+    private readonly string _animationNoticeMarkerPath;
+    private bool _animationNoticeShownThisSession;
     private bool _loading = true;
     private bool _disposed;
     private bool _dialogOpen;
@@ -28,6 +43,14 @@ internal sealed class SettingsWindowController : IDisposable
         SettingsEditSession session, ShellRuntimeState runtime)
     {
         _window = window; _model = model; _session = session; _runtime = runtime;
+
+        _animationNoticeMarkerPath =
+            Path.Combine(
+                Environment.GetFolderPath(
+                    Environment.SpecialFolder.LocalApplicationData),
+                StoragePolicy.LibraryRootDirectoryName,
+                AnimationNoticeMarkerFileName);
+
         _keys = new ProviderKeysViewModel(session);
         window.ApiContent = _keys;
         window.SaveCommand = new AsyncRelayCommand(async () => { await ApplyAsync(); });
@@ -44,12 +67,18 @@ internal sealed class SettingsWindowController : IDisposable
             finally { _dialogOpen = false; }
         };
         model.Library.OpenFolder = path => Task.FromResult(ShellFolderLauncher.TryOpen(path));
+        model.Search.OpenAnimationSettings = OpenAnimationSettingsAsync;
+        window.Activated += HandleWindowActivated;
+        RefreshSystemAnimationState();
         foreach (INotifyPropertyChanged section in Sections()) section.PropertyChanged += Changed;
         session.Changed += SessionChanged;
     }
 
     public async Task LoadAsync()
     {
+        bool loadedSuccessfully =
+            false;
+
         _window.IsBusy = true;
         try
         {
@@ -58,9 +87,11 @@ internal sealed class SettingsWindowController : IDisposable
             if (!_model.IsLoaded || _model.HasSectionErrors)
                 throw new CopyGIF.Core.Models.UserFacingException("Settings could not be loaded. Close and reopen Settings to retry.");
             await _keys.RefreshAsync();
+            RefreshSystemAnimationState();
             _loading = false;
             CaptureDraft();
             _window.StatusMessage = string.Empty;
+            loadedSuccessfully = true;
         }
         catch (Exception exception)
         {
@@ -70,6 +101,11 @@ internal sealed class SettingsWindowController : IDisposable
             _window.StatusSeverity = InfoBarSeverity.Error;
         }
         finally { _window.IsBusy = false; }
+
+        if (loadedSuccessfully)
+        {
+            await ShowAnimationEffectsNoticeIfNeededAsync();
+        }
     }
 
     private IEnumerable<INotifyPropertyChanged> Sections() =>
@@ -86,6 +122,176 @@ internal sealed class SettingsWindowController : IDisposable
 
     private void SessionChanged(object? sender, EventArgs args) =>
         _window.HasUnsavedChanges = _session.HasChanges;
+
+    private void HandleWindowActivated(
+        object sender,
+        WindowActivatedEventArgs args)
+    {
+        _ = sender;
+        _ = args;
+
+        RefreshSystemAnimationState();
+    }
+
+    private void RefreshSystemAnimationState()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _model.Search.SystemAnimationsEnabled =
+            _uiSettings.AnimationsEnabled;
+    }
+
+    private async Task ShowAnimationEffectsNoticeIfNeededAsync()
+    {
+        if (_disposed ||
+            _loading ||
+            _dialogOpen ||
+            !_model.Search.AnimatePreviews ||
+            _uiSettings.AnimationsEnabled ||
+            _animationNoticeShownThisSession ||
+            HasAnimationNoticeBeenShown() ||
+            _window.RootElement.XamlRoot is null)
+        {
+            return;
+        }
+
+        _dialogOpen =
+            true;
+
+        try
+        {
+            // Recheck immediately before displaying in case Windows changed
+            // the setting while the Settings window was loading.
+            RefreshSystemAnimationState();
+
+            if (_model.Search.SystemAnimationsEnabled)
+            {
+                return;
+            }
+
+            ContentDialog dialog =
+                new()
+                {
+                    XamlRoot =
+                        _window.RootElement.XamlRoot,
+
+                    RequestedTheme =
+                        _window.RootElement.ActualTheme,
+
+                    Title =
+                        "Windows Animation effects are disabled",
+
+                    Content =
+                        "GIF previews cannot animate while Windows Animation effects " +
+                        "is turned off. CopyGIF will leave Animate previews unavailable " +
+                        "until you enable Animation effects under Windows Settings > " +
+                        "Accessibility > Visual effects.",
+
+                    PrimaryButtonText =
+                        "Open Windows Settings",
+
+                    CloseButtonText =
+                        "Continue",
+
+                    DefaultButton =
+                        ContentDialogButton.Primary
+                };
+
+            ContentDialogResult result =
+                await dialog.ShowAsync();
+
+            _animationNoticeShownThisSession =
+                true;
+
+            MarkAnimationNoticeAsShown();
+
+            if (result ==
+                ContentDialogResult.Primary)
+            {
+                await OpenAnimationSettingsAsync();
+            }
+        }
+        catch (Exception exception)
+        {
+            RepairDiagnostics.Record(
+                "animation-effects-notice",
+                "settings",
+                exception.GetType().Name);
+        }
+        finally
+        {
+            _dialogOpen =
+                false;
+
+            RefreshSystemAnimationState();
+        }
+    }
+
+    private bool HasAnimationNoticeBeenShown()
+    {
+        try
+        {
+            return File.Exists(
+                _animationNoticeMarkerPath);
+        }
+        catch (Exception exception)
+        {
+            RepairDiagnostics.Record(
+                "animation-effects-marker-read",
+                "settings",
+                exception.GetType().Name);
+
+            return false;
+        }
+    }
+
+    private void MarkAnimationNoticeAsShown()
+    {
+        try
+        {
+            string? directory =
+                Path.GetDirectoryName(
+                    _animationNoticeMarkerPath);
+
+            if (!string.IsNullOrWhiteSpace(
+                    directory))
+            {
+                Directory.CreateDirectory(
+                    directory);
+            }
+
+            File.WriteAllText(
+                _animationNoticeMarkerPath,
+                "CopyGIF Windows Animation effects notice shown.");
+        }
+        catch (Exception exception)
+        {
+            // The notice is still session-scoped if persistence fails.
+            RepairDiagnostics.Record(
+                "animation-effects-marker-write",
+                "settings",
+                exception.GetType().Name);
+        }
+    }
+
+    private async Task OpenAnimationSettingsAsync()
+    {
+        try
+        {
+            await Launcher.LaunchUriAsync(
+                AnimationSettingsUri);
+        }
+        catch (Exception exception)
+        {
+            RepairDiagnostics.Record(
+                "animation-effects-settings",
+                "settings",
+                exception.GetType().Name);
+        }
+    }
 
     private void CaptureDraft()
     {
@@ -182,6 +388,8 @@ internal sealed class SettingsWindowController : IDisposable
         CancelSuccessStatus();
         foreach (INotifyPropertyChanged section in Sections()) section.PropertyChanged -= Changed;
         _session.Changed -= SessionChanged;
+        _window.Activated -= HandleWindowActivated;
+        _model.Search.OpenAnimationSettings = null;
         _session.Close();
         _model.Library.PickFolder = null;
         _model.Library.OpenFolder = null;

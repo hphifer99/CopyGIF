@@ -25,6 +25,11 @@ public sealed class SearchSettingsViewModel :
     private bool _animatePreviews =
         true;
 
+    private bool _systemAnimationsEnabled =
+        true;
+
+    private Func<Task>? _openAnimationSettings;
+
     private bool _autoLoadMoreResults;
 
     private bool _showTrendingWhenEmpty =
@@ -80,6 +85,10 @@ public sealed class SearchSettingsViewModel :
             new RelayCommand(
                 CancelOperation,
                 CanCancel);
+
+        OpenAnimationSettingsCommand =
+            new AsyncRelayCommand(
+                OpenAnimationSettingsAsync);
     }
 
     public IAsyncRelayCommand LoadCommand
@@ -89,6 +98,9 @@ public sealed class SearchSettingsViewModel :
     { get; }
 
     public IRelayCommand CancelCommand
+    { get; }
+
+    public IAsyncRelayCommand OpenAnimationSettingsCommand
     { get; }
 
     public int MinimumResultsPerSearch
@@ -159,6 +171,37 @@ public sealed class SearchSettingsViewModel :
             SetProperty(
                 ref _animatePreviews,
                 value);
+    }
+
+    public bool SystemAnimationsEnabled
+    {
+        get =>
+            _systemAnimationsEnabled;
+
+        set
+        {
+            if (SetProperty(
+                    ref _systemAnimationsEnabled,
+                    value))
+            {
+                OnPropertyChanged(
+                    nameof(
+                        AnimationsBlockedByWindows));
+            }
+        }
+    }
+
+    public bool AnimationsBlockedByWindows =>
+        !SystemAnimationsEnabled;
+
+    public Func<Task>? OpenAnimationSettings
+    {
+        get =>
+            _openAnimationSettings;
+
+        set =>
+            _openAnimationSettings =
+                value;
     }
 
     public bool AutoLoadMoreResults
@@ -591,6 +634,12 @@ public sealed class SearchSettingsViewModel :
         cancellation.Dispose();
 
         NotifyCommandStates();
+    }
+
+    private Task OpenAnimationSettingsAsync()
+    {
+        return OpenAnimationSettings?.Invoke() ??
+            Task.CompletedTask;
     }
 
     private void CancelOperation()

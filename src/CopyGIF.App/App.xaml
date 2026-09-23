@@ -230,10 +230,26 @@
                                 <NumberBox.Header><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Search delay after typing (ms)" /><controls:InfoButton Subject="Search delay after typing (ms)" Text="Waits after typing stops. Enter starts immediately." /></StackPanel></NumberBox.Header>
                             </NumberBox>
 
-                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Animate previews" /><controls:InfoButton Subject="Animate previews" Text="GIFs animate on hover when Windows permits animation." /></StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Animate previews" /><controls:InfoButton Subject="Animate previews" Text="GIFs animate when you hover over them. Windows Animation effects must also be enabled under Settings > Accessibility > Visual effects." /></StackPanel>
                             <ToggleSwitch
                                 AutomationProperties.Name="Animate GIF previews"
+                                IsEnabled="{Binding SystemAnimationsEnabled}"
                                 IsOn="{Binding AnimatePreviews, Mode=TwoWay}" />
+
+                            <InfoBar
+                                AutomationProperties.Name="Windows animation effects warning"
+                                IsClosable="False"
+                                IsOpen="{Binding AnimationsBlockedByWindows}"
+                                Message="GIF previews cannot animate until Animation effects is enabled in Windows Settings."
+                                Severity="Warning"
+                                Title="Windows Animation effects are disabled">
+                                <InfoBar.ActionButton>
+                                    <Button
+                                        AutomationProperties.Name="Open Windows Animation effects settings"
+                                        Command="{Binding OpenAnimationSettingsCommand}"
+                                        Content="Open Windows Settings" />
+                                </InfoBar.ActionButton>
+                            </InfoBar>
 
                             <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Automatically load more results" /><controls:InfoButton Subject="Automatically load more results" Text="Scrolling to the bottom can request another page." /></StackPanel>
                             <ToggleSwitch

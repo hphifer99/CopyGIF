@@ -293,6 +293,58 @@ public sealed class SearchSettingsViewModelTests
             coordinator.LastSaveRequest?.Hotkey);
     }
 
+    [TestMethod]
+    public void SystemAnimationsEnabled_ControlsBlockedState()
+    {
+        SearchSettingsViewModel viewModel =
+            new(
+                new FakeSettingsCoordinator(
+                    new AppSettings()));
+
+        Assert.IsTrue(
+            viewModel.SystemAnimationsEnabled);
+
+        Assert.IsFalse(
+            viewModel.AnimationsBlockedByWindows);
+
+        viewModel.SystemAnimationsEnabled =
+            false;
+
+        Assert.IsFalse(
+            viewModel.SystemAnimationsEnabled);
+
+        Assert.IsTrue(
+            viewModel.AnimationsBlockedByWindows);
+    }
+
+    [TestMethod]
+    public async Task OpenAnimationSettingsCommand_InvokesConfiguredLauncher()
+    {
+        SearchSettingsViewModel viewModel =
+            new(
+                new FakeSettingsCoordinator(
+                    new AppSettings()));
+
+        bool invoked =
+            false;
+
+        viewModel.OpenAnimationSettings =
+            () =>
+            {
+                invoked =
+                    true;
+
+                return Task.CompletedTask;
+            };
+
+        await viewModel
+            .OpenAnimationSettingsCommand
+            .ExecuteAsync(null);
+
+        Assert.IsTrue(
+            invoked);
+    }
+
     private sealed class FakeSettingsCoordinator :
         ISettingsCoordinator
     {
